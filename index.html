@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Raffaele P. — ML Projects</title>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --card: #1a1d24;
+      --text: #e6e8eb;
+      --muted: #9aa0a8;
+      --accent: #5b9dff;
+      --border: #2a2e37;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      padding: 4rem 1.5rem;
+    }
+    .container { max-width: 880px; margin: 0 auto; }
+    header { margin-bottom: 3.5rem; }
+    h1 { font-size: 2.2rem; font-weight: 600; letter-spacing: -0.02em; }
+    .subtitle { color: var(--muted); font-size: 1.1rem; margin-top: 0.5rem; }
+    .links { margin-top: 1.2rem; display: flex; gap: 1.2rem; }
+    .links a { color: var(--accent); text-decoration: none; font-size: 0.95rem; }
+    .links a:hover { text-decoration: underline; }
+
+    section h2 {
+      font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em;
+      color: var(--muted); margin: 2.5rem 0 1.2rem;
+    }
+
+    .grid { display: grid; gap: 1.2rem; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.4rem;
+      text-decoration: none;
+      color: inherit;
+      transition: border-color 0.15s, transform 0.15s;
+      display: block;
+    }
+    .card:hover { border-color: var(--accent); transform: translateY(-2px); }
+    .card h3 { font-size: 1.05rem; font-weight: 600; margin-bottom: 0.4rem; }
+    .card p { color: var(--muted); font-size: 0.9rem; }
+    .tags { margin-top: 0.9rem; display: flex; flex-wrap: wrap; gap: 0.4rem; }
+    .tag {
+      font-size: 0.72rem; color: var(--accent);
+      background: rgba(91,157,255,0.1); padding: 0.2rem 0.55rem; border-radius: 6px;
+    }
+
+    .embed-wrap {
+      border: 1px solid var(--border); border-radius: 12px;
+      overflow: hidden; background: var(--card);
+    }
+    .embed-wrap iframe { width: 100%; height: 640px; border: none; display: block; }
+
+    footer { margin-top: 4rem; color: var(--muted); font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Raffaele P.</h1>
+      <p class="subtitle">Applied ML · domain-driven AI systems</p>
+      <div class="links">
+        <a href="https://github.com/YOUR_USERNAME">GitHub</a>
+        <a href="https://linkedin.com/in/YOUR_HANDLE">LinkedIn</a>
+        <a href="mailto:you@example.com">Email</a>
+      </div>
+    </header>
+
+    <!-- FLAGSHIP: embedded -->
+    <section>
+      <h2>Featured</h2>
+      <div class="embed-wrap">
+        <iframe
+          src="https://YOUR_USERNAME-FLAGSHIP-SPACE.hf.space"
+          loading="lazy"
+          title="Flagship demo"></iframe>
+      </div>
+    </section>
+
+    <!-- REST: linked cards -->
+    <section>
+      <h2>Projects</h2>
+      <div class="grid">
+
+        <a class="card" href="https://YOUR_USERNAME-bear-detector.hf.space" target="_blank" rel="noopener">
+          <h3>Bear Classifier</h3>
+          <p>Image classification fine-tuned with fastai. Upload a photo, get a species prediction with confidence scores.</p>
+          <div class="tags">
+            <span class="tag">fastai</span>
+            <span class="tag">Gradio</span>
+            <span class="tag">vision</span>
+          </div>
+        </a>
+
+        <a class="card" href="https://github.com/YOUR_USERNAME/PROJECT" target="_blank" rel="noopener">
+          <h3>Another Project</h3>
+          <p>One-sentence description of what it does and the interesting technical decision behind it.</p>
+          <div class="tags">
+            <span class="tag">FastAPI</span>
+            <span class="tag">RAG</span>
+          </div>
+        </a>
+
+      </div>
+    </section>
+
+    <footer>
+      Built with static HTML · hosted on GitHub Pages
+    </footer>
+  </div>
+</body>
+</html>
