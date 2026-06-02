@@ -1,0 +1,7 @@
+title: Raffaele P. — ML Projects
+description: Applied ML · domain-driven AI systems
+markdown: kramdown
+kramdown:
+  syntax_highlighter: rouge
+# index.html has no front matter, so Jekyll copies it through untouched —
+# the landing page is unchanged. Articles under writing/ use _layouts/article.html.
