@@ -19,23 +19,21 @@ bears — and deployed it on a Hugging Face Space with Gradio.
 Then I fed it a photo of a human. It said something like **"grizzly, 70%
 confident"**.
 
-That's the whole problem in one screenshot. The model reduces the universe of
-all possible images to exactly three species of bear. It is *structurally
+That's the whole problem. The model reduces the universe (of
+all possible images) to exactly three species of bear. It is *structurally
 incapable* of saying "none of these". Show it a cat, a car, a coffee mug — it
-will still pick a bear, often loudly. A silent, irritatingly confident failure
+will still pick a bear. A silent, irritatingly confident failure
 the moment it sees out-of-distribution (OOD) data.
 
-A classifier that can't abstain isn't wrong by accident here — it's wrong by
-construction. So I wanted to see how far I could push it toward "I don't know"
+So I wanted to see how far I could push it toward "I don't know"
 *without retraining the model*, using only the signals already hiding in its
 outputs.
 
-## Problem 1: raw softmax isn't a probability, it's a normalization
+## Raw softmax isn't a probability, it's a normalization
 
 The softmax takes the three logits the network produces, applies `exp`, and
 divides by their sum. That makes them sum to 1 and *look* like they came out of
-a probability distribution. They don't — it's a normalization, not a calibrated
-belief about the world.
+a probability distribution. They don't — it's just a normalization.
 
 Still, the **maximum softmax probability (MSP)** isn't useless as a signal.
 Hendrycks & Gimpel (2017), *A Baseline for Detecting Misclassified and
@@ -77,7 +75,7 @@ energy = -logsumexp(logits)
 Low energy means the model is confident the input is in-distribution; high
 energy means it isn't. Unlike the softmax, it doesn't get normalized into a
 bounded range, so it keeps more of the signal. The paper benchmarks energy
-against MSP and generally wins — so I ran both, head to head, on my own model.
+against MSP and generally wins — so I ran both, on my own model.
 
 ## The experiment
 
@@ -97,7 +95,7 @@ no train/serve skew. The full harness is
   - **near-OOD** — [Oxford-IIIT Pet](https://www.robots.ox.ac.uk/~vgg/data/pets/):
     37 cat and dog breeds. Furry quadruped mammals, visually adjacent to bears
     but — crucially — containing **no bears** (so real bears can't leak in and
-    corrupt the metric). This is the failure mode that actually matters.
+    corrupt the metric).
 
 First, what the two signals look like on real bears:
 
@@ -106,9 +104,26 @@ First, what the two signals look like on real bears:
 | energy | -5.58 | -3.49 | -1.57 |
 | MSP    | 0.536 | **0.952** | 0.9997 |
 
-That MSP mean of **0.95** is the calibration problem made concrete: on
-held-out bears the network is already screaming 95% confidence on average. An
-overconfident model leaves the OOD detector very little daylight to work with.
+That MSP mean of **0.95** is a concrete example of the calibration problem: on
+held-out bears, the network already outputs 95% confidence on average. An
+overconfident model leaves the OOD detector very little room to work with.
+
+For further clarification:
+* When a cat comes in and scores, say, 0.85, that's inside the bears' own range 
+— there's no clean threshold that keeps the bears in and the cat out. 
+The detector is trying to separate two groups that overlap heavily near the top.
+
+* The confidence is systematically too high for what the model actually knows. 
+The number isn't reporting genuine certainty; it's the network's habitual overconfidence. 
+Modern nets do this (Guo et al.), and a 3-class softmax with a small training set does it especially hard.
+
+* The whole premise of MSP-based detection is that OOD inputs get lower confidence than in-distribution ones. 
+But if in-distribution bears are pinned at 0.95+, the model has already spent its confidence — there's 
+no headroom for OOD inputs to look distinctively less confident, because everything looks confident.
+
+* Energy doesn't have this ceiling. It runs −5.58 to −1.57, unbounded by construction, so in principle 
+it has more dynamic range for OOD inputs to separate out. That's the theoretical reason to prefer 
+it — and exactly the expectation the near-OOD result below then violates.
 
 Calibrated thresholds at TPR 95:
 
@@ -139,9 +154,10 @@ about most.
 
 That's the opposite of the textbook takeaway. Energy being superior on the
 standard benchmarks (big models, ImageNet-scale) does **not** transfer to a
-tiny 3-class head fine-tuned on a few hundred bears. The honest conclusion isn't
-"use energy" — it's that **no post-hoc scalar squeezed out of these logits
-reliably separates near-OOD on this model.**
+tiny 3-class head fine-tuned on a few hundred bears. The honest conclusion 
+isn't "use energy instead of MSP." Both are scalars computed from the same three logits, 
+and on near-OOD inputs those logits are already fooled — no formula over them can recover 
+a distinction the model never learned. The fix has to come from more information, not a better scalar.
 
 ## Looking at the failures
 
@@ -178,10 +194,7 @@ signal:
 
 Even if I get aggressive and reject **one real bear in five** (TPR 0.80), ~9%
 of pets still leak. There's no setting on this dial that makes the near-OOD
-problem go away. (Side note: the value originally hard-coded in the serving
-code was `-5.0`, which — since almost every real bear scores above that —
-would have flagged nearly *every* genuine bear as OOD. Calibrating against real
-data mattered.)
+problem go away.
 
 > Try it live: the [Hugging Face Space](https://rfflpllcn-bear-detector.hf.space)
 > exposes this exact trade-off — drag the TPR slider and watch the threshold,
@@ -194,8 +207,7 @@ data mattered.)
 - You *can* recover a usable OOD signal post-hoc from the logits, and it's free.
 - On **far-OOD** it works fine; **energy > MSP**, as advertised.
 - On **near-OOD** — the case that matters — it's weak, and on this small model
-  **MSP > energy**, contradicting the standard result. Generic benchmark
-  rankings don't automatically hold on your model.
+  **MSP > energy**, contradicting the standard result. 
 
 The fix isn't a better scalar; it's more information. The natural next steps:
 
