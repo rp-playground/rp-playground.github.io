@@ -60,6 +60,22 @@
     }
     .embed-wrap iframe { width: 100%; height: 640px; border: none; display: block; }
 
+    /* Featured: demo + its companion write-up as one coupled unit */
+    .companion {
+      display: block; text-decoration: none; color: inherit;
+      border-top: 1px solid var(--border);
+      padding: 1.2rem 1.4rem;
+      transition: background 0.15s;
+    }
+    .companion:hover { background: rgba(91,157,255,0.06); }
+    .companion .eyebrow {
+      font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em;
+      color: var(--accent); margin-bottom: 0.35rem;
+    }
+    .companion h3 { font-size: 1.05rem; font-weight: 600; margin-bottom: 0.3rem; }
+    .companion p { color: var(--muted); font-size: 0.9rem; }
+    .companion .tags { margin-top: 0.9rem; display: flex; flex-wrap: wrap; gap: 0.4rem; }
+
     footer { margin-top: 4rem; color: var(--muted); font-size: 0.85rem; }
   </style>
 </head>
@@ -75,7 +91,7 @@
       </div>
     </header>
 
-    <!-- FLAGSHIP: embedded -->
+    <!-- FLAGSHIP: live demo + its companion write-up, as one unit -->
     <section>
       <h2>Featured — Bear Classifier</h2>
       <div class="embed-wrap">
@@ -84,6 +100,16 @@
           loading="lazy"
           title="Bear Classifier — fastai/Gradio image classifier"
           allow="camera"></iframe>
+        <a class="companion" href="/writing/ood-detection/">
+          <div class="eyebrow">The write-up</div>
+          <h3>Teaching a bear detector to say "I don't know"</h3>
+          <p>A post-hoc out-of-distribution study on the classifier above: MSP vs energy, far- vs near-OOD, and an honest negative result.</p>
+          <div class="tags">
+            <span class="tag">PyTorch</span>
+            <span class="tag">OOD detection</span>
+            <span class="tag">calibration</span>
+          </div>
+        </a>
       </div>
     </section>
 
