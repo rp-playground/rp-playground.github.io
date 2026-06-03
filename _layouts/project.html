@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ page.title }} — Raffaele P.</title>
+  {% if page.summary %}<meta name="description" content="{{ page.summary }}">{% endif %}
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <style>
+    .topbar { max-width: var(--media); margin: 0 auto; padding: 1.5rem 1.5rem 0; }
+    .topbar a { font-size: 0.9rem; text-decoration: none; color: var(--muted); }
+    .topbar a:hover { color: var(--accent); }
+    .project { max-width: var(--media); margin: 0 auto; padding: 2rem 1.5rem 5rem; }
+    .project-header h1 { font-size: 2.4rem; font-weight: 600; letter-spacing: -0.02em; line-height: 1.15; }
+    .project-meta { color: var(--muted); font-size: 0.95rem; margin-top: 0.8rem; }
+    .project .links { margin: 1.2rem 0; display: flex; gap: 1.2rem; }
+    .project .links a { font-size: 0.95rem; text-decoration: none; }
+    .embed-wrap { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--card); margin: 1.5rem 0; }
+    .embed-wrap iframe { width: 100%; height: 640px; border: none; display: block; }
+    .project-body { margin-top: 2rem; }
+    .project-body p, .project-body li { font-size: 1.1rem; line-height: 1.7; color: #d7dade; }
+    .project-body p { margin: 1.2rem 0; }
+    .project-body h2 { font-size: 1.4rem; margin: 2.2rem 0 0.8rem; }
+    footer { max-width: var(--media); margin: 0 auto; padding: 0 1.5rem 4rem; color: var(--muted); font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <div class="topbar"><a href="/">← Home</a></div>
+  <article class="project">
+    <header class="project-header">
+      <h1>{{ page.title }}</h1>
+      <p class="project-meta">{% if page.date %}{{ page.date | date: "%B %Y" }}{% endif %}</p>
+      {% if page.tags %}
+      <div class="tags">
+        {% for t in page.tags %}<span class="tag">{{ t }}</span>{% endfor %}
+      </div>
+      {% endif %}
+    </header>
+
+    {% if page.repo or page.writeup %}
+    <div class="links">
+      {% if page.repo %}<a href="{{ page.repo }}" target="_blank" rel="noopener">Source ↗</a>{% endif %}
+      {% if page.writeup %}<a href="{{ page.writeup }}">Write-up →</a>{% endif %}
+    </div>
+    {% endif %}
+
+    {% if page.demo %}
+    <div class="embed-wrap">
+      <iframe src="{{ page.demo }}?__theme=dark" loading="lazy" title="{{ page.title }} — live demo" allow="camera"></iframe>
+    </div>
+    {% endif %}
+
+    <div class="project-body">
+      {{ content }}
+    </div>
+  </article>
+  <footer>Built with Jekyll · hosted on GitHub Pages · <a href="/">back home</a></footer>
+</body>
+</html>
