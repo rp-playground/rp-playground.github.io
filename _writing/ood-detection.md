@@ -2,7 +2,9 @@
 layout: article
 title: 'Teaching a bear detector to say "I don''t know"'
 description: A post-hoc out-of-distribution study on a 3-class bear classifier — MSP vs energy, far-OOD vs near-OOD, and an honest negative result.
+summary: A post-hoc out-of-distribution study on the bear classifier — MSP vs energy, far- vs near-OOD, and an honest negative result.
 date: 2026-06-02
+tags: [PyTorch, OOD detection, calibration]
 permalink: /writing/ood-detection/
 ---
 
@@ -192,7 +194,7 @@ signal:
   0.99    -1.8306    12.34%    38.38%
 ```
 
-Even if I get aggressive and reject **one real bear in five** (TPR 0.80), ~9%
+Even if I get aggr[config](../../bear-detector/.git/config)essive and reject **one real bear in five** (TPR 0.80), ~9%
 of pets still leak. There's no setting on this dial that makes the near-OOD
 problem go away.
 

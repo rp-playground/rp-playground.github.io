@@ -13,3 +13,11 @@ exclude:
   - Gemfile.lock
   - README.md
   - .superpowers/
+
+collections:
+  projects:
+    output: true
+    permalink: /projects/:name/
+  writing:
+    output: true
+    permalink: /writing/:name/
