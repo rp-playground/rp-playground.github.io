@@ -12,6 +12,14 @@
 
 **Verification model:** There is no JS/Liquid unit-test runner for a static site. Each task's "red/green" is a **build + grep on the generated `_site/`**: first confirm the feature is absent, implement, then confirm it is present. The filter script is additionally smoke-tested manually with `jekyll serve` in the final task.
 
+**Build command (this environment):** bundler is user-installed and the bundle path is local, so every build/serve must be prefixed with the user gem bin on PATH. The canonical command used in all verification steps below is:
+
+```bash
+export PATH="$HOME/.local/share/gem/ruby/3.2.0/bin:$PATH" && cd /home/rp/git/rp-playground/rp-playground.github.io && bundle exec jekyll build
+```
+
+System packages `ruby-dev` + `build-essential` must be present (needed to compile native gems like nokogiri); they were installed during Task 1 setup.
+
 ---
 
 ## File Structure
@@ -32,9 +40,22 @@
 
 **Files:**
 - Create: `Gemfile`
-- Modify: `.gitignore`
+- Modify: `.gitignore`, `_config.yml`
 
-- [ ] **Step 1: Create the Gemfile**
+> **Note:** This task was executed by the controller during setup (toolchain
+> bootstrap, analogous to creating a worktree). It is recorded here as-built so
+> reviewers and any re-run match reality.
+
+- [ ] **Step 1: System prerequisites**
+
+`ruby-dev` and `build-essential` must be installed (native gems like nokogiri
+need a C toolchain + ruby headers):
+
+```bash
+sudo apt-get install -y ruby-dev build-essential
+```
+
+- [ ] **Step 2: Create the Gemfile**
 
 Create `Gemfile`:
 
@@ -49,14 +70,19 @@ gem "github-pages", group: :jekyll_plugins
 gem "webrick"
 ```
 
-- [ ] **Step 2: Install the gems**
+- [ ] **Step 3: Install bundler (user) + the gems (local path)**
 
-Run: `cd /home/rp/git/rp-playground/rp-playground.github.io && bundle install`
-Expected: `Bundle complete!`. (If network blocks the install, stop and report — the rest of the plan relies on a local build.)
+```bash
+gem install bundler --user-install --no-document
+export PATH="$HOME/.local/share/gem/ruby/3.2.0/bin:$PATH"
+bundle config set --local path vendor/bundle
+bundle install
+```
+Expected: `Bundle complete!`.
 
-- [ ] **Step 3: Ignore build output**
+- [ ] **Step 4: Ignore build output**
 
-Add these lines to `.gitignore` (it already contains `.superpowers/`):
+Append to `.gitignore` (it already contains `.superpowers/`):
 
 ```
 _site/
@@ -64,18 +90,33 @@ _site/
 vendor/
 ```
 
-- [ ] **Step 4: Verify the current site builds**
+- [ ] **Step 5: Exclude tooling + design docs from the site**
 
-Run: `bundle exec jekyll build`
-Expected: `done in X.XXX seconds`, and `_site/writing/ood-detection/index.html` exists:
+Add an `exclude:` block to `_config.yml` so Jekyll does not try to render
+`docs/` (its fenced Liquid examples break the build) or the build tooling:
+
+```yaml
+exclude:
+  - docs/
+  - vendor/
+  - Gemfile
+  - Gemfile.lock
+  - README.md
+  - .superpowers/
+```
+
+- [ ] **Step 6: Verify the current site builds**
+
+Run: `export PATH="$HOME/.local/share/gem/ruby/3.2.0/bin:$PATH" && bundle exec jekyll build`
+Expected: `done in X.XXX seconds`.
 Run: `test -f _site/writing/ood-detection/index.html && echo OK`
 Expected: `OK`
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add Gemfile Gemfile.lock .gitignore
-git commit -m "build: add local Jekyll (github-pages gem) + ignore build output"
+git add Gemfile Gemfile.lock .gitignore _config.yml
+git commit -m "build: add local Jekyll (github-pages gem); exclude docs/tooling from site"
 ```
 
 ---
