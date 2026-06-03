@@ -1,9 +1,9 @@
 ---
 layout: project
 title: Bear detector
-summary: A 3-class bear classifier (black / grizzly / teddy) with a live out-of-distribution panel.
+summary: A 3-class bear classifier (black / grizzly / teddy) from fast.ai lesson 2, with a live out-of-distribution panel.
 date: 2026-06-01
-tags: [PyTorch, OOD detection, calibration]
+tags: [PyTorch, OOD detection, calibration, fast.ai]
 demo: https://rfflpllcn-bear-detector.hf.space
 repo: https://github.com/rp-playground/play-pytorch/tree/main/course.fast.ai/lesson2
 writeup: /writing/ood-detection/
