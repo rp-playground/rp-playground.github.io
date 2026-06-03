@@ -3,5 +3,13 @@ description: Applied ML · domain-driven AI systems
 markdown: kramdown
 kramdown:
   syntax_highlighter: rouge
-# index.html has no front matter, so Jekyll copies it through untouched —
-# the landing page is unchanged. Articles under writing/ use _layouts/article.html.
+
+# Keep build tooling and design docs out of the generated site. docs/ holds
+# specs/plans whose fenced Liquid examples would otherwise break the build.
+exclude:
+  - docs/
+  - vendor/
+  - Gemfile
+  - Gemfile.lock
+  - README.md
+  - .superpowers/
