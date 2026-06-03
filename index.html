@@ -1,154 +1,132 @@
+---
+# Front matter (even empty) makes Jekyll process the Liquid below.
+---
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Raffaele P. — ML Projects</title>
+  <link rel="stylesheet" href="/assets/css/main.css">
   <style>
-    :root {
-      --bg: #0f1115;
-      --card: #1a1d24;
-      --text: #e6e8eb;
-      --muted: #9aa0a8;
-      --accent: #5b9dff;
-      --border: #2a2e37;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      line-height: 1.6;
-      padding: 4rem 1.5rem;
-    }
-    .container { max-width: 880px; margin: 0 auto; }
-    header { margin-bottom: 3.5rem; }
-    h1 { font-size: 2.2rem; font-weight: 600; letter-spacing: -0.02em; }
+    .container { max-width: 1040px; margin: 0 auto; padding: 4rem 1.5rem; }
+    header.site { margin-bottom: 3rem; }
+    header.site h1 { font-size: 2.2rem; font-weight: 600; letter-spacing: -0.02em; }
     .subtitle { color: var(--muted); font-size: 1.1rem; margin-top: 0.5rem; }
     .links { margin-top: 1.2rem; display: flex; gap: 1.2rem; }
     .links a { color: var(--accent); text-decoration: none; font-size: 0.95rem; }
     .links a:hover { text-decoration: underline; }
 
-    section h2 {
-      font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em;
-      color: var(--muted); margin: 2.5rem 0 1.2rem;
-    }
+    .layout { display: grid; grid-template-columns: 180px 1fr; gap: 2.5rem; align-items: start; }
+    @media (max-width: 680px) { .layout { grid-template-columns: 1fr; gap: 1.5rem; } }
 
+    aside .label { text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-size: 0.7rem; margin: 1.1rem 0 0.5rem; }
+    aside .label:first-child { margin-top: 0; }
+    .filter {
+      display: block; width: 100%; text-align: left; cursor: pointer;
+      background: none; border: none; color: var(--text); font: inherit;
+      padding: 0.25rem 0.55rem; border-radius: 6px; margin-bottom: 0.15rem;
+    }
+    .filter:hover { background: rgba(91,157,255,0.08); }
+    .filter.active { background: rgba(91,157,255,0.18); color: var(--accent); }
+
+    section.item-section h2 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 1.2rem; }
+    section.item-section + section.item-section { margin-top: 2.5rem; }
     .grid { display: grid; gap: 1.2rem; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
-    .card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 1.4rem;
-      text-decoration: none;
-      color: inherit;
-      transition: border-color 0.15s, transform 0.15s;
-      display: block;
-    }
-    .card:hover { border-color: var(--accent); transform: translateY(-2px); }
-    .card h3 { font-size: 1.05rem; font-weight: 600; margin-bottom: 0.4rem; }
-    .card p { color: var(--muted); font-size: 0.9rem; }
-    .tags { margin-top: 0.9rem; display: flex; flex-wrap: wrap; gap: 0.4rem; }
-    .tag {
-      font-size: 0.72rem; color: var(--accent);
-      background: rgba(91,157,255,0.1); padding: 0.2rem 0.55rem; border-radius: 6px;
-    }
-
-    .embed-wrap {
-      border: 1px solid var(--border); border-radius: 12px;
-      overflow: hidden; background: var(--card);
-    }
-    .embed-wrap iframe { width: 100%; height: 640px; border: none; display: block; }
-
-    /* Featured: demo + its companion write-up as one coupled unit */
-    .companion {
-      display: block; text-decoration: none; color: inherit;
-      border-top: 1px solid var(--border);
-      padding: 1.2rem 1.4rem;
-      transition: background 0.15s;
-    }
-    .companion:hover { background: rgba(91,157,255,0.06); }
-    .companion .eyebrow {
-      font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em;
-      color: var(--accent); margin-bottom: 0.35rem;
-    }
-    .companion h3 { font-size: 1.05rem; font-weight: 600; margin-bottom: 0.3rem; }
-    .companion p { color: var(--muted); font-size: 0.9rem; }
-    .companion .tags { margin-top: 0.9rem; display: flex; flex-wrap: wrap; gap: 0.4rem; }
+    .item-card .meta-year { margin-left: auto; color: var(--muted); font-size: 0.72rem; }
 
     footer { margin-top: 4rem; color: var(--muted); font-size: 0.85rem; }
   </style>
 </head>
 <body>
   <div class="container">
-    <header>
+    <header class="site">
       <h1>Raffaele P.</h1>
       <p class="subtitle">Applied ML · domain-driven AI systems</p>
       <div class="links">
+        <!-- TODO: real links -->
         <a href="https://github.com/YOUR_USERNAME">GitHub</a>
         <a href="https://linkedin.com/in/YOUR_HANDLE">LinkedIn</a>
         <a href="mailto:you@example.com">Email</a>
       </div>
     </header>
 
-    <!-- FLAGSHIP: live demo + its companion write-up, as one unit -->
-    <section>
-      <h2>Featured — Bear Classifier</h2>
-      <div class="embed-wrap">
-        <iframe
-          src="https://rfflpllcn-bear-detector.hf.space?__theme=dark"
-          loading="lazy"
-          title="Bear Classifier — fastai/Gradio image classifier"
-          allow="camera"></iframe>
-        <a class="companion" href="/writing/ood-detection/">
-          <div class="eyebrow">The write-up</div>
-          <h3>Teaching a bear detector to say "I don't know"</h3>
-          <p>A post-hoc out-of-distribution study on the classifier above: MSP vs energy, far- vs near-OOD, and an honest negative result.</p>
-          <div class="tags">
-            <span class="tag">PyTorch</span>
-            <span class="tag">OOD detection</span>
-            <span class="tag">calibration</span>
+    {%- comment -%} Build the union of tags and years across both collections. {%- endcomment -%}
+    {%- assign all_items = site.projects | concat: site.writing -%}
+    {%- assign tag_acc = "" -%}
+    {%- assign year_acc = "" -%}
+    {%- for item in all_items -%}
+      {%- for t in item.tags -%}{%- assign tag_acc = tag_acc | append: t | append: "~" -%}{%- endfor -%}
+      {%- assign y = item.date | date: "%Y" -%}
+      {%- assign year_acc = year_acc | append: y | append: "~" -%}
+    {%- endfor -%}
+    {%- assign all_tags = tag_acc | split: "~" | uniq | sort -%}
+    {%- assign all_years = year_acc | split: "~" | uniq | sort | reverse -%}
+
+    <div class="layout">
+      <aside>
+        <div class="label">Filter</div>
+        <button class="filter active" data-filter="all">All</button>
+
+        {%- if all_tags.size > 0 -%}
+        <div class="label">Tags</div>
+        {%- for t in all_tags -%}
+        <button class="filter" data-filter="tag" data-value="{{ t }}">{{ t }}</button>
+        {%- endfor -%}
+        {%- endif -%}
+
+        {%- if all_years.size > 0 -%}
+        <div class="label">Year</div>
+        {%- for y in all_years -%}
+        <button class="filter" data-filter="year" data-value="{{ y }}">{{ y }}</button>
+        {%- endfor -%}
+        {%- endif -%}
+      </aside>
+
+      <main>
+        {%- assign projects = site.projects | sort: "date" | reverse -%}
+        {%- if projects.size > 0 -%}
+        <section class="item-section">
+          <h2>Projects</h2>
+          <div class="grid">
+            {%- for p in projects -%}
+            <a class="card item-card" href="{{ p.url }}"
+               data-tags="|{{ p.tags | join: '|' }}|" data-year="{{ p.date | date: '%Y' }}">
+              <h3>{{ p.title }}</h3>
+              <p>{{ p.summary }}</p>
+              <div class="tags">
+                {%- for t in p.tags -%}<span class="tag">{{ t }}</span>{%- endfor -%}
+                <span class="meta-year">{{ p.date | date: "%Y" }}</span>
+              </div>
+            </a>
+            {%- endfor -%}
           </div>
-        </a>
-      </div>
-    </section>
+        </section>
+        {%- endif -%}
 
-    <!-- WRITING -->
-    <section>
-      <h2>Writing</h2>
-      <div class="grid">
-        <a class="card" href="/writing/ood-detection/">
-          <h3>Teaching a bear detector to say "I don't know"</h3>
-          <p>A post-hoc out-of-distribution study on the classifier above: MSP vs energy, far- vs near-OOD, and an honest negative result.</p>
-          <div class="tags">
-            <span class="tag">PyTorch</span>
-            <span class="tag">OOD detection</span>
-            <span class="tag">calibration</span>
+        {%- assign writing = site.writing | sort: "date" | reverse -%}
+        {%- if writing.size > 0 -%}
+        <section class="item-section">
+          <h2>Writing</h2>
+          <div class="grid">
+            {%- for w in writing -%}
+            <a class="card item-card" href="{{ w.url }}"
+               data-tags="|{{ w.tags | join: '|' }}|" data-year="{{ w.date | date: '%Y' }}">
+              <h3>{{ w.title }}</h3>
+              <p>{{ w.summary }}</p>
+              <div class="tags">
+                {%- for t in w.tags -%}<span class="tag">{{ t }}</span>{%- endfor -%}
+                <span class="meta-year">{{ w.date | date: "%Y" }}</span>
+              </div>
+            </a>
+            {%- endfor -%}
           </div>
-        </a>
-      </div>
-    </section>
+        </section>
+        {%- endif -%}
+      </main>
+    </div>
 
-    <!-- REST: linked cards -->
-    <section>
-      <h2>Projects</h2>
-      <div class="grid">
-
-        <a class="card" href="https://github.com/YOUR_USERNAME/PROJECT" target="_blank" rel="noopener">
-          <h3>Another Project</h3>
-          <p>One-sentence description of what it does and the interesting technical decision behind it.</p>
-          <div class="tags">
-            <span class="tag">FastAPI</span>
-            <span class="tag">RAG</span>
-          </div>
-        </a>
-
-      </div>
-    </section>
-
-    <footer>
-      Built with static HTML · hosted on GitHub Pages
-    </footer>
+    <footer>Built with Jekyll · hosted on GitHub Pages</footer>
   </div>
 </body>
 </html>
