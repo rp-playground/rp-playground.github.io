@@ -21,3 +21,6 @@ collections:
   writing:
     output: true
     permalink: /writing/:name/
+  papers:
+    output: true
+    permalink: /papers/:name/
