@@ -15,7 +15,7 @@ for out-of-distribution detection. The core observation:
 > the prediction probability of incorrect and out-of-distribution examples tends
 > to be lower than the prediction probability for correct examples.
 
-## Why it stuck with me
+## Noteworthy
 
 It is the reference point every later OOD method is measured against — including
 the energy score I compared it to on my own
