@@ -1,0 +1,112 @@
+---
+permalink: /papers/
+---
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Papers — Raffaele P.</title>
+  <meta name="description" content="Papers I've read, with commentary.">
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <style>
+    .container { max-width: 1040px; margin: 0 auto; padding: 4rem 1.5rem; }
+    header.site { margin-bottom: 3rem; }
+    header.site h1 { font-size: 2.2rem; font-weight: 600; letter-spacing: -0.02em; }
+    .subtitle { color: var(--muted); font-size: 1.1rem; margin-top: 0.5rem; }
+    .topbar { margin-bottom: 1.5rem; }
+    .topbar a { font-size: 0.9rem; text-decoration: none; color: var(--muted); }
+    .topbar a:hover { color: var(--accent); }
+
+    .layout { display: grid; grid-template-columns: 180px 1fr; gap: 2.5rem; align-items: start; }
+    @media (max-width: 680px) { .layout { grid-template-columns: 1fr; gap: 1.5rem; } }
+
+    aside .label { text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-size: 0.7rem; margin: 1.1rem 0 0.5rem; }
+    aside .label:first-child { margin-top: 0; }
+    .filter {
+      display: block; width: 100%; text-align: left; cursor: pointer;
+      background: none; border: none; color: var(--text); font: inherit;
+      padding: 0.25rem 0.55rem; border-radius: 6px; margin-bottom: 0.15rem;
+    }
+    .filter:hover { background: rgba(91,157,255,0.08); }
+    .filter.active { background: rgba(91,157,255,0.18); color: var(--accent); }
+
+    section.item-section h2 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 1.2rem; }
+    .grid { display: grid; gap: 1.2rem; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+    .item-card .byline { color: var(--muted); font-size: 0.82rem; margin: 0.15rem 0 0.4rem; }
+    .item-card .meta-year { margin-left: auto; color: var(--muted); font-size: 0.72rem; }
+
+    .empty { color: var(--muted); }
+    footer { margin-top: 4rem; color: var(--muted); font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="topbar"><a href="/">← Home</a></div>
+    <header class="site">
+      <h1>Papers</h1>
+      <p class="subtitle">Papers I've read, with commentary.</p>
+    </header>
+
+    {%- comment -%} Tags + reading-years across the papers collection only. {%- endcomment -%}
+    {%- assign tag_acc = "" -%}
+    {%- assign year_acc = "" -%}
+    {%- for item in site.papers -%}
+      {%- for t in item.tags -%}{%- assign tag_acc = tag_acc | append: t | append: "~" -%}{%- endfor -%}
+      {%- assign y = item.date | date: "%Y" -%}
+      {%- assign year_acc = year_acc | append: y | append: "~" -%}
+    {%- endfor -%}
+    {%- assign all_tags = tag_acc | split: "~" | uniq | sort -%}
+    {%- assign all_years = year_acc | split: "~" | uniq | sort | reverse -%}
+
+    <div class="layout">
+      <aside>
+        <div class="label">Filter</div>
+        <button class="filter active" data-filter="all">All</button>
+
+        {%- if all_tags.size > 0 -%}
+        <div class="label">Tags</div>
+        {%- for t in all_tags -%}
+        <button class="filter" data-filter="tag" data-value="{{ t }}">{{ t }}</button>
+        {%- endfor -%}
+        {%- endif -%}
+
+        {%- if all_years.size > 0 -%}
+        <div class="label">Year</div>
+        {%- for y in all_years -%}
+        <button class="filter" data-filter="year" data-value="{{ y }}">{{ y }}</button>
+        {%- endfor -%}
+        {%- endif -%}
+      </aside>
+
+      <main>
+        {%- assign papers = site.papers | sort: "date" | reverse -%}
+        {%- if papers.size > 0 -%}
+        <section class="item-section">
+          <h2>Papers</h2>
+          <div class="grid">
+            {%- for p in papers -%}
+            <a class="card item-card" href="{{ p.url }}"
+               data-tags="|{{ p.tags | join: '|' }}|" data-year="{{ p.date | date: '%Y' }}">
+              <h3>{{ p.title }}</h3>
+              <p class="byline">{{ p.authors }}{% if p.authors and p.paper_year %} · {% endif %}{{ p.paper_year }}</p>
+              <p>{{ p.summary }}</p>
+              <div class="tags">
+                {%- for t in p.tags -%}<span class="tag">{{ t }}</span>{%- endfor -%}
+                <span class="meta-year">{{ p.date | date: "%Y" }}</span>
+              </div>
+            </a>
+            {%- endfor -%}
+          </div>
+        </section>
+        {%- else -%}
+        <p class="empty">No papers yet.</p>
+        {%- endif -%}
+      </main>
+    </div>
+
+    <footer>Built with Jekyll · hosted on GitHub Pages · <a href="/">back home</a></footer>
+  </div>
+  <script src="/assets/js/filter.js"></script>
+</body>
+</html>
