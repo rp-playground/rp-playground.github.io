@@ -89,7 +89,7 @@ permalink: /papers/
             <a class="card item-card" href="{{ p.url }}"
                data-tags="|{{ p.tags | join: '|' }}|" data-year="{{ p.date | date: '%Y' }}">
               <h3>{{ p.title }}</h3>
-              <p class="byline">{{ p.authors }}{% if p.authors and p.paper_year %} · {% endif %}{{ p.paper_year }}</p>
+              <p class="byline">{{ p.authors | escape }}{% if p.authors and p.paper_year %} · {% endif %}{{ p.paper_year }}</p>
               <p>{{ p.summary }}</p>
               <div class="tags">
                 {%- for t in p.tags -%}<span class="tag">{{ t }}</span>{%- endfor -%}
