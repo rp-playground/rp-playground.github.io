@@ -14,9 +14,10 @@ permalink: /papers/
     header.site { margin-bottom: 3rem; }
     header.site h1 { font-size: 2.2rem; font-weight: 600; letter-spacing: -0.02em; }
     .subtitle { color: var(--muted); font-size: 1.1rem; margin-top: 0.5rem; }
-    .topbar { margin-bottom: 1.5rem; }
-    .topbar a { font-size: 0.9rem; text-decoration: none; color: var(--muted); }
-    .topbar a:hover { color: var(--accent); }
+    .topnav { display: flex; gap: 1.4rem; padding-bottom: 1rem; margin-bottom: 2.5rem; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+    .topnav a { color: var(--muted); text-decoration: none; }
+    .topnav a:hover { color: var(--accent); }
+    .topnav a.current { color: var(--text); font-weight: 600; }
 
     .layout { display: grid; grid-template-columns: 180px 1fr; gap: 2.5rem; align-items: start; }
     @media (max-width: 680px) { .layout { grid-template-columns: 1fr; gap: 1.5rem; } }
@@ -42,7 +43,10 @@ permalink: /papers/
 </head>
 <body>
   <div class="container">
-    <div class="topbar"><a href="/">← Home</a></div>
+    <nav class="topnav">
+      <a href="/">Home</a>
+      <a href="/papers/" class="current">Papers</a>
+    </nav>
     <header class="site">
       <h1>Papers</h1>
       <p class="subtitle">Papers I've read, with commentary.</p>

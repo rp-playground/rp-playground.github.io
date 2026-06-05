@@ -13,6 +13,10 @@
     header.site { margin-bottom: 3rem; }
     header.site h1 { font-size: 2.2rem; font-weight: 600; letter-spacing: -0.02em; }
     .subtitle { color: var(--muted); font-size: 1.1rem; margin-top: 0.5rem; }
+    .topnav { display: flex; gap: 1.4rem; padding-bottom: 1rem; margin-bottom: 2.5rem; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+    .topnav a { color: var(--muted); text-decoration: none; }
+    .topnav a:hover { color: var(--accent); }
+    .topnav a.current { color: var(--text); font-weight: 600; }
     .links { margin-top: 1.2rem; display: flex; gap: 1.2rem; }
     .links a { color: var(--accent); text-decoration: none; font-size: 0.95rem; }
     .links a:hover { text-decoration: underline; }
@@ -40,12 +44,15 @@
 </head>
 <body>
   <div class="container">
+    <nav class="topnav">
+      <a href="/" class="current">Home</a>
+      <a href="/papers/">Papers</a>
+    </nav>
     <header class="site">
       <h1>Raffaele P.</h1>
       <p class="subtitle">Applied ML · domain-driven AI systems</p>
       <div class="links">
         <!-- TODO: real links -->
-        <a href="/papers/">Papers</a>
         <a href="https://github.com/YOUR_USERNAME">GitHub</a>
         <a href="https://linkedin.com/in/YOUR_HANDLE">LinkedIn</a>
         <a href="mailto:you@example.com">Email</a>
