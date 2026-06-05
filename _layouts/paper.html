@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ page.title }} — Raffaele P.</title>
+  {% if page.summary %}<meta name="description" content="{{ page.summary }}">{% endif %}
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <style>
+    .topbar { max-width: var(--media); margin: 0 auto; padding: 1.5rem 1.5rem 0; }
+    .topbar a { font-size: 0.9rem; text-decoration: none; color: var(--muted); }
+    .topbar a:hover { color: var(--accent); }
+
+    .paper { max-width: var(--media); margin: 0 auto; padding: 2rem 1.5rem 5rem; }
+    .paper > * { max-width: var(--measure); margin-left: auto; margin-right: auto; }
+    .paper > .highlighter-rouge,
+    .paper > div.highlight,
+    .paper > pre,
+    .paper > table,
+    .paper > figure { max-width: var(--media); }
+
+    .paper-header { margin-bottom: 2.5rem; }
+    .paper-header h1 { font-size: 2.1rem; font-weight: 600; letter-spacing: -0.02em; line-height: 1.2; }
+    .paper-byline { color: var(--text); font-size: 1.05rem; margin-top: 0.7rem; }
+    .paper-links { margin: 0.9rem 0; }
+    .paper-links a { font-size: 0.95rem; text-decoration: none; }
+    .paper-meta { color: var(--muted); font-size: 0.95rem; margin-top: 0.9rem; }
+    .paper-meta .tags { display: inline-flex; gap: 0.4rem; margin-left: 0.6rem; vertical-align: middle; }
+
+    .paper p, .paper li { font-size: 1.15rem; line-height: 1.75; color: #d7dade; }
+    .paper p { margin: 1.3rem auto; }
+    .paper ul, .paper ol { margin: 1.3rem auto; padding-left: 1.4rem; }
+    .paper li { margin: 0.5rem auto; }
+    .paper li > ul, .paper li > ol { margin: 0.5rem 0; }
+
+    .paper h2 { font-size: 1.5rem; font-weight: 600; letter-spacing: -0.01em; margin: 3rem auto 1rem; padding-top: 0.5rem; }
+    .paper h3 { font-size: 1.15rem; font-weight: 600; color: var(--muted); margin: 2rem auto 0.8rem; text-transform: none; }
+
+    .paper strong { color: #fff; }
+    .paper em { color: #c8ccd2; }
+    .paper a { text-decoration: none; border-bottom: 1px solid rgba(91,157,255,0.35); }
+    .paper a:hover { border-bottom-color: var(--accent); }
+
+    .paper blockquote { border-left: 3px solid var(--accent); padding: 0.2rem 0 0.2rem 1.3rem; margin: 1.6rem auto; color: var(--muted); font-style: italic; }
+    .paper blockquote p { font-size: 1.08rem; color: var(--muted); }
+
+    .paper code { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace; font-size: 0.88em; background: var(--code-bg); padding: 0.15em 0.4em; border-radius: 5px; border: 1px solid var(--border); }
+    .paper pre, .paper .highlighter-rouge, .paper .highlight { background: var(--code-bg); border: 1px solid var(--border); border-radius: 10px; margin: 1.6rem auto; overflow-x: auto; }
+    .paper pre, .paper .highlight pre { padding: 1rem 1.2rem; }
+    .paper pre code { background: none; border: none; padding: 0; font-size: 0.92rem; line-height: 1.6; color: var(--text); }
+
+    .paper table { width: 100%; border-collapse: collapse; margin: 1.8rem auto; font-size: 1rem; }
+    .paper th, .paper td { border: 1px solid var(--border); padding: 0.6rem 0.9rem; text-align: left; vertical-align: middle; }
+    .paper th { background: var(--card); font-weight: 600; }
+
+    .paper hr { border: none; border-top: 1px solid var(--border); margin: 3rem auto; }
+
+    footer { max-width: var(--measure); margin: 0 auto; padding: 0 1.5rem 4rem; color: var(--muted); font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <div class="topbar"><a href="/papers/">← Papers</a></div>
+  <article class="paper">
+    <header class="paper-header">
+      <h1>{{ page.title }}</h1>
+      {% if page.authors or page.paper_year %}
+      <p class="paper-byline">
+        {{ page.authors | escape }}{% if page.authors and page.paper_year %} · {% endif %}{{ page.paper_year }}
+      </p>
+      {% endif %}
+      {% if page.link %}
+      <div class="paper-links"><a href="{{ page.link }}" target="_blank" rel="noopener">Read paper ↗</a></div>
+      {% endif %}
+      <p class="paper-meta">
+        {% if page.date %}Read {{ page.date | date: "%B %Y" }}{% endif %}
+        {% if page.tags %}<span class="tags">{% for t in page.tags %}<span class="tag">{{ t }}</span>{% endfor %}</span>{% endif %}
+      </p>
+    </header>
+    {{ content }}
+  </article>
+  <footer>Built with Jekyll · hosted on GitHub Pages · <a href="/">back home</a></footer>
+</body>
+</html>
