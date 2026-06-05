@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{ page.title }} — Raffaele P.</title>
-  {% if page.summary %}<meta name="description" content="{{ page.summary }}">{% endif %}
+  {% if page.summary %}<meta name="description" content="{{ page.summary | escape }}">{% endif %}
   <link rel="stylesheet" href="/assets/css/main.css">
   <style>
     .topbar { max-width: var(--media); margin: 0 auto; padding: 1.5rem 1.5rem 0; }
