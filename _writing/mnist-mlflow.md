@@ -147,3 +147,7 @@ calibration, for example:
 - **How critical Search is.** The importance plot tells far more about a model than its accuracy.
 - **Pruning is cheap and resources saving**.
 - **"Load by version" is cool**.
+
+The champion is deployed as a registry-backed
+[live demo](/projects/mnist-mlflow/) — loaded by revision from the Hugging Face
+Hub, with a system panel showing exactly which version is being served.
