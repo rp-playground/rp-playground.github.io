@@ -1,14 +1,14 @@
 ---
 layout: article
 title: 'Teaching a bear detector to say "I don''t know"'
-description: A post-hoc out-of-distribution study on a 3-class bear classifier — MSP vs energy, far-OOD vs near-OOD, and an honest negative result.
-summary: A post-hoc out-of-distribution study on the bear classifier — MSP vs energy, far- vs near-OOD, and an honest negative result.
+description: A post-hoc out-of-distribution study on a 3-class bear classifier — MSP vs energy, far-OOD vs near-OOD, and the concluding negative result.
+summary: A post-hoc out-of-distribution study on the bear classifier — MSP vs energy, far- vs near-OOD, and the concluding negative result.
 date: 2026-06-02
 tags: [PyTorch, OOD detection, calibration]
 permalink: /writing/ood-detection/
 ---
 
-*A small OOD-detection study bolted onto the [bear detector](https://rfflpllcn-bear-detector.hf.space)
+*A small OOD-detection study added to the [bear detector](https://rfflpllcn-bear-detector.hf.space)
 I deployed as a Hugging Face Space.*
 
 ## The setup, and the problem
@@ -23,12 +23,11 @@ confident"**.
 
 That's the whole problem. The model reduces the universe (of
 all possible images) to exactly three species of bear. It is *structurally
-incapable* of saying "none of these". Show it a cat, a car, a coffee mug — it
-will still pick a bear. A silent, irritatingly confident failure
-the moment it sees out-of-distribution (OOD) data.
+incapable* of saying "none of these". Show it a cat, a car, anything — it
+will still pick a bear. A silent, irritatingly confident failure.
 
 So I wanted to see how far I could push it toward "I don't know"
-*without retraining the model*, using only the signals already hiding in its
+*without retraining the model*, using only the signals of its
 outputs.
 
 ## Raw softmax isn't a probability, it's a normalization
@@ -63,8 +62,7 @@ real bears from non-bears — and then try a stronger signal.
 
 The MSP has an obvious weakness *for this model in particular*: with only **3
 classes**, the maximum softmax probability is squeezed into `[1/3, 1]`. There
-just isn't much room for the score to move. (And it saturates — more on that
-below.)
+just isn't much room for the score to move. 
 
 The **energy score** (Liu et al., 2020, *Energy-based Out-of-distribution
 Detection*) sidesteps the normalization entirely. It's computed straight from
@@ -82,8 +80,7 @@ against MSP and generally wins — so I ran both, on my own model.
 ## The experiment
 
 Everything runs on the **real** deployed weights (`bear_detector.pth`), reusing
-the exact architecture and preprocessing from the serving code — no mock model,
-no train/serve skew. The full harness is
+the exact architecture and preprocessing from the serving code. The full evaluation coming from 
 [`calibrate_threshold.py`](https://github.com/rp-playground/play-pytorch/blob/main/course.fast.ai/lesson2/app/serving/calibrate_threshold.py).
 
 - **In-distribution:** my held-out `bear_test/` set (99 real bear photos).
@@ -107,25 +104,25 @@ First, what the two signals look like on real bears:
 | MSP    | 0.536 | **0.952** | 0.9997 |
 
 That MSP mean of **0.95** is a concrete example of the calibration problem: on
-held-out bears, the network already outputs 95% confidence on average. An
-overconfident model leaves the OOD detector very little room to work with.
+held-out bears, the network already outputs 95% confidence on average. 
+Because of a baseline so high, there is almost no room left to separate real bears from OOD objects.
 
 For further clarification:
 * When a cat comes in and scores, say, 0.85, that's inside the bears' own range 
 — there's no clean threshold that keeps the bears in and the cat out. 
-The detector is trying to separate two groups that overlap heavily near the top.
+The two groups mix together at the top of the scale.
 
 * The confidence is systematically too high for what the model actually knows. 
-The number isn't reporting genuine certainty; it's the network's habitual overconfidence. 
-Modern nets do this (Guo et al.), and a 3-class softmax with a small training set does it especially hard.
+It's the network's habitual overconfidence. 
+Modern nets do this (Guo et al.), and a 3-class softmax with a small training dataset makes this problem much worse.
 
 * The whole premise of MSP-based detection is that OOD inputs get lower confidence than in-distribution ones. 
 But if in-distribution bears are pinned at 0.95+, the model has already spent its confidence — there's 
-no headroom for OOD inputs to look distinctively less confident, because everything looks confident.
+no empty space left for strange inputs to look less confident, because everything looks confident.
 
 * Energy doesn't have this ceiling. It runs −5.58 to −1.57, unbounded by construction, so in principle 
-it has more dynamic range for OOD inputs to separate out. That's the theoretical reason to prefer 
-it — and exactly the expectation the near-OOD result below then violates.
+it has more dynamic range for OOD inputs to separate out. 
+While this is true in theory, the near-OOD results actually break this expectation.
 
 Calibrated thresholds at TPR 95:
 
@@ -163,24 +160,20 @@ a distinction the model never learned. The fix has to come from more information
 
 ## Looking at the failures
 
-It helps to look at *what* leaks. These are real false positives — non-bears
-the energy filter waved through — shown exactly as the model saw them
-(resized, cropped, normalized, then de-normalized back to something viewable).
-The filename energy sits comfortably below the −1.98 threshold — the model is
-confidently filing both of these under "bear".
+Let’s look at what the energy filter let slip through. 
+Both examples are false positives that the model confidently classified as bears. Their energy scores sit safely below the −1.98 threshold.
+The images are shown exactly as the model processed them: resized, cropped, and normalized.
 
 | near-OOD (Oxford Pet), energy −3.05 | far-OOD (DTD), energy −3.29 |
 |---|---|
 | ![A cat the model is sure is a bear](/assets/ood/near-ood-cat-energy-3.05.png) | ![A texture the model is sure is a bear](/assets/ood/far-ood-texture-energy-3.29.png) |
 
-The pattern is unsubtle once you see it: **fur and soft, lumpy texture.** A
-ginger cat in profile and a pile of bumpy gourds both trip the same wire that
-brown fur trips. The model never learned "bear" — it learned "brown furry
-blob", and at inference time that's all it has to go on.
+The issue is simple: the model tracks fur and lumpy textures. A
+ginger cat in profile and a pile of pumpkins both activate the same channels as a brown bear.
 
-## Choosing a threshold, consciously
+## Choosing a threshold
 
-The threshold is a dial, not a constant. Loosen it (accept fewer false bears)
+Adjusting the threshold requires balancing the risk of false positives against the risk of missing real signals. Loosen it (accept fewer false bears)
 and you start rejecting real bears too. Here's the trade-off for the energy
 signal:
 
@@ -194,8 +187,8 @@ signal:
   0.99    -1.8306    12.34%    38.38%
 ```
 
-Even if I get aggr[config](../../bear-detector/.git/config)essive and reject **one real bear in five** (TPR 0.80), ~9%
-of pets still leak. There's no setting on this dial that makes the near-OOD
+Even if I get aggressive and reject **one real bear in five** (TPR 0.80), ~9%
+of pets still leak. There's no setting that makes the near-OOD
 problem go away.
 
 > Try it live: the [Hugging Face Space](https://rfflpllcn-bear-detector.hf.space)
@@ -205,8 +198,7 @@ problem go away.
 ## Verdict, and what's next
 
 - A closed-set softmax classifier fails silently and confidently on OOD input.
-  That part is real and reproducible.
-- You *can* recover a usable OOD signal post-hoc from the logits, and it's free.
+- You *can* recover a usable OOD signal post-hoc from the logits.
 - On **far-OOD** it works fine; **energy > MSP**, as advertised.
 - On **near-OOD** — the case that matters — it's weak, and on this small model
   **MSP > energy**, contradicting the standard result. 
@@ -214,15 +206,9 @@ problem go away.
 The fix isn't a better scalar; it's more information. The natural next steps:
 
 - **Outlier exposure** (Hendrycks et al., 2019) — fine-tune the model to push
-  energy up on known non-bears. I already have a head start: the leaked cats,
-  dogs and textures above are exactly the hard negatives to train on.
-- **Temperature scaling / proper calibration** (Guo et al.) so the 0.95 mean
-  confidence stops lying.
-- **ODIN, Mahalanobis distance** and other feature-space detectors that don't
-  rely on a single output scalar.
-- The blunt-but-honest option: add a background / "none of these" class, or
-  simply surface the energy score in the UI and let the app *abstain* instead
-  of always committing to a bear.
+  energy up on known non-bears. 
+- **Temperature scaling / proper calibration** (Guo et al.).
+
 
 ## Reproduce it
 
