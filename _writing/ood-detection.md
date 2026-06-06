@@ -80,7 +80,7 @@ against MSP and generally wins — so I ran both, on my own model.
 ## The experiment
 
 Everything runs on the **real** deployed weights (`bear_detector.pth`), reusing
-the exact architecture and preprocessing from the serving code. The full evaluation coming from 
+the exact architecture and preprocessing from the serving code. The full evaluation code lives in 
 [`calibrate_threshold.py`](https://github.com/rp-playground/play-pytorch/blob/main/course.fast.ai/lesson2/app/serving/calibrate_threshold.py).
 
 - **In-distribution:** my held-out `bear_test/` set (99 real bear photos).
@@ -105,7 +105,7 @@ First, what the two signals look like on real bears:
 
 That MSP mean of **0.95** is a concrete example of the calibration problem: on
 held-out bears, the network already outputs 95% confidence on average. 
-Because of a baseline so high, there is almost no room left to separate real bears from OOD objects.
+With a baseline this high, there's almost no room left to separate real bears from OOD objects.
 
 For further clarification:
 * When a cat comes in and scores, say, 0.85, that's inside the bears' own range 
@@ -160,7 +160,7 @@ a distinction the model never learned. The fix has to come from more information
 
 ## Looking at the failures
 
-Let’s look at what the energy filter let slip through. 
+Let's look at what the energy filter let slip through. 
 Both examples are false positives that the model confidently classified as bears. Their energy scores sit safely below the −1.98 threshold.
 The images are shown exactly as the model processed them: resized, cropped, and normalized.
 
@@ -173,7 +173,7 @@ ginger cat in profile and a pile of pumpkins both activate the same channels as 
 
 ## Choosing a threshold
 
-Adjusting the threshold requires balancing the risk of false positives against the risk of missing real signals. Loosen it (accept fewer false bears)
+Adjusting the threshold requires balancing the risk of false positives against the risk of missing real signals. Tighten it (accept fewer false bears)
 and you start rejecting real bears too. Here's the trade-off for the energy
 signal:
 
