@@ -27,8 +27,7 @@ incapable* of saying "none of these". Show it a cat, a car, anything — it
 will still pick a bear. A silent, irritatingly confident failure.
 
 So I wanted to see how far I could push it toward "I don't know"
-*without retraining the model*, using only the signals of its
-outputs.
+*without retraining the model*, using only what its outputs already tell me.
 
 ## Raw softmax isn't a probability, it's a normalization
 
@@ -107,7 +106,7 @@ That MSP mean of **0.95** is a concrete example of the calibration problem: on
 held-out bears, the network already outputs 95% confidence on average. 
 With a baseline this high, there's almost no room left to separate real bears from OOD objects.
 
-For further clarification:
+To unpack that:
 * When a cat comes in and scores, say, 0.85, that's inside the bears' own range 
 — there's no clean threshold that keeps the bears in and the cat out. 
 The two groups mix together at the top of the scale.
@@ -120,7 +119,7 @@ Modern nets do this (Guo et al.), and a 3-class softmax with a small training da
 But if in-distribution bears are pinned at 0.95+, the model has already spent its confidence — there's 
 no empty space left for strange inputs to look less confident, because everything looks confident.
 
-* Energy doesn't have this ceiling. It runs −5.58 to −1.57, unbounded by construction, so in principle 
+* Energy doesn't have this ceiling. It runs −5.58 to −1.57, unbounded by design, so in principle 
 it has more dynamic range for OOD inputs to separate out. 
 While this is true in theory, the near-OOD results actually break this expectation.
 
@@ -173,9 +172,8 @@ ginger cat in profile and a pile of pumpkins both activate the same channels as 
 
 ## Choosing a threshold
 
-Adjusting the threshold requires balancing the risk of false positives against the risk of missing real signals. Tighten it (accept fewer false bears)
-and you start rejecting real bears too. Here's the trade-off for the energy
-signal:
+The threshold is a balancing act: too strict and you reject real bears, too
+loose and fakes get through. Here's the trade-off for the energy signal:
 
 ```
   TPR     thresh       DTD      Pets

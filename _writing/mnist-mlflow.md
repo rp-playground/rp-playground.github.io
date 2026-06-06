@@ -28,7 +28,7 @@ hyperparameter search on top of it.*
 
 *Goal: go past "99% accuracy" and learn where and how confidently the model is wrong.*
 
-For the present write-up I pick: **system design with MLflow + Optuna**
+This write-up covers: **system design with MLflow + Optuna**
 (tracking, hyperparameter search, the model registry, and the artifacts each run
 leaves behind). Perspectives 2. and 3. are separate stories.
 
@@ -75,7 +75,7 @@ rate, then adds:
 - `mlp_relu` → `hidden_dim` (64 / 128 / 256 / 512)
 - `conv_net` → `conv_channels` (16 / 32 / 64) and `dropout`
 
-To make that possible I had to make the models **parametric**, so `build_model(name, hidden_dim=…,
+To allow that, the models are **parametric**: `build_model(name, hidden_dim=…,
 conv_channels=…, dropout=…)` builds the architecture Optuna needs. 
 
 Optuna then hands you a few plots for free. For the `conv_net` study:
@@ -103,8 +103,8 @@ a good reminder that importances need many more trials to mean much.
 
 ### Pruning
 
-A naïve search wastes time training every model configuration to the very end—even the clearly underperforming ones. Optuna's
-**MedianPruner** solves this problem through automated early-stopping: each trial reports its validation accuracy after every
+A naïve search trains every trial to the end, even the obviously bad ones. Optuna's
+**MedianPruner** stops them early; each trial reports its validation accuracy after every
 epoch, and if it falls below the median of past trials at the same epoch, the trial
 is stopped instantly. In the run above, **6 of 10 trials were pruned** — well over half
 the search budget saved.
@@ -139,7 +139,7 @@ calibration, for example:
 
 ## What I took away
 
-- **Once everything is a run, comparison is free.** The task of investigating "which
+- **Once everything is a run, comparison is free.** Figuring out "which
   model is better" becomes a sorting problem.
 - **Search matters.** But importances need many trials to trust.
 - **Pruning is cheap and resource-saving**.
@@ -165,4 +165,4 @@ live. It's the same trade-off as the
 [bear detector's OOD study](/writing/ood-detection/):
 thin `1`s land near the boundary, and are sometimes rejected as
 "not a digit" at a strict TPR. But the model can finally say *that isn't a digit*
-instead of guessing, with confidence.
+instead of confidently guessing.
