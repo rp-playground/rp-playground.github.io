@@ -92,7 +92,7 @@ Optuna then hands you a few plots for free. For the `conv_net` study:
 
 <figure>
   <img src="/assets/mnist/optuna_parallel_coordinate_conv_net.png" alt="Optuna parallel coordinate plot for conv_net">
-  <figcaption>Parallel coordinates — line colour is val accuracy (viridis), and the best trial is the bold red line. The winner runs <code>conv_channels=16</code> with low dropout and a mid learning rate; the same <code>conv_channels=16</code> with too small a learning rate is the dark line that bottoms out at ~0.975.</figcaption>
+  <figcaption>Parallel coordinates — a custom version of Optuna's plot (its default colours every line in near-identical shades of blue, so when all trials score ~0.98 you can't tell them apart). Here line colour is val accuracy (viridis) and the best trial is the bold red line. The winner runs <code>conv_channels=16</code> with low dropout and a mid learning rate; the same <code>conv_channels=16</code> with too small a learning rate is the dark line that bottoms out at ~0.975.</figcaption>
 </figure>
 
 Let's look at the parallel-coordinate plot: the two
