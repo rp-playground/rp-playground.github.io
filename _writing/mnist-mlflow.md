@@ -1,11 +1,13 @@
 ---
-layout: project
+layout: article
 title: MNIST × MLflow + Optuna
+description: A deliberately trivial MNIST model wrapped in real MLOps — experiment tracking, hyperparameter search with pruning, and a model registry you serve by version.
 summary: A deliberately trivial MNIST model wrapped in real MLOps — experiment tracking, hyperparameter search with pruning, and a model registry you serve by version.
 date: 2026-06-06
 tags: [MLflow, Optuna, MLOps, experiment tracking]
-repo: https://github.com/rp-playground/play-mlflow/tree/main/mnist
 ---
+
+*Code: [play-mlflow/mnist on GitHub](https://github.com/rp-playground/play-mlflow/tree/main/mnist).*
 
 I pick MNIST and look at it from three different angles. MNIST itself is just the excuse — a dataset I
 already understand. The real goal is to **learn new frameworks, tools and techniques**, and build/document the *reasoning*

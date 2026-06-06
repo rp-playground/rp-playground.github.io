@@ -52,6 +52,11 @@
     .article td img { display: block; max-width: 100%; height: auto; margin: 0 auto; border-radius: 10px; }
     .article table:has(img) td { text-align: center; }
 
+    .article figure { margin: 1.8rem auto; }
+    .article figure img { width: 100%; border: 1px solid var(--border); border-radius: 10px; background: #fff; display: block; }
+    .article figure.narrow { max-width: 460px; }
+    .article figcaption { color: var(--muted); font-size: 0.85rem; margin-top: 0.5rem; text-align: center; }
+
     .article hr { border: none; border-top: 1px solid var(--border); margin: 3rem auto; }
 
     footer { max-width: var(--measure); margin: 0 auto; padding: 0 1.5rem 4rem; color: var(--muted); font-size: 0.85rem; }
