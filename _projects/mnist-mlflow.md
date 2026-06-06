@@ -7,20 +7,30 @@ tags: [MLflow, Optuna, MLOps, experiment tracking]
 repo: https://github.com/rp-playground/play-mlflow/tree/main/mnist
 ---
 
-This is the **systems** half of my learning portfolio. Where the
-[bear detector](/projects/bear-detector/) says *"I evaluate honestly and
-understand failure modes,"* this one is me learning to say *"I track, search,
-version, and serve."* The model is trivial on purpose — MNIST is just an excuse I
-already understand, so the dataset never gets in the way of learning the tools.
+I pick MNIST and look at it from three different angles. MNIST itself is just the excuse — a dataset I
+already understand. The real goal is to **learn new frameworks, tools and techniques**, and build/document the *reasoning*
+around deliberately trivial models rather than chasing accuracy.
 
-I picked one lens for this write-up: **system design with MLflow + Optuna**
+The three perspectives are:
+
+## 1. System design — MLflow + Optuna
+
+*Goal: learn the experiment-tracking / model-registry / serving loop, and add
+hyperparameter search on top of it.*
+
+## 2. Exploratory data analysis
+
+*Goal: actually look at the data before/around modelling — the step that's easy
+to skip and easy to learn from.*
+
+## 3. Confidence calibration
+
+*Goal: go past "99% accuracy" and learn the vocabulary of honest evaluation —
+where and how confidently the model is wrong.*
+
+For the present write-up I pick: **system design with MLflow + Optuna**
 (tracking, hyperparameter search, the model registry, and the artifacts each run
-leaves behind). The same project also has an EDA lens and a calibration lens, but
-those are separate stories.
-
-> The point is the comparison and the engineering, not the accuracy. A 99% CNN on
-> MNIST signals *"finished a tutorial"* — so I tried to make the interesting part
-> everything *around* the model.
+leaves behind). Perspectives 2. and 3. are separate stories.
 
 ## The complexity ladder (the thing being tracked)
 
@@ -33,8 +43,7 @@ comparing:
 | `mlp_relu` | `Linear → ReLU → Linear` | ~98% |
 | `conv_net` | 2× (conv → ReLU → pool) → classifier | ~99% |
 
-The pedagogical nugget: without the `ReLU`, stacked linear layers collapse into a
-single linear map — that one nonlinearity is what breaks the ~92% ceiling.
+Without the `ReLU`, any number of stacked linear layers collapses into one — it's ReLU that breaks the ~92% accuracy.
 
 ## Experiment tracking with MLflow
 
@@ -53,23 +62,21 @@ compare
 
 Each run logs its params (learning rate, parameter count, the tuned
 hyperparameters), per-epoch `train_loss` / `val_accuracy`, and final test metrics
-(`test_accuracy`, `test_macro_recall`, `test_ece`, per-class accuracy). The nice
-thing I didn't expect: once everything is a logged run, the MLflow UI turns
-"which model won and why" into a sortable table instead of a folder of notebooks.
+(`test_accuracy`, `test_macro_recall`, `test_ece`, `per-class accuracy`). The nicest
+thing: once every run is logged, the MLflow UI makes it incredibly easy to explore the winner run and understand why (easy like sorting a table).
 
 ## Hyperparameter search with Optuna
 
 Instead of hand-picking learning rates, I let **Optuna** search. Each model has
 its own study and its own little search space — every model tunes the learning
-rate, then adds the knobs that actually apply to it:
+rate, then adds:
 
-- `logistic` → also `weight_decay`
-- `mlp_relu` → also `hidden_dim` (64 / 128 / 256 / 512)
-- `conv_net` → also `conv_channels` (16 / 32 / 64) and `dropout`
+- `logistic` → `weight_decay`
+- `mlp_relu` → `hidden_dim` (64 / 128 / 256 / 512)
+- `conv_net` → `conv_channels` (16 / 32 / 64) and `dropout`
 
-To make that possible I had to make the models **parametric** — Optuna needs a
-seam to push hyperparameters through, so `build_model(name, hidden_dim=…,
-conv_channels=…, dropout=…)` builds the architecture the trial asks for. **Each
+To make that possible I had to make the models **parametric**, so `build_model(name, hidden_dim=…,
+conv_channels=…, dropout=…)` builds the architecture Optuna asks for. **Each
 trial is its own nested MLflow run**, so the search is fully visible afterwards.
 
 Optuna then hands you a few plots for free. For the `conv_net` study:
@@ -89,11 +96,9 @@ Optuna then hands you a few plots for free. For the `conv_net` study:
   <figcaption>Parallel coordinates — darker lines are better trials. The good ones run through wider conv channels (64) and lower dropout; <code>conv_channels=16</code> is the line that bottoms out at ~0.97.</figcaption>
 </figure>
 
-The importance plot was the moment it clicked for me: I'd assumed learning rate
-would dominate, but for this tiny conv net the regularization knobs mattered more.
-That's the kind of thing you only see if you actually log the search.
+I'd assumed learning rate would dominate, but for this tiny conv net the regularization matters more.
 
-### Pruning: don't waste epochs on dead ends
+### Pruning
 
 A naïve search trains every trial to the end, even the obviously bad ones. Optuna's
 **MedianPruner** fixes that: each trial reports its validation accuracy after every
@@ -102,10 +107,9 @@ is stopped early. In the run above, **5 of 10 trials were pruned** — roughly h
 the search budget saved.
 
 I wired this so a pruned trial ends as a `KILLED` run tagged `pruned=true` in
-MLflow (not `FAILED`), because a pruned trial isn't a bug — it's the system
-working. Small detail, but it keeps the run history honest.
+MLflow (not `FAILED`).
 
-## The model registry (the one senior-level decision)
+## The model registry
 
 After the ladder finishes, the best model by test accuracy — the `conv_net`, at
 **~98.7%** with an ECE of **0.0023** — is registered as `mnist-classifier` and
@@ -114,13 +118,11 @@ given the alias `@champion`.
 The decision I actually care about: **serving loads the model by alias/version
 from the registry, never from a checked-in weights file.** `predict.py` asks for
 `models:/mnist-classifier@champion` and gets whatever the current champion is. So
-a rollback is a one-line alias change, not a redeploy. That indirection is the
-spine of the whole design.
+a rollback is a one-line alias change, not a redeploy. 
 
 ## Every run carries its own evidence
 
-Because each final run logs failure-analysis figures as artifacts, the "how good
-is it, really?" answer travels *with* the model version. The champion's
+Each final run logs failure-analysis figures as artifacts. The champion's
 calibration, for example:
 
 <figure class="narrow">
@@ -135,15 +137,8 @@ calibration, for example:
 
 ## What I took away
 
-- **Once everything is a run, comparison is free.** The hardest part of "which
-  model is better" turned out to be a sorting problem, not a bookkeeping one.
-- **Search teaches you about your model.** The importance plot told me more about
-  this conv net than its accuracy did.
-- **Pruning is cheap leverage** — half the compute back for a few lines of code.
-- **"Load by version" is the idea that scales** beyond MNIST: it's the same move
-  whether the model is a 200k-param CNN or something serious.
-
-**Next step:** package the champion behind a small demo on Hugging Face Spaces,
-the same way the [bear detector](/projects/bear-detector/) is deployed — so this
-page can embed a live, registry-backed prediction the way that one embeds its OOD
-panel.
+- **Once everything is a run, comparison is free.** The task of investigating "which
+  model is better" becomes a sorting problem.
+- **How critical Search is.** The importance plot tells far more about a model than its accuracy.
+- **Pruning is cheap and resources saving**.
+- **"Load by version" is cool**.
