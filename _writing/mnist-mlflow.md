@@ -82,27 +82,34 @@ Optuna then hands you a few plots for free. For the `conv_net` study:
 
 <figure>
   <img src="/assets/mnist/optuna_history_conv_net.png" alt="Optuna optimization history for conv_net">
-  <figcaption>Optimization history — each dot is a completed trial; the line is the best value so far. Only 5 dots show because the other 5 trials were pruned (see below).</figcaption>
+  <figcaption>Optimization history — each dot is a completed trial; the line is the best value so far. Only 4 dots show because the other 6 trials were pruned (see below).</figcaption>
 </figure>
 
 <figure class="narrow">
   <img src="/assets/mnist/optuna_param_importances_conv_net.png" alt="Optuna hyperparameter importances for conv_net">
-  <figcaption>Which hyperparameter mattered most. For my conv net, <code>dropout</code> dominated (0.50), then <code>conv_channels</code> (0.29), then <code>lr</code> (0.21).</figcaption>
+  <figcaption>Optuna's fANOVA importance — but with only 4 completed trials it's noisy: here <code>dropout</code> and <code>conv_channels</code> tie (~0.36) and <code>lr</code> trails (0.28), and the ranking wobbles if you rerun it.</figcaption>
 </figure>
 
 <figure>
   <img src="/assets/mnist/optuna_parallel_coordinate_conv_net.png" alt="Optuna parallel coordinate plot for conv_net">
-  <figcaption>Parallel coordinates — darker lines are better trials. The good ones run through wider conv channels (64) and lower dropout; <code>conv_channels=16</code> is the line that bottoms out at ~0.97.</figcaption>
+  <figcaption>Parallel coordinates — line colour is val accuracy (viridis), and the best trial is the bold red line. The winner runs <code>conv_channels=16</code> with low dropout and a mid learning rate; the same <code>conv_channels=16</code> with too small a learning rate is the dark line that bottoms out at ~0.975.</figcaption>
 </figure>
 
-I'd assumed learning rate would dominate, but for this tiny conv net the regularization matters more.
+The parallel-coordinate plot is the one I actually trust here: the two
+`conv_channels=16` trials differ mostly in learning rate and span 0.975 → 0.989,
+so width and learning rate clearly swing the result. The fANOVA importance plot
+is shakier — with only four completed trials its ranking wobbles between runs,
+a good reminder that importances need many more trials to mean much. (I also
+swapped in my own parallel-coordinate plot: Optuna's default colours every line
+in near-identical shades of blue, so when all trials score ~0.98 you can't tell
+them apart.)
 
 ### Pruning
 
 A naïve search trains every trial to the end, even the obviously bad ones. Optuna's
 **MedianPruner** fixes that: each trial reports its validation accuracy after every
 epoch, and if it's trailing the median of past trials at the same epoch, the trial
-is stopped early. In the run above, **5 of 10 trials were pruned** — roughly half
+is stopped early. In the run above, **6 of 10 trials were pruned** — well over half
 the search budget saved.
 
 In MLflow a pruned trial ends as a `KILLED` run tagged `pruned=true` (not `FAILED`).
