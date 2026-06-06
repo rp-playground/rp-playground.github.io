@@ -87,9 +87,12 @@ that axis, versus **0.00** for correctly-classified points of the same class, an
 extreme cases are the strongest tell — **39%** drift *past the midpoint*, all the
 way into the predicted cluster (those are the markers whose fill matches the cloud
 they're sitting in but whose ring doesn't: a non-`2` confidently absorbed into the
-`2` island). So it's not just "errors at the edges": each error is *polarized*,
-displaced toward the specific digit the model mistook it for. The metaphor
-survives the check.
+`2` island). And the drift tracks confidence: how far an error sits along that
+axis correlates with its softmax confidence (**r ≈ 0.41**) — the ones that drift
+all the way in average **85%** confidence versus **69%** for those left near the
+border. The deeper into the wrong cluster, the surer the model is it's right. So
+it's not just "errors at the edges": each error is *polarized*, displaced toward
+the specific digit the model mistook it for. The metaphor survives the check.
 
 Put the two halves together and you get the honest reading of "99%": the model
 isn't 99%-accurate *uniformly*. Its 1% is concentrated in specific, interpretable
