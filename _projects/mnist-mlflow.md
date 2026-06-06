@@ -20,19 +20,17 @@ hyperparameter search on top of it.*
 
 ## 2. Exploratory data analysis
 
-*Goal: actually look at the data before/around modelling — the step that's easy
-to skip and easy to learn from.*
+*Goal: actually look at the data before/around modelling.*
 
 ## 3. Confidence calibration
 
-*Goal: go past "99% accuracy" and learn the vocabulary of honest evaluation —
-where and how confidently the model is wrong.*
+*Goal: go past "99% accuracy" and learn where and how confidently the model is wrong.*
 
 For the present write-up I pick: **system design with MLflow + Optuna**
 (tracking, hyperparameter search, the model registry, and the artifacts each run
 leaves behind). Perspectives 2. and 3. are separate stories.
 
-## The complexity ladder (the thing being tracked)
+## The complexity ladder
 
 I train three models of increasing sophistication so there's something worth
 comparing:
@@ -47,7 +45,7 @@ Without the `ReLU`, any number of stacked linear layers collapses into one — i
 
 ## Experiment tracking with MLflow
 
-Every training is an MLflow **run**, and runs nest. The whole job is one parent
+Every training is an MLflow **run**. The whole job is one parent
 run, and under it each model gets a *search* phase and a *final* phase:
 
 ```
@@ -67,7 +65,7 @@ thing: once every run is logged, the MLflow UI makes it incredibly easy to explo
 
 ## Hyperparameter search with Optuna
 
-Instead of hand-picking learning rates, I let **Optuna** search. Each model has
+I let **Optuna** search. Each model has
 its own study and its own little search space — every model tunes the learning
 rate, then adds:
 
@@ -76,8 +74,7 @@ rate, then adds:
 - `conv_net` → `conv_channels` (16 / 32 / 64) and `dropout`
 
 To make that possible I had to make the models **parametric**, so `build_model(name, hidden_dim=…,
-conv_channels=…, dropout=…)` builds the architecture Optuna asks for. **Each
-trial is its own nested MLflow run**, so the search is fully visible afterwards.
+conv_channels=…, dropout=…)` builds the architecture Optuna needs. 
 
 Optuna then hands you a few plots for free. For the `conv_net` study:
 
@@ -106,8 +103,7 @@ epoch, and if it's trailing the median of past trials at the same epoch, the tri
 is stopped early. In the run above, **5 of 10 trials were pruned** — roughly half
 the search budget saved.
 
-I wired this so a pruned trial ends as a `KILLED` run tagged `pruned=true` in
-MLflow (not `FAILED`).
+In MLflow a pruned trial ends as a `KILLED` run tagged `pruned=true` (not `FAILED`).
 
 ## The model registry
 
@@ -115,7 +111,7 @@ After the ladder finishes, the best model by test accuracy — the `conv_net`, a
 **~98.7%** with an ECE of **0.0023** — is registered as `mnist-classifier` and
 given the alias `@champion`.
 
-The decision I actually care about: **serving loads the model by alias/version
+**Serving loads the model by alias/version
 from the registry, never from a checked-in weights file.** `predict.py` asks for
 `models:/mnist-classifier@champion` and gets whatever the current champion is. So
 a rollback is a one-line alias change, not a redeploy. 
