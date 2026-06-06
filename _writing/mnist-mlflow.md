@@ -43,7 +43,7 @@ comparing:
 | `mlp_relu` | `Linear → ReLU → Linear` | ~98% |
 | `conv_net` | 2× (conv → ReLU → pool) → classifier | ~99% |
 
-Without the `ReLU`, any number of stacked linear layers collapses into one — it's ReLU that breaks the ~92% accuracy.
+Without the `ReLU`, any number of stacked linear layers collapses into one — it's ReLU that breaks past the ~92% ceiling.
 
 ## Experiment tracking with MLflow
 
@@ -117,7 +117,7 @@ In MLflow a pruned trial ends as a `KILLED` run tagged `pruned=true` (not `FAILE
 ## The model registry
 
 After the ladder finishes, the best model by test accuracy — the `conv_net`, at
-**~98.7%** with an ECE of **0.0023** — is registered as `mnist-classifier` and
+**~98.9%** with an ECE of **0.0023** — is registered as `mnist-classifier` and
 given the alias `@champion`.
 
 **Serving loads the model by alias/version
@@ -144,8 +144,8 @@ calibration, for example:
 
 - **Once everything is a run, comparison is free.** The task of investigating "which
   model is better" becomes a sorting problem.
-- **How critical Search is.** The importance plot tells far more about a model than its accuracy.
-- **Pruning is cheap and resources saving**.
+- **Search matters.** But importances need many trials to trust.
+- **Pruning is cheap and resource-saving**.
 - **"Load by version" is cool**.
 
 The champion is deployed as a registry-backed
