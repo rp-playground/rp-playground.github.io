@@ -95,21 +95,18 @@ Optuna then hands you a few plots for free. For the `conv_net` study:
   <figcaption>Parallel coordinates — line colour is val accuracy (viridis), and the best trial is the bold red line. The winner runs <code>conv_channels=16</code> with low dropout and a mid learning rate; the same <code>conv_channels=16</code> with too small a learning rate is the dark line that bottoms out at ~0.975.</figcaption>
 </figure>
 
-The parallel-coordinate plot is the one I actually trust here: the two
+Let's look at the parallel-coordinate plot: the two
 `conv_channels=16` trials differ mostly in learning rate and span 0.975 → 0.989,
 so width and learning rate clearly swing the result. The fANOVA importance plot
 is shakier — with only four completed trials its ranking wobbles between runs,
-a good reminder that importances need many more trials to mean much. (I also
-swapped in my own parallel-coordinate plot: Optuna's default colours every line
-in near-identical shades of blue, so when all trials score ~0.98 you can't tell
-them apart.)
+a good reminder that importances need many more trials to mean much. 
 
 ### Pruning
 
-A naïve search trains every trial to the end, even the obviously bad ones. Optuna's
-**MedianPruner** fixes that: each trial reports its validation accuracy after every
-epoch, and if it's trailing the median of past trials at the same epoch, the trial
-is stopped early. In the run above, **6 of 10 trials were pruned** — well over half
+A naïve search wastes time training every model configuration to the very end—even the clearly underperforming ones. Optuna's
+**MedianPruner** solves this problem through automated early-stopping: each trial reports its validation accuracy after every
+epoch, and if it falls below the median of past trials at the same epoch, the trial
+is stopped instantly. In the run above, **6 of 10 trials were pruned** — well over half
 the search budget saved.
 
 In MLflow a pruned trial ends as a `KILLED` run tagged `pruned=true` (not `FAILED`).
@@ -157,15 +154,15 @@ Hub, with a system panel showing exactly which version is being served.
 The deployed demo is **closed-set**, exactly like my
 [bear detector](/projects/bear-detector/): softmax always picks one of the ten
 classes, so it will happily call a drawing of a flower a "9" with 53% confidence.
-Rather than pretend otherwise, the Space adds the same fix I used there — an
+The Space adds the same fix I used there — an
 **energy score** (`-logsumexp` of the logits; Liu et al., 2020) compared against a
 threshold calibrated on real MNIST digits (in-distribution) versus FashionMNIST
 (near-OOD). Low energy means "digit-like"; high energy flags out-of-distribution.
 
 At a TPR of 0.95 the threshold keeps 95% of real digits while letting only ~4% of
 FashionMNIST leak through as "digit", and a slider moves that operating point
-live. It's the same honest trade-off as the
-[bear detector's OOD study](/writing/ood-detection/) — and the price is visible:
-thin `1`s carry little ink, land near the boundary, and are sometimes rejected as
+live. It's the same trade-off as the
+[bear detector's OOD study](/writing/ood-detection/):
+thin `1`s land near the boundary, and are sometimes rejected as
 "not a digit" at a strict TPR. But the model can finally say *that isn't a digit*
-instead of confidently guessing.
+instead of guessing, with confidence.
