@@ -151,3 +151,21 @@ calibration, for example:
 The champion is deployed as a registry-backed
 [live demo](/projects/mnist-mlflow/) — loaded by revision from the Hugging Face
 Hub, with a system panel showing exactly which version is being served.
+
+## Knowing when it's not a digit
+
+The deployed demo is **closed-set**, exactly like my
+[bear detector](/projects/bear-detector/): softmax always picks one of the ten
+classes, so it will happily call a drawing of a flower a "9" with 53% confidence.
+Rather than pretend otherwise, the Space adds the same fix I used there — an
+**energy score** (`-logsumexp` of the logits; Liu et al., 2020) compared against a
+threshold calibrated on real MNIST digits (in-distribution) versus FashionMNIST
+(near-OOD). Low energy means "digit-like"; high energy flags out-of-distribution.
+
+At a TPR of 0.95 the threshold keeps 95% of real digits while letting only ~4% of
+FashionMNIST leak through as "digit", and a slider moves that operating point
+live. It's the same honest trade-off as the
+[bear detector's OOD study](/writing/ood-detection/) — and the price is visible:
+thin `1`s carry little ink, land near the boundary, and are sometimes rejected as
+"not a digit" at a strict TPR. But the model can finally say *that isn't a digit*
+instead of confidently guessing.
