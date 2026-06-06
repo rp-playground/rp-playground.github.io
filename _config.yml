@@ -24,3 +24,6 @@ collections:
   papers:
     output: true
     permalink: /papers/:name/
+  talks:
+    output: true
+    permalink: /talks/:name/

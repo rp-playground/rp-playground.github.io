@@ -1,26 +1,23 @@
 ---
-# Front matter (even empty) makes Jekyll process the Liquid below.
+permalink: /talks/
 ---
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Raffaele P. — ML Projects</title>
+  <title>Talks — Raffaele P.</title>
+  <meta name="description" content="Notes from talks I've attended or watched.">
   <link rel="stylesheet" href="/assets/css/main.css">
   <style>
     .container { max-width: 1040px; margin: 0 auto; padding: 4rem 1.5rem; }
     header.site { margin-bottom: 3rem; }
     header.site h1 { font-size: 2.2rem; font-weight: 600; letter-spacing: -0.02em; }
     .subtitle { color: var(--muted); font-size: 1.1rem; margin-top: 0.5rem; }
-    .bio { color: var(--muted); font-size: 0.95rem; font-style: italic; margin-top: 0.6rem; }
     .topnav { display: flex; gap: 1.4rem; padding-bottom: 1rem; margin-bottom: 2.5rem; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
     .topnav a { color: var(--muted); text-decoration: none; }
     .topnav a:hover { color: var(--accent); }
     .topnav a.current { color: var(--text); font-weight: 600; }
-    .links { margin-top: 1.2rem; display: flex; gap: 1.2rem; }
-    .links a { color: var(--accent); text-decoration: none; font-size: 0.95rem; }
-    .links a:hover { text-decoration: underline; }
 
     .layout { display: grid; grid-template-columns: 180px 1fr; gap: 2.5rem; align-items: start; }
     @media (max-width: 680px) { .layout { grid-template-columns: 1fr; gap: 1.5rem; } }
@@ -36,38 +33,32 @@
     .filter.active { background: rgba(91,157,255,0.18); color: var(--accent); }
 
     section.item-section h2 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 1.2rem; }
-    section.item-section + section.item-section { margin-top: 2.5rem; }
     .grid { display: grid; gap: 1.2rem; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+    .item-card .byline { color: var(--muted); font-size: 0.82rem; margin: 0.15rem 0 0.4rem; }
     .item-card .meta-year { margin-left: auto; color: var(--muted); font-size: 0.72rem; }
 
+    .empty { color: var(--muted); }
     footer { margin-top: 4rem; color: var(--muted); font-size: 0.85rem; }
   </style>
 </head>
 <body>
   <div class="container">
     <nav class="topnav">
-      <a href="/" class="current">Home</a>
+      <a href="/">Home</a>
       <a href="/papers/">Papers</a>
-      <a href="/talks/">Talks</a>
+      <a href="/talks/" class="current">Talks</a>
     </nav>
     <header class="site">
-      <h1>Raffaele P.</h1>
-      <p class="subtitle">From physics to finance, now learning ML from the ground up — experiments, write-ups  &amp; papers</p>
-      <div class="links">
-        <!-- TODO: real links -->
-        <a href="https://github.com/YOUR_USERNAME">GitHub</a>
-        <a href="https://linkedin.com/in/YOUR_HANDLE">LinkedIn</a>
-        <a href="mailto:you@example.com">Email</a>
-      </div>
+      <h1>Talks</h1>
+      <p class="subtitle">Notes from talks I've attended or watched.</p>
     </header>
 
-    {%- comment -%} Build the union of tags and years across both collections. {%- endcomment -%}
-    {%- assign all_items = site.projects | concat: site.writing -%}
+    {%- comment -%} Tags + years across the talks collection only. {%- endcomment -%}
     {%- assign tag_acc = "" -%}
     {%- assign year_acc = "" -%}
-    {%- for item in all_items -%}
+    {%- for item in site.talks -%}
       {%- for t in item.tags -%}{%- assign tag_acc = tag_acc | append: t | append: "~" -%}{%- endfor -%}
-      {%- assign y = item.date | date: "%Y" -%}
+      {%- assign y = item.talk_date | default: item.date | date: "%Y" -%}
       {%- assign year_acc = year_acc | append: y | append: "~" -%}
     {%- endfor -%}
     {%- assign all_tags = tag_acc | split: "~" | uniq | sort -%}
@@ -94,49 +85,32 @@
       </aside>
 
       <main>
-        {%- assign projects = site.projects | sort: "date" | reverse -%}
-        {%- if projects.size > 0 -%}
+        {%- assign talks = site.talks | sort: "talk_date" | reverse -%}
+        {%- if talks.size > 0 -%}
         <section class="item-section">
-          <h2>Projects</h2>
+          <h2>Talks</h2>
           <div class="grid">
-            {%- for p in projects -%}
-            <a class="card item-card" href="{{ p.url }}"
-               data-tags="|{{ p.tags | join: '|' }}|" data-year="{{ p.date | date: '%Y' }}">
-              <h3>{{ p.title }}</h3>
-              <p>{{ p.summary }}</p>
+            {%- for t in talks -%}
+            <a class="card item-card" href="{{ t.url }}"
+               data-tags="|{{ t.tags | join: '|' }}|" data-year="{{ t.talk_date | default: t.date | date: '%Y' }}">
+              <h3>{{ t.title }}</h3>
+              <p class="byline">{{ t.speaker | escape }}{% if t.speaker and t.event %} · {% endif %}{{ t.event | escape }}</p>
+              <p>{{ t.summary }}</p>
               <div class="tags">
-                {%- for t in p.tags -%}<span class="tag">{{ t }}</span>{%- endfor -%}
-                <span class="meta-year">{{ p.date | date: "%Y" }}</span>
+                {%- for tag in t.tags -%}<span class="tag">{{ tag }}</span>{%- endfor -%}
+                <span class="meta-year">{{ t.talk_date | default: t.date | date: "%Y" }}</span>
               </div>
             </a>
             {%- endfor -%}
           </div>
         </section>
-        {%- endif -%}
-
-        {%- assign writing = site.writing | sort: "date" | reverse -%}
-        {%- if writing.size > 0 -%}
-        <section class="item-section">
-          <h2>Writing</h2>
-          <div class="grid">
-            {%- for w in writing -%}
-            <a class="card item-card" href="{{ w.url }}"
-               data-tags="|{{ w.tags | join: '|' }}|" data-year="{{ w.date | date: '%Y' }}">
-              <h3>{{ w.title }}</h3>
-              <p>{{ w.summary }}</p>
-              <div class="tags">
-                {%- for t in w.tags -%}<span class="tag">{{ t }}</span>{%- endfor -%}
-                <span class="meta-year">{{ w.date | date: "%Y" }}</span>
-              </div>
-            </a>
-            {%- endfor -%}
-          </div>
-        </section>
+        {%- else -%}
+        <p class="empty">No talks yet.</p>
         {%- endif -%}
       </main>
     </div>
 
-    <footer>Built with Jekyll · hosted on GitHub Pages</footer>
+    <footer>Built with Jekyll · hosted on GitHub Pages · <a href="/">back home</a></footer>
   </div>
   <script src="/assets/js/filter.js"></script>
 </body>
