@@ -30,5 +30,4 @@ just the clean climb. The full story is in the [write-up](/writing/kaggle-lab/).
 I know MLflow and W&B exist. I started with a flat `runs.jsonl` on purpose: it's
 greppable, diffable, and needs no server, and it was the smallest thing that made
 every run reproducible. Mapping it onto MLflow for a UI and a model registry is a
-deliberate next step, not a default. There's no live demo here either — it's a CLI
-and a log format, not a model.
+deliberate next step.
