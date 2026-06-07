@@ -118,6 +118,29 @@ A few things generalised past this one competition:
   leaks enough fold structure that local CV and the leaderboard disagreed more than
   once, which is why I added a fixed 20% holdout as a third, untouched oracle.
 
+## Where I'd take it next
+
+Two directions interest me, neither built yet.
+
+**Let an agent drive the loop.** The log is already machine-readable. Each run
+states a change and a hypothesis, carries its parent, and records the score that
+change produced — most of what an agent would need to run the search itself: read
+the tree, propose the next change with a written hypothesis, submit it through the
+same `run` path, read the new score, repeat. The plumbing is the easy half. The hard
+half is getting an agent to propose changes that beat the ones I'd think of, and
+hypothesis-first logging at least gives it the same constraint I work under, so its
+dead-ends would be as legible as mine. Karpathy's framing of an autonomous research
+loop is the obvious reference here.
+
+**Put it on MLflow.** `runs.jsonl` is greppable and needs no server, which is why I
+started there. MLflow maps onto it cleanly: a kaggle-lab run becomes an MLflow run,
+the changelog becomes params and tags, the public score a metric, the notebook and
+submission CSV artifacts, and `parent_run_id` a nested run. In return I'd get a UI to
+sort and compare runs and a model registry to serve a chosen submission by version —
+the loop I built separately on an [MNIST project](/writing/mnist-mlflow/). The
+trade-off is infrastructure. A flat JSONL is portable and honest; MLflow earns its
+keep once I actually want the UI and the registry, not before.
+
 ## What it isn't
 
 It isn't a way to win Kaggle. The modelling here is ordinary — gradient boosting,
