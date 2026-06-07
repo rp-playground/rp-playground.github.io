@@ -15,8 +15,8 @@ I do not perform. Grounded over clever.
 - **Write in the first person.** "I built mine in pure PyTorch." "This is the
   case I care about." Own the work and the opinions.
 - **Have a point of view.** Say which result mattered, which approach you'd pick,
-  what surprised you. A flat, neutral report is worse than an honest opinion.
-- **Value honest and negative results.** If the fancy method lost to the
+  what surprised you. A flat, neutral report is worse than a stated opinion.
+- **Value negative and surprising results.** If the fancy method lost to the
   baseline, lead with that. The surprising or humbling finding is usually the
   reason the piece is worth reading.
 - **Keep a narrative spine**, but a grounded one: setup → what I tried → what
@@ -73,6 +73,10 @@ I do not perform. Grounded over clever.
   - ✗ "Same data, same projection: separation climbs with model class."
   - ✓ "The data and projection are identical across panels; separation increases
     with model class."
+- **Don't use the word "honest" (or "honestly").** Show it by foregrounding the
+  negative or surprising result; never label the writing as honest.
+  - ✗ "a log that kept an honest record of the regressions"
+  - ✓ "a log that kept the regressions"
 - **Don't use jargon without unpacking it.** If a term needs prior knowledge,
   either say it plainly or explain it in the same sentence.
   - ✗ "The raw weights are noisier, since a linear model has no spatial prior."
@@ -93,7 +97,7 @@ When revising an existing piece, before finishing:
 1. Every number, table, code block, figure, link, and reference is byte-for-byte
    unchanged.
 2. No stock openers, no aphoristic punch-lines, no decorative metaphors.
-3. The first-person point of view is present and the honest/surprising result is
+3. The first-person point of view is present and the negative/surprising result is
    foregrounded.
 4. Read it aloud — if a sentence sounds like it's performing, cut the performance
    and keep the point.
