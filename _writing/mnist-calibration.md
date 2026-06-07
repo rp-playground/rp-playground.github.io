@@ -2,7 +2,7 @@
 layout: article
 title: "Past 99%: where a confident MNIST model is wrong"
 description: The confidence-calibration angle on the MNIST × MLflow project — reliability/ECE says how confidently the model is wrong, a UMAP of its features says where, with Colah's t-SNE visualization as the ancestor.
-summary: Reliability/ECE tells you how confidently the model is wrong; a UMAP of its features tells you where — the two halves of going past 99% accuracy.
+summary: Reliability/ECE tells you how confidently the model is wrong; a UMAP of its features tells you where.
 date: 2026-06-06
 tags: [calibration, ECE, UMAP, t-SNE, MNIST]
 published: true
