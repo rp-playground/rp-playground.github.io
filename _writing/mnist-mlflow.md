@@ -31,7 +31,7 @@ hyperparameter search on top of it.*
 
 This write-up is the first angle: **system design with MLflow + Optuna** —
 tracking, hyperparameter search, the model registry, and the artifacts each run
-leaves behind. Angles 2 and 3 are separate pieces.
+produces. Angles 2 and 3 are separate pieces.
 
 ## The complexity ladder
 
@@ -64,9 +64,9 @@ compare
 
 Each run logs its params (learning rate, parameter count, the tuned
 hyperparameters), per-epoch `train_loss` / `val_accuracy`, and final test metrics
-(`test_accuracy`, `test_macro_recall`, `test_ece`, `per-class accuracy`). The payoff
-comes once every run is logged: the MLflow UI turns "which run won, and why" into
-something you answer by sorting a table.
+(`test_accuracy`, `test_macro_recall`, `test_ece`, `per-class accuracy`). Once every
+run is logged, the MLflow UI turns "which run won, and why" into something you
+answer by sorting a table.
 
 ## Hyperparameter search with Optuna
 
@@ -112,8 +112,7 @@ every epoch, and if it falls below the median of past trials at the same epoch, 
 trial is killed on the spot. In the run above, **6 of 10 trials were pruned** — more
 than half the search budget saved for no loss in result.
 
-In MLflow a pruned trial ends as a `KILLED` run tagged `pruned=true` (not `FAILED`),
-so you can tell "we stopped this on purpose" apart from "this crashed."
+In MLflow a pruned trial ends as a `KILLED` run tagged `pruned=true` (not `FAILED`).
 
 ## The model registry
 
@@ -147,7 +146,7 @@ calibration, for example:
 - **Once everything is a run, comparison is free.** "Which model is better"
   becomes a sorting problem.
 - **Search matters** — but importances need many trials before you can trust them.
-- **Pruning is cheap** and saves a real chunk of the compute budget.
+- **Pruning is cheap** and saves a meaningful fraction of the compute budget.
 - **Loading by version** is the piece I'll reuse everywhere: serve by alias,
   roll back with a tag.
 
