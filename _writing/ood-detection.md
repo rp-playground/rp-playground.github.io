@@ -90,7 +90,7 @@ lives in
   then measure what fraction of non-bears *also* sneak through. Lower is better.
   The threshold is pinned by the in-dist bears alone; the OOD sets only measure
   leakage.
-- **Two OOD regimes, because difficulty isn't one number:**
+- **Two OOD regimes:**
   - **far-OOD** — [DTD](https://huggingface.co/datasets/tanganke/dtd), the
     Describable Textures Dataset. Pure textures, no object semantics. The easy case.
   - **near-OOD** — [Oxford-IIIT Pet](https://www.robots.ox.ac.uk/~vgg/data/pets/):
