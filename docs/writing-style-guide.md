@@ -68,6 +68,16 @@ I do not perform. Grounded over clever.
 - **Don't reach for filler verbs/metaphors** where a plain one works
   ("the artifacts each run *leaves behind*" → "the artifacts each run
   *produces*").
+- **Don't use the colon-cadence punchline** — a short fragment, a colon, then the
+  payoff. It reads as a rhetorical drumroll.
+  - ✗ "Same data, same projection: separation climbs with model class."
+  - ✓ "The data and projection are identical across panels; separation increases
+    with model class."
+- **Don't use jargon without unpacking it.** If a term needs prior knowledge,
+  either say it plainly or explain it in the same sentence.
+  - ✗ "The raw weights are noisier, since a linear model has no spatial prior."
+  - ✓ "The model learns one independent weight per pixel, with nothing tying
+    neighbouring pixels together, so the raw weights look speckled."
 
 ## Calibration note
 
@@ -87,4 +97,3 @@ When revising an existing piece, before finishing:
    foregrounded.
 4. Read it aloud — if a sentence sounds like it's performing, cut the performance
    and keep the point.
-</content>

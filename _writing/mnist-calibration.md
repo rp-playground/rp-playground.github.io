@@ -197,4 +197,3 @@ run's weight matrix and logs the template grid (raw + smoothed).
   Projection for Dimension Reduction.*
 - Guo, Pleiss, Sun & Weinberger (2017). *On Calibration of Modern Neural
   Networks.*
-</content>

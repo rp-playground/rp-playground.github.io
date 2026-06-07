@@ -169,4 +169,3 @@ FashionMNIST leak through as "digit", and a slider moves that operating point li
 It's the same trade-off as the [bear detector's OOD study](/writing/ood-detection/):
 thin `1`s land near the boundary and get rejected as "not a digit" at a strict TPR.
 But the model can finally say *that isn't a digit* instead of confidently guessing.
-</content>

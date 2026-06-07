@@ -146,7 +146,7 @@ Two things stood out, and the second wasn't what I expected.
 against MSP's 13%. Good — and a sanity check that the pipeline works.
 
 **2. Near-OOD breaks everything — and MSP, the plain baseline, beats energy.**
-Against cats and dogs, energy leaks a brutal **28.75%**: more than one pet in four
+Against cats and dogs, energy leaks **28.75%**: more than one pet in four
 gets past the filter labelled "bear." Worse, the supposedly-better energy score
 does *worse* than plain softmax (17.33%) on the exact case I built this for.
 
@@ -161,8 +161,8 @@ scalar.
 
 ## Looking at the failures
 
-Here's what slipped past the energy filter. Both are false positives the model
-confidently filed under "bear," with energy scores below the −1.98 threshold. The
+These slipped past the energy filter — both false positives the model confidently
+filed under "bear," with energy scores below the −1.98 threshold. The
 images are shown exactly as the model saw them: resized, cropped, normalized.
 
 | near-OOD (Oxford Pet), energy −3.05 | far-OOD (DTD), energy −3.29 |
@@ -177,7 +177,7 @@ texture it was trained on.
 ## Choosing a threshold
 
 The threshold is a trade-off: too strict and you reject real bears, too loose and
-non-bears get through. Here's how it moves for the energy signal:
+non-bears get through. How it moves for the energy signal:
 
 ```
   TPR     thresh       DTD      Pets
@@ -237,5 +237,3 @@ MODEL_PATH=../../bear_detector.pth python calibrate_threshold.py \
   Exposure.*
 - Cimpoi et al. (2014). *Describing Textures in the Wild* (DTD).
 - Parkhi et al. (2012). *Cats and Dogs* (Oxford-IIIT Pet).
-</content>
-</invoke>
