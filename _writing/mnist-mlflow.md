@@ -81,7 +81,7 @@ For that to work the models have to be **parametric**: `build_model(name,
 hidden_dim=…, conv_channels=…, dropout=…)` builds whatever architecture Optuna asks
 for.
 
-Optuna then hands you a few plots for free. For the `conv_net` study:
+Optuna also produces a few plots automatically. For the `conv_net` study:
 
 <figure>
   <img src="/assets/mnist/optuna_history_conv_net.png" alt="Optuna optimization history for conv_net">
@@ -109,8 +109,8 @@ that importances need many more trials before they mean much.
 A naïve search trains every trial to the end, even the obviously bad ones. Optuna's
 **MedianPruner** stops them early: each trial reports its validation accuracy after
 every epoch, and if it falls below the median of past trials at the same epoch, the
-trial is killed on the spot. In the run above, **6 of 10 trials were pruned** — more
-than half the search budget saved for no loss in result.
+trial is stopped immediately. In the run above, **6 of 10 trials were pruned** — more
+than half the search budget saved without changing the final result.
 
 In MLflow a pruned trial ends as a `KILLED` run tagged `pruned=true` (not `FAILED`).
 
@@ -143,7 +143,7 @@ calibration, for example:
 
 ## What I took away
 
-- **Once everything is a run, comparison is free.** "Which model is better"
+- **Once everything is a run, comparison is easy.** "Which model is better"
   becomes a sorting problem.
 - **Search matters** — but importances need many trials before you can trust them.
 - **Pruning is cheap** and saves a meaningful fraction of the compute budget.
