@@ -5,7 +5,7 @@ description: The confidence-calibration angle on the MNIST × MLflow project —
 summary: Reliability/ECE tells you how confidently the model is wrong; a UMAP of its features tells you where — the two halves of going past 99% accuracy.
 date: 2026-06-06
 tags: [calibration, ECE, UMAP, t-SNE, MNIST]
-published: false  # draft — excluded from the build for now
+published: true
 ---
 
 *The confidence-calibration angle on the [MNIST × MLflow + Optuna](/writing/mnist-mlflow/)
