@@ -54,6 +54,20 @@ I do not perform. Grounded over clever.
   sentence. Use it sparingly, for genuine asides.
 - **Don't use throat-clearing or hype** ("It's worth noting that," "Importantly,"
   "In today's fast-paced world of ML," "game-changer," "powerful").
+- **Don't use colloquial intensifiers.** State the magnitude plainly.
+  - ✗ "Pruning saves a real chunk of the compute budget."
+  - ✓ "Pruning saves a meaningful fraction of the compute budget."
+- **Don't open with value-narration** — sentences that announce a benefit before
+  giving it.
+  - ✗ "The payoff comes once every run is logged: the UI lets you sort by metric."
+  - ✓ "Once every run is logged, the UI lets you sort by metric."
+- **Don't add editorializing asides that restate a fact in casual quotes.**
+  - ✗ "…tagged `pruned=true` (not `FAILED`), so you can tell 'we stopped this on
+    purpose' apart from 'this crashed.'"
+  - ✓ "…tagged `pruned=true` (not `FAILED`)."
+- **Don't reach for filler verbs/metaphors** where a plain one works
+  ("the artifacts each run *leaves behind*" → "the artifacts each run
+  *produces*").
 
 ## Calibration note
 
