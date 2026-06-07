@@ -58,15 +58,37 @@ Two things line up with the calibration story:
 
 **The classes are cleanly disentangled.** Ten tight, well-separated islands — the
 geometric reason the model is high-confidence almost everywhere, and the reason
-the reliability histogram is so top-heavy. (Run the same projection on raw pixels,
-à la Colah, and the clusters touch and bleed; the network has *earned* this
-separation.)
+the reliability histogram is so top-heavy. And it's *earned*, in a way you can
+watch accrue rung by rung: run the **same** UMAP — same parameters, same seed —
+on the raw 784-d pixels, then on the middle-rung MLP's penultimate features, then
+on the conv net's. The pixels (à la Colah) touch and bleed; the MLP starts
+pulling the classes apart but leaves them loose and overlapping; the conv net
+carves clean islands.
+
+<figure>
+  <img src="/assets/mnist/umap_ladder_conv_net.png" alt="Three-panel UMAP of the same MNIST test set: raw pixels with overlapping bleeding clusters, MLP penultimate features partly separated, conv penultimate features in ten clean islands">
+  <figcaption>The same UMAP on three input spaces, all coloured by true class — the complexity ladder made geometric. <strong>Left:</strong> raw pixels — digit clouds overlap and leak into each other. <strong>Middle:</strong> the MLP's penultimate features — clusters forming but still loose and touching. <strong>Right:</strong> the conv net's penultimate features — ten tight, separated islands. Same data, same projection: separation climbs monotonically with model class, the geometric echo of the ECE that halves at each rung. The separation on the right is something the network <em>built</em>, not a property MNIST hands you for free.</figcaption>
+</figure>
 
 **The errors sit on the borders.** The 134 misclassifications aren't scattered at
 random — they cluster at the **edges** of the islands and in the thin bridges
 between them. That's exactly where an ambiguous digit lands: a sloppy `4`
-drifting toward the `9` island, a `5` leaning into `3`. The mistakes the
-confusion matrix already flagged (4↔9, 3↔5) are right there as geometry.
+drifting toward the `9` island, a `5` leaning into `3`. And this isn't just
+eyeballing the picture: the geometry and the confusion matrix are two independent
+views that agree. Rank all 45 digit-pairs by how close their UMAP clusters sit
+and by how often they get confused, and the two orderings correlate (Spearman
+**ρ ≈ 0.49**, *p* < 0.001). The headline coincides exactly — `3↔5` is *both* the
+single most-confused pair (15 errors) *and* the closest pair of clusters in the
+whole projection; `7↔9` and `2↔7` are likewise top-confused and among the
+nearest. The agreement isn't perfect, and that's the useful part: `5↔6` confuses
+often yet isn't especially close in 2D, while `2↔9` sit close but never confuse.
+UMAP's 2D squeeze loses what the raw counts keep — which is exactly why holding
+*both* views beats trusting either alone.
+
+<figure class="narrow">
+  <img src="/assets/mnist/confusion_geometry_conv_net.png" alt="Scatter of all 45 digit-pairs: UMAP centroid distance on the x-axis (closer to the right) against how often the pair is confused on the y-axis, trending up-right, with 3–5 circled in the top-right corner">
+  <figcaption>Each point is one of the 45 digit-pairs: how close its clusters sit in UMAP (x, closer to the right) against how often the two digits are confused (y). The cloud trends up-right — close pairs confuse more — and <code>3–5</code> (circled) anchors the corner as both the nearest and the most-confused pair. The off-trend points are the honest exceptions: <code>5–6</code> confuses despite sitting far apart, <code>2–9</code> sit close but never confuse.</figcaption>
+</figure>
 
 **And they lean toward their confuser.** It's tempting to read more into the
 picture — that each error is *pulled* toward the digit it gets mistaken for, like
@@ -117,22 +139,37 @@ capture the many ways a `4` or an `8` is drawn, so visually similar digits get
 near-identical templates. That smudginess is the interpretable cause of the
 `logistic` rung's worse separation **and its worse calibration**: where the conv
 net carves ten clean islands and earns its confidence, the linear model decides
-with overlapping stamps and pays for it with a higher ECE. Same complexity
-ladder, two ends of the calibration story — and two different ways to *see* what
-each model learned.
+with overlapping stamps and pays for it with a higher ECE.
+
+And the middle rung lands exactly where you'd hope — the calibration story isn't
+two anecdotes at the extremes but a monotone trend, with ECE roughly **halving at
+each step up the ladder**:
+
+| rung        | test accuracy | test ECE |
+|-------------|:-------------:|:--------:|
+| `logistic`  | 92.2%         | 0.0101   |
+| `mlp_relu`  | 96.9%         | 0.0050   |
+| `conv_net`  | 98.7%         | 0.0023   |
+
+The MLP's geometry tells the same in-between story (middle panel above): clusters
+forming but still loose, the visual midpoint between the linear model's smudge and
+the conv net's clean islands. Same complexity ladder, one continuous calibration
+curve — and two different ways to *see* what each model learned.
 
 ## Reproduce it
 
 ```bash
-uv run python -m mnist.embedding   # conv net: forward-hook + UMAP of penultimate features
-uv run python -m mnist.templates   # logistic: recover the weight matrix as per-class templates
+uv run python -m mnist.embedding         # conv net: forward-hook + UMAP of penultimate features
+uv run python -m mnist.pixel_embedding   # the ladder: same UMAP on pixels -> MLP -> conv features
+uv run python -m mnist.templates         # logistic: recover the weight matrix as per-class templates
 ```
 
 `embedding` loads the champion by registry alias, captures the penultimate
 activations over the test set with a forward hook, runs UMAP, and logs both UMAP
 figures plus the error-polarization metric onto the conv net's MLflow run;
-`templates` reads the logistic run's weight matrix and logs the template grid
-(raw + smoothed).
+`pixel_embedding` runs the same UMAP on raw pixels, the MLP's penultimate
+features, and the conv net's, for the three-panel ladder; `templates` reads the
+logistic run's weight matrix and logs the template grid (raw + smoothed).
 
 ---
 
