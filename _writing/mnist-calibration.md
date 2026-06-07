@@ -57,21 +57,21 @@ classifier, where the model actually makes its decision.
 reason the model is confident almost everywhere. And that separation comes from the
 model, not the data. To see it, run the same UMAP — same parameters, same seed — on
 the raw 784-d pixels, then on the MLP's penultimate features, then on the conv
-net's. The raw pixels (à la Colah) overlap and bleed together; the MLP starts
-pulling the classes apart but leaves them touching; the conv net produces clean,
-separated clusters.
+net's. The raw pixels (à la Colah) overlap heavily; the MLP starts pulling the
+classes apart but leaves them touching; the conv net produces clean, separated
+clusters.
 
 <figure>
   <img src="/assets/mnist/umap_ladder_conv_net.png" alt="Three-panel UMAP of the same MNIST test set: raw pixels with overlapping bleeding clusters, MLP penultimate features partly separated, conv penultimate features in ten clean clusters">
-  <figcaption>The same UMAP on three input spaces, all coloured by true class — the complexity ladder made geometric. <strong>Left:</strong> raw pixels — digit clouds overlap and leak into each other. <strong>Middle:</strong> the MLP's penultimate features — clusters forming but still loose and touching. <strong>Right:</strong> the conv net's penultimate features — ten tight, separated clusters. Same data, same projection: separation climbs monotonically with model class, matching the ECE that roughly halves at each rung.</figcaption>
+  <figcaption>The same UMAP on three input spaces, all coloured by true class — the complexity ladder made geometric. <strong>Left:</strong> raw pixels — digit clouds overlap and leak into each other. <strong>Middle:</strong> the MLP's penultimate features — clusters forming but still loose and touching. <strong>Right:</strong> the conv net's penultimate features — ten tight, separated clusters. The data and projection are identical across the three panels; separation increases with model class, matching the ECE that roughly halves at each rung.</figcaption>
 </figure>
 
 
 **The errors sit on the borders.** The 134 misclassifications aren't scattered at
 random — they sit at the edges of the clusters, and a few fall into the neighbouring
 cluster they get confused with. That's where an ambiguous digit lands: a sloppy `4`
-near the `9` cluster, a `5` near the `3`. And this isn't just eyeballing the picture
-— the geometry and the confusion matrix are two independent views that agree. Rank
+near the `9` cluster, a `5` near the `3`. The geometry and the confusion matrix are
+two independent views, and they agree. Rank
 all 45 digit-pairs by how close their UMAP clusters sit and by how often they get
 confused, and the two orderings correlate (Spearman **ρ ≈ 0.49**, *p* < 0.001).
 `3↔5` is *both* the single most-confused pair (15 errors) *and* the closest pair of
@@ -155,7 +155,7 @@ calibrated.
 
 <figure>
   <img src="/assets/mnist/weight_templates_logistic.png" alt="The logistic model's ten per-class weight templates, reshaped to 28x28">
-  <figcaption>The `logistic` model's per-class weight templates (red pushes <em>toward</em> the class, blue <em>against</em>). Display-smoothed with a Gaussian blur — the raw per-pixel weights are noisier, since a linear model has no spatial prior. You can still make out a ring for `0`, the stroke of `2`, the loop of `6`.</figcaption>
+  <figcaption>The `logistic` model's per-class weight templates (red pushes <em>toward</em> the class, blue <em>against</em>). Display-smoothed with a Gaussian blur: the model learns one independent weight per pixel, with nothing tying neighbouring pixels together, so the raw weights look speckled. You can still make out a ring for `0`, the stroke of `2`, the loop of `6`.</figcaption>
 </figure>
 
 Calibration improves steadily — ECE roughly halves at each step up the ladder:
