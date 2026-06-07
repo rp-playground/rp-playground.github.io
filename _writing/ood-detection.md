@@ -1,43 +1,45 @@
 ---
 layout: article
-title: 'Teaching a bear detector to say "I don''t know"'
-description: A post-hoc out-of-distribution study on a 3-class bear classifier — MSP vs energy, far-OOD vs near-OOD, and the concluding negative result.
-summary: A post-hoc out-of-distribution study on the bear classifier — MSP vs energy, far- vs near-OOD, and the concluding negative result.
+title: 'The bear detector that thought I was a grizzly'
+description: A post-hoc out-of-distribution study on a 3-class bear classifier — MSP vs energy, far-OOD vs near-OOD, and the negative result I didn't see coming.
+summary: I tried to teach a 3-class bear classifier to say "I don't know" without retraining it. Far-OOD was easy. Near-OOD was hard — and the fancy energy score lost to the plain baseline.
 date: 2026-06-02
 tags: [PyTorch, OOD detection, calibration]
 permalink: /writing/ood-detection/
 ---
 
-*A small OOD-detection study added to the [bear detector](https://rfflpllcn-bear-detector.hf.space)
-I deployed as a Hugging Face Space.*
+*A small OOD-detection study bolted onto the [bear detector](https://rfflpllcn-bear-detector.hf.space)
+I deployed as a Hugging Face Space — and the negative result that turned out to be
+the interesting part.*
 
-## The setup, and the problem
+## A model that cannot say no
 
 I was working through [fast.ai lesson 2](https://course.fast.ai/Lessons/lesson2.html),
-where the task is to build a bear detector. I built it in pure PyTorch — a
-ResNet-18 with a hard-coded softmax over **black**, **grizzly** and **teddy**
-bears — and deployed it on a Hugging Face Space with Gradio.
+where the task is a bear detector. I built mine in pure PyTorch — a ResNet-18 with
+a hard-coded softmax over **black**, **grizzly** and **teddy** bears — and deployed
+it on a Hugging Face Space with Gradio.
 
-Then I fed it a photo of a human. It said something like **"grizzly, 70%
-confident"**.
+Then I uploaded a photo of my own face. It came back **"grizzly, 70% confident."**
 
-That's the whole problem. The model reduces the universe (of
-all possible images) to exactly three species of bear. It is *structurally
-incapable* of saying "none of these". Show it a cat, a car, anything — it
-will still pick a bear. A silent, irritatingly confident failure.
+That isn't a bug; it's the design working as specified. The model reduces every
+possible image down to three species of bear, so it is *structurally* incapable of
+the answer "that's not a bear." Show it a cat, a car, my face — it picks a bear,
+and it does so confidently. The failure is silent and the confidence is misplaced.
 
-So I wanted to see how far I could push it toward "I don't know"
-*without retraining the model*, using only what its outputs already tell me.
+That confidence is the problem, but it's also the only thing I had to work with.
+So I set a constraint: get this model closer to "I don't know" **without
+retraining it**, using only the numbers it already produces. No new data, no new
+weights.
 
-## Raw softmax isn't a probability, it's a normalization
+## Softmax isn't a probability
 
-The softmax takes the three logits the network produces, applies `exp`, and
-divides by their sum. That makes them sum to 1 and *look* like they came out of
-a probability distribution. They don't — it's just a normalization.
+The softmax takes the three logits the network produces, applies `exp`, and divides
+by the sum. The outputs add to 1 and look like a probability distribution, but they
+aren't one — it's just a normalization.
 
-Still, the **maximum softmax probability (MSP)** isn't useless as a signal.
-Hendrycks & Gimpel (2017), *A Baseline for Detecting Misclassified and
-Out-of-Distribution Examples in Neural Networks*, put it well:
+Even so, the **maximum softmax probability (MSP)** carries real signal. Hendrycks
+& Gimpel (2017), *A Baseline for Detecting Misclassified and Out-of-Distribution
+Examples in Neural Networks*, put it well:
 
 > "the prediction probability of incorrect and out-of-distribution examples
 > tends to be lower than the prediction probability for correct examples.
@@ -46,54 +48,55 @@ Out-of-Distribution Examples in Neural Networks*, put it well:
 > error or abnormal, even though the prediction probability viewed in isolation
 > can be misleading."
 
-The deeper issue is calibration. As Guo et al. (2017), *On Calibration of
-Modern Neural Networks*, frame it:
+The deeper issue is calibration. As Guo et al. (2017), *On Calibration of Modern
+Neural Networks*, frame it:
 
 > "a network should provide a calibrated confidence measure in addition to its
 > prediction. In other words, the probability associated with the predicted
 > class label should reflect its ground truth correctness likelihood."
 
-So MSP is the baseline. The plan: reproduce an experiment in the spirit of
-Hendrycks & Gimpel §3 — measure how well the model's own confidence separates
-real bears from non-bears — and then try a stronger signal.
+So MSP is my baseline — the simple thing any fancier method has to beat. The plan:
+reproduce an experiment in the spirit of Hendrycks & Gimpel §3 — measure how well
+the model's own confidence separates real bears from non-bears — and then try to
+beat it with something stronger.
 
 ## A stronger signal: energy
 
-The MSP has an obvious weakness *for this model in particular*: with only **3
-classes**, the maximum softmax probability is squeezed into `[1/3, 1]`. There
-just isn't much room for the score to move. 
+MSP has a specific weakness *for this model in particular*. With only **3
+classes**, the maximum softmax probability is trapped in `[1/3, 1]`. There's barely
+any room for the score to move.
 
 The **energy score** (Liu et al., 2020, *Energy-based Out-of-distribution
-Detection*) sidesteps the normalization entirely. It's computed straight from
-the logits:
+Detection*) skips the normalization and reads straight off the logits:
 
 ```
 energy = -logsumexp(logits)
 ```
 
-Low energy means the model is confident the input is in-distribution; high
-energy means it isn't. Unlike the softmax, it doesn't get normalized into a
-bounded range, so it keeps more of the signal. The paper benchmarks energy
-against MSP and generally wins — so I ran both, on my own model.
+Low energy means the model thinks the input is in-distribution; high energy means
+it doesn't. Energy isn't squeezed into a bounded range, so it keeps more of the raw
+signal. On the standard benchmarks the paper shows energy beating MSP fairly
+consistently, so I ran both on my own weights, expecting energy to win.
 
 ## The experiment
 
-Everything runs on the **real** deployed weights (`bear_detector.pth`), reusing
-the exact architecture and preprocessing from the serving code. The full evaluation code lives in 
+Everything runs on the **real** deployed weights (`bear_detector.pth`), reusing the
+exact architecture and preprocessing from the serving code. The full evaluation
+lives in
 [`calibrate_threshold.py`](https://github.com/rp-playground/play-pytorch/blob/main/course.fast.ai/lesson2/app/serving/calibrate_threshold.py).
 
 - **In-distribution:** my held-out `bear_test/` set (99 real bear photos).
-- **Metric:** FPR at TPR 95 — calibrate a threshold so 95% of real bears are
-  accepted, then measure what fraction of non-bears *also* sneak through. Lower
-  is better. The threshold is fixed by the in-dist bears alone; the OOD sets
-  only measure leakage.
+- **Metric:** FPR at TPR 95 — fix a threshold so 95% of real bears get accepted,
+  then measure what fraction of non-bears *also* sneak through. Lower is better.
+  The threshold is pinned by the in-dist bears alone; the OOD sets only measure
+  leakage.
 - **Two OOD regimes:**
   - **far-OOD** — [DTD](https://huggingface.co/datasets/tanganke/dtd), the
-    Describable Textures Dataset. Textures, no object semantics. The easy case.
+    Describable Textures Dataset. Pure textures, no object semantics. The easy case.
   - **near-OOD** — [Oxford-IIIT Pet](https://www.robots.ox.ac.uk/~vgg/data/pets/):
-    37 cat and dog breeds. Furry quadruped mammals, visually adjacent to bears
-    but — crucially — containing **no bears** (so real bears can't leak in and
-    corrupt the metric).
+    37 cat and dog breeds. Furry quadruped mammals sitting visually next to bears,
+    but — crucially — containing **no actual bears** (so real bears can't leak in
+    and corrupt the metric). This is the case I care about.
 
 First, what the two signals look like on real bears:
 
@@ -102,26 +105,24 @@ First, what the two signals look like on real bears:
 | energy | -5.58 | -3.49 | -1.57 |
 | MSP    | 0.536 | **0.952** | 0.9997 |
 
-That MSP mean of **0.95** is a concrete example of the calibration problem: on
-held-out bears, the network already outputs 95% confidence on average. 
-With a baseline this high, there's almost no room left to separate real bears from OOD objects.
+That MSP mean of **0.95** is the calibration problem made concrete. On held-out
+bears the network is, on average, 95% confident — and these are the *easy*
+in-distribution cases. When the floor is already this high, there's no headroom
+left to separate real bears from impostors:
 
-To unpack that:
-* When a cat comes in and scores, say, 0.85, that's inside the bears' own range 
-— there's no clean threshold that keeps the bears in and the cat out. 
-The two groups mix together at the top of the scale.
-
-* The confidence is systematically too high for what the model actually knows. 
-It's the network's habitual overconfidence. 
-Modern nets do this (Guo et al.), and a 3-class softmax with a small training dataset makes this problem much worse.
-
-* The whole premise of MSP-based detection is that OOD inputs get lower confidence than in-distribution ones. 
-But if in-distribution bears are pinned at 0.95+, the model has already spent its confidence — there's 
-no empty space left for strange inputs to look less confident, because everything looks confident.
-
-* Energy doesn't have this ceiling. It runs −5.58 to −1.57, unbounded by design, so in principle 
-it has more dynamic range for OOD inputs to separate out. 
-While this is true in theory, the near-OOD results actually break this expectation.
+* A cat that scores, say, 0.85 lands *inside* the bears' own range. There's no
+  clean threshold that keeps the bears in and the cat out — the two groups mix at
+  the top of the scale.
+* The confidence is systematically higher than the model's actual competence
+  justifies. Modern nets do this (Guo et al.), and a 3-class softmax trained on a
+  few hundred images makes it much worse.
+* The premise of MSP detection is that OOD inputs look *less* confident than
+  in-distribution ones. But if in-distribution bears are pinned at 0.95+, the model
+  has already spent its confidence — there's no low-confidence region left for
+  strange inputs to fall into.
+* Energy has no ceiling. It runs −5.58 to −1.57, unbounded by design, so in
+  principle it has more room for OOD inputs to separate out. The near-OOD results
+  break that expectation.
 
 Calibrated thresholds at TPR 95:
 
@@ -139,41 +140,44 @@ FPR at TPR 95 — fraction of non-bears that bypass the filter (lower is better)
 | DTD  | far-OOD  | **7.13%**  | 12.61% |
 | Pets | near-OOD | 28.75% | **17.33%** |
 
-Two things jumped out, and the second one wasn't what I expected.
+Two things stood out, and the second wasn't what I expected.
 
-**1. Far-OOD is the easy case, and energy wins it.** On textures, energy leaks
-7% vs MSP's 13%. Good — and a sanity check that the pipeline works.
+**1. Far-OOD is the easy case, and energy wins it.** On textures, energy leaks 7%
+against MSP's 13%. Good — and a sanity check that the pipeline works.
 
-**2. Near-OOD breaks everything — and here MSP actually beats energy.** Against
-cats and dogs, energy leaks a brutal **28.75%**: more than one pet in four
-strolls past the filter labelled "bear". And the supposedly-better energy score
-is *worse* than the plain softmax baseline (17.33%) on exactly the case I care
-about most.
+**2. Near-OOD breaks everything — and MSP, the plain baseline, beats energy.**
+Against cats and dogs, energy leaks **28.75%**: more than one pet in four
+gets past the filter labelled "bear." Worse, the supposedly-better energy score
+does *worse* than plain softmax (17.33%) on the exact case I built this for.
 
-That's the opposite of the textbook takeaway. Energy being superior on the
-standard benchmarks (big models, ImageNet-scale) does **not** transfer to a
-tiny 3-class head fine-tuned on a few hundred bears. The honest conclusion 
-isn't "use energy instead of MSP." Both are scalars computed from the same three logits, 
-and on near-OOD inputs those logits are already fooled — no formula over them can recover 
-a distinction the model never learned. The fix has to come from more information, not a better scalar.
+That's the opposite of what I expected. Energy's advantage on the big benchmarks —
+ImageNet-scale models, hundreds of classes — does **not** survive the trip down to
+a tiny 3-class head fine-tuned on a few hundred bears. And the honest reading isn't
+"use energy instead of MSP." Both scores are just scalars computed from the same
+three logits. On near-OOD inputs those logits are already fooled — the cat genuinely
+activates the bear channels — and no formula over them can recover a distinction the
+network never learned. The fix has to come from more information, not a better
+scalar.
 
 ## Looking at the failures
 
-Let's look at what the energy filter let slip through. 
-Both examples are false positives that the model confidently classified as bears. Their energy scores sit safely below the −1.98 threshold.
-The images are shown exactly as the model processed them: resized, cropped, and normalized.
+These slipped past the energy filter — both false positives the model confidently
+filed under "bear," with energy scores below the −1.98 threshold. The
+images are shown exactly as the model saw them: resized, cropped, normalized.
 
 | near-OOD (Oxford Pet), energy −3.05 | far-OOD (DTD), energy −3.29 |
 |---|---|
 | ![A cat the model is sure is a bear](/assets/ood/near-ood-cat-energy-3.05.png) | ![A texture the model is sure is a bear](/assets/ood/far-ood-texture-energy-3.29.png) |
 
-The issue is simple: the model tracks fur and lumpy textures. A
-ginger cat in profile and a pile of pumpkins both activate the same channels as a brown bear.
+The failures aren't mysterious. The model tracks fur and lumpy brown texture, and a
+ginger cat in profile and a pile of pumpkins push on the same channels as a brown
+bear. From the model's point of view these look like bears — it's matching the
+texture it was trained on.
 
 ## Choosing a threshold
 
-The threshold is a balancing act: too strict and you reject real bears, too
-loose and fakes get through. Here's the trade-off for the energy signal:
+The threshold is a trade-off: too strict and you reject real bears, too loose and
+non-bears get through. How it moves for the energy signal:
 
 ```
   TPR     thresh       DTD      Pets
@@ -185,9 +189,9 @@ loose and fakes get through. Here's the trade-off for the energy signal:
   0.99    -1.8306    12.34%    38.38%
 ```
 
-Even if I get aggressive and reject **one real bear in five** (TPR 0.80), ~9%
-of pets still leak. There's no setting that makes the near-OOD
-problem go away.
+Even if I get aggressive and throw away **one real bear in five** (TPR 0.80), ~9%
+of pets still leak. No threshold makes the near-OOD problem go away — you can only
+move it around.
 
 > Try it live: the [Hugging Face Space](https://rfflpllcn-bear-detector.hf.space)
 > exposes this exact trade-off — drag the TPR slider and watch the threshold,
@@ -196,17 +200,19 @@ problem go away.
 ## Verdict, and what's next
 
 - A closed-set softmax classifier fails silently and confidently on OOD input.
-- You *can* recover a usable OOD signal post-hoc from the logits.
-- On **far-OOD** it works fine; **energy > MSP**, as advertised.
-- On **near-OOD** — the case that matters — it's weak, and on this small model
-  **MSP > energy**, contradicting the standard result. 
+  This is structural, not a tuning issue.
+- You *can* recover a usable OOD signal post-hoc, straight from the logits.
+- On **far-OOD** it works fine, and **energy > MSP**, as advertised.
+- On **near-OOD** — the case I actually cared about — it's weak, and on this small
+  model **MSP > energy**, contradicting the standard result.
 
-The fix isn't a better scalar; it's more information. The natural next steps:
+The fix isn't a better scalar; it's more information. The natural next steps both
+add information rather than re-summarizing the same three numbers:
 
 - **Outlier exposure** (Hendrycks et al., 2019) — fine-tune the model to push
-  energy up on known non-bears. 
-- **Temperature scaling / proper calibration** (Guo et al.).
-
+  energy up on known non-bears, so "not a bear" becomes something it has seen.
+- **Temperature scaling / proper calibration** (Guo et al.) — stop the model
+  spending all its confidence before the test starts.
 
 ## Reproduce it
 

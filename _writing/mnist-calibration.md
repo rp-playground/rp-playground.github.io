@@ -14,37 +14,37 @@ confidently** the model is wrong.*
 
 ## The remaining "1%"
 
-The champion `conv_net` hits ~99% test accuracy; this part will focus on the other 1%: 
-the test digits the model still gets wrong, and what they 
-have in common. 
+The champion `conv_net` hits ~99% test accuracy; here I focus on the other 1% —
+the test digits the model still gets wrong, and what they have in common.
 
-The obvious first tool, a reliability diagram, 
-can't tell you that (the figure below shows why), so the investigation will focus on the geometry of where the mistakes fall.
+A reliability diagram, the obvious first tool, can't tell you that (the figure
+below shows why), so the rest of this is about the geometry of where the mistakes
+fall.
 
 <figure class="narrow">
   <img src="/assets/mnist/reliability_diagram_conv_net.png" alt="Reliability diagram for the champion conv net, with a confidence histogram">
   <figcaption>Reliability diagram with a count histogram. The curve sits almost on the diagonal (ECE ≈ 0.002), and the histogram shows why: nearly all predictions pile into the top confidence bin — and there they're right.</figcaption>
 </figure>
 
-The ECE of **~0.002** looks excellent, but it's a flattered number: the model is
-so confident-and-correct that almost all the mass lands in the last bin, leaving
-very little low-confidence mass to be miscalibrated *about*. The reliability
-diagram tells you the model isn't wildly overconfident — but it can't tell you
-*where* the residual errors live. For that you have to look at the geometry.
+The ECE of **~0.002** looks excellent, but it's a flattered number: the model is so
+confident-and-correct that almost all the mass lands in the last bin, leaving very
+little low-confidence mass to be miscalibrated *about*. The reliability diagram
+tells you the model isn't wildly overconfident, but it can't tell you *where* the
+residual errors live. For that I have to look at the geometry.
 
 ## The geometric approach
 
-To see *where* the mistakes happen, the model's representation will be projected to 2D.
-This is an old idea: in 2014 Chris Olah's
+To see *where* the mistakes happen, I project the model's representation down to 2D.
+It's an old idea: in 2014 Chris Olah's
 [*Visualizing MNIST*](https://colah.github.io/posts/2014-10-Visualizing-MNIST/)
 used **t-SNE** to flatten MNIST into a picture and watch the digit classes pull
-apart. Instead of **t-SNE**, we will use **UMAP** (McInnes et al., 2018; see 
+apart. I use **UMAP** (McInnes et al., 2018) instead of t-SNE — see
 [Performance Comparison of Dimension Reduction Implementations](https://umap-learn.readthedocs.io/en/latest/benchmarking.html)
-to understand why it's a better choice).
+for why it's the better choice.
 
 A second difference from Colah: he projected the **raw pixels**. I project the conv
 net's **penultimate-layer activations** — the 128-d representation just before the
-classifier, the space where the model actually decides.
+classifier, where the model actually makes its decision.
 
 <figure>
   <img src="/assets/mnist/umap_penultimate_conv_net.png" alt="UMAP of the conv net's penultimate-layer activations: ten clean clusters by class, with misclassifications at the cluster edges">
@@ -53,33 +53,31 @@ classifier, the space where the model actually decides.
 
 ## Where it's wrong
 
-**The classes are cleanly disentangled.** Ten well-separated islands — the
-geometric reason the model is high-confident almost everywhere. And this net separation
-comes from the model, not from the data. To watch it: 
-run the **same** UMAP — same parameters, same seed —
-on the raw 784-d pixels, then on MLP's penultimate features, then
-on the conv net's. The pixels (à la Colah) touch, their clusters compenetrate one into the other; the MLP starts
-pulling the classes apart but leaves them overlapping; the conv net results in clean islands.
+**The classes are cleanly separated.** Ten well-separated clusters — the geometric
+reason the model is confident almost everywhere. And that separation comes from the
+model, not the data. To see it, run the same UMAP — same parameters, same seed — on
+the raw 784-d pixels, then on the MLP's penultimate features, then on the conv
+net's. The raw pixels (à la Colah) overlap heavily; the MLP starts pulling the
+classes apart but leaves them touching; the conv net produces clean, separated
+clusters.
 
 <figure>
-  <img src="/assets/mnist/umap_ladder_conv_net.png" alt="Three-panel UMAP of the same MNIST test set: raw pixels with overlapping bleeding clusters, MLP penultimate features partly separated, conv penultimate features in ten clean islands">
-  <figcaption>The same UMAP on three input spaces, all coloured by true class — the complexity ladder made geometric. <strong>Left:</strong> raw pixels — digit clouds overlap and leak into each other. <strong>Middle:</strong> the MLP's penultimate features — clusters forming but still loose and touching. <strong>Right:</strong> the conv net's penultimate features — ten tight, separated islands. Same data, same projection: separation climbs monotonically with model class, the geometric echo of the ECE that halves at each rung. The separation on the right is something the network <em>built</em>.</figcaption>
+  <img src="/assets/mnist/umap_ladder_conv_net.png" alt="Three-panel UMAP of the same MNIST test set: raw pixels with overlapping bleeding clusters, MLP penultimate features partly separated, conv penultimate features in ten clean clusters">
+  <figcaption>The same UMAP on three input spaces, all coloured by true class — the complexity ladder made geometric. <strong>Left:</strong> raw pixels — digit clouds overlap and leak into each other. <strong>Middle:</strong> the MLP's penultimate features — clusters forming but still loose and touching. <strong>Right:</strong> the conv net's penultimate features — ten tight, separated clusters. The data and projection are identical across the three panels; separation increases with model class, matching the ECE that roughly halves at each rung.</figcaption>
 </figure>
 
 
 **The errors sit on the borders.** The 134 misclassifications aren't scattered at
-random — they sit at the edges of the islands, and a few drift across the gap into 
-the neighbour they get confused with. \
-That's exactly where an ambiguous digit lands: a sloppy `4`
-drifting toward the `9` island, a `5` leaning into `3`. And this isn't just
-eyeballing the picture: the geometry and the confusion matrix are two independent
-views that agree. Rank all 45 digit-pairs by how close their UMAP clusters sit
-and by how often they get confused, and the two orderings correlate (Spearman
-**ρ ≈ 0.49**, *p* < 0.001). \
-`3↔5` is *both* the single most-confused pair (15 errors) *and* the closest pair of clusters in the
-whole projection; `7↔9` and `2↔7` are likewise top-confused and among the
-nearest. The agreement isn't perfect: `5↔6` confuses
-often yet isn't especially close in 2D, while `2↔9` sit close but never confuse.
+random — they sit at the edges of the clusters, and a few fall into the neighbouring
+cluster they get confused with. That's where an ambiguous digit lands: a sloppy `4`
+near the `9` cluster, a `5` near the `3`. The geometry and the confusion matrix are
+two independent views, and they agree. Rank
+all 45 digit-pairs by how close their UMAP clusters sit and by how often they get
+confused, and the two orderings correlate (Spearman **ρ ≈ 0.49**, *p* < 0.001).
+`3↔5` is *both* the single most-confused pair (15 errors) *and* the closest pair of
+clusters in the whole projection; `7↔9` and `2↔7` are likewise top-confused and
+among the nearest. The agreement isn't perfect: `5↔6` confuses often yet isn't
+especially close in 2D, while `2↔9` sit close but never confuse.
 
 <figure class="narrow">
   <img src="/assets/mnist/confusion_geometry_conv_net.png" alt="Scatter of all 45 digit-pairs: UMAP centroid distance on the x-axis (closer to the right) against how often the pair is confused on the y-axis, trending up-right, with 3–5 circled in the top-right corner">
@@ -146,22 +144,21 @@ often yet isn't especially close in 2D, while `2↔9` sit close but never confus
 
 ## The bottom rung, and why it's worse calibrated
 
-The logistic model is simple enough to read directly: 
-with a single linear layer, its (10, 784) weight matrix is the explanation. 
-Reshape each row to 28×28 and you get one per-class
-template.
+The logistic model is simple enough to read directly: with a single linear layer,
+its (10, 784) weight matrix is the explanation. Reshape each row to 28×28 and you
+get one per-class template.
 
-The templates are blurry and overlap a lot: one linear stamp can't capture all the ways 
-a 4 or an 8 is written, so similar digits get near-identical templates. 
-That overlap is why the
-linear model both separates the classes worse and is worse calibrated.
+The templates are blurry and overlap a lot: one linear template can't capture all
+the ways a 4 or an 8 is written, so similar digits get near-identical templates.
+That overlap is why the linear model both separates the classes worse and is worse
+calibrated.
 
 <figure>
   <img src="/assets/mnist/weight_templates_logistic.png" alt="The logistic model's ten per-class weight templates, reshaped to 28x28">
-  <figcaption>The `logistic` model's per-class weight templates (red pushes <em>toward</em> the class, blue <em>against</em>). Display-smoothed with a Gaussian blur — the raw per-pixel weights are noisier, since a linear model has no spatial prior. You can still make out a ring for `0`, the stroke of `2`, the loop of `6`.</figcaption>
+  <figcaption>The `logistic` model's per-class weight templates (red pushes <em>toward</em> the class, blue <em>against</em>). Display-smoothed with a Gaussian blur: the model learns one independent weight per pixel, with nothing tying neighbouring pixels together, so the raw weights look speckled. You can still make out a ring for `0`, the stroke of `2`, the loop of `6`.</figcaption>
 </figure>
 
-Calibration improve with a steady trend — ECE roughly halves at each step up the ladder:
+Calibration improves steadily — ECE roughly halves at each step up the ladder:
 
 | rung        | test accuracy | test ECE |
 |-------------|:-------------:|:--------:|
@@ -170,9 +167,9 @@ Calibration improve with a steady trend — ECE roughly halves at each step up t
 | `conv_net`  | 98.7%         | 0.0023   |
 
 The MLP's geometry tells the same in-between story (middle panel above): clusters
-forming but still loose, the visual midpoint between the linear model's smudge and
-the conv net's clean islands. Same complexity ladder, one continuous calibration
-curve — and two different ways to *see* what each model learned.
+forming but still loose, midway between the linear model's smudge and the conv net's
+clean separation. Same complexity ladder, one calibration curve, and two ways to
+see what each model learned.
 
 ## Reproduce it
 
@@ -185,9 +182,9 @@ uv run python -m mnist.templates         # logistic: recover the weight matrix a
 `embedding` loads the champion by registry alias, captures the penultimate
 activations over the test set with a forward hook, runs UMAP, and logs both UMAP
 figures plus the error-polarization metric onto the conv net's MLflow run;
-`pixel_embedding` runs the same UMAP on raw pixels, the MLP's penultimate
-features, and the conv net's, for the three-panel ladder; `templates` reads the
-logistic run's weight matrix and logs the template grid (raw + smoothed).
+`pixel_embedding` runs the same UMAP on raw pixels, the MLP's penultimate features,
+and the conv net's, for the three-panel ladder; `templates` reads the logistic
+run's weight matrix and logs the template grid (raw + smoothed).
 
 ---
 
