@@ -1,6 +1,6 @@
 ---
 layout: article
-title: "The Kaggle log that kept my mistakes"
+title: "A reproducible Kaggle log, regressions included"
 description: A small experiment-tracking framework for Kaggle — changelog-first runs, auto-submit, score polling, and an append-only log. The useful part wasn't the leaderboard climb; it was the 15 regressions it made me keep.
 summary: I built a tiny framework so every Kaggle submission was a falsifiable run. The leaderboard went 16704 → 12438, but the thing I actually got from it was an honest log of the 15 ideas that made the score worse.
 date: 2026-06-07
