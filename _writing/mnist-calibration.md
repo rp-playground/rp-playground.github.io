@@ -84,6 +84,7 @@ especially close in 2D, while `2↔9` sit close but never confuse.
   <figcaption>Each point is one of the 45 digit-pairs: how close its clusters sit in UMAP (x, closer to the right) against how often the two digits are confused (y). <code>3–5</code> (circled) is the nearest and the most-confused pair. <code>5–6</code> confuses despite sitting far apart, <code>2–9</code> sit close but never confuse.</figcaption>
 </figure>
 
+{% comment %}
 [//]: # (**And they lean toward their confuser.** It's tempting to read more into the)
 
 [//]: # (picture — that each error is *pulled* toward the digit it gets mistaken for, like)
@@ -141,6 +142,7 @@ especially close in 2D, while `2↔9` sit close but never confuse.
 [//]: # (residue calibration can't scrub away, because at the border the inputs really are)
 
 [//]: # (ambiguous. A good place to stop trusting a single accuracy number.)
+{% endcomment %}
 
 ## The bottom rung, and why it's worse calibrated
 
