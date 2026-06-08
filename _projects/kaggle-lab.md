@@ -29,4 +29,4 @@ worse and they're all still in it. The full story is in the [write-up](/writing/
 I know MLflow and W&B exist. I started with a flat `runs.jsonl` on purpose: it's
 greppable, diffable, and needs no server, and it was the smallest thing that made
 every run reproducible. Mapping it onto MLflow for a UI and a model registry is a
-deliberate next step.
+next step.
