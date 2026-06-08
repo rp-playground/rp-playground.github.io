@@ -12,7 +12,7 @@ The framework behind the [write-up](/writing/kaggle-lab/). On Kaggle I could see
 scores, but I couldn't reconstruct which change produced which number, or whether an
 idea I'd "tried" had been submitted or just thought about. So I made every submission
 a run: a *change* and a *hypothesis* written **before** I see the score, which makes
-each run a claim that can be wrong instead of a story told afterwards. The notebook
+each run a claim to be proved correct. The notebook
 runs with papermill, gets submitted and polled, and lands as a parent→child row in
 `runs.jsonl`. I never edit a record — corrections go in as new rows with `supersedes`.
 
