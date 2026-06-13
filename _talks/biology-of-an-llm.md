@@ -42,6 +42,11 @@ He then sets up three claims he wants to complicate *(~00:07:34–00:08:18)* —
 
 The technical spine of the talk is the chain of abstractions that makes a forward pass interpretable.
 
+<figure>
+  <img src="/assets/biology-of-an-llm/replace-components-with-interpretable-ones.png" alt="The method in one picture: the model's opaque components are replaced with interpretable ones whose activations reconstruct the original forward pass">
+  <figcaption>The method in one picture: swap the model's opaque components for interpretable ones (features and transcoders) whose activations reconstruct the original forward pass, then read the computation off the replacement.</figcaption>
+</figure>
+
 Individual neurons mostly *aren't* interpretable in language models *(~00:11:03–00:12:25)* — unlike some vision cases (the car-detector, the Trump neuron in CLIP). A given neuron fires on an incoherent jumble (code, Chinese, math, "hemlock for Socrates"). The fix is **dictionary learning** *(~00:12:25–00:13:34)*: rather than hope neurons are the right unit, fit each activation vector as a *sparse* linear combination of dictionary atoms ("features"). After trying to be clever, the bitter lesson won *(~00:28:10, restated ~00:82)* — a one-layer sparse autoencoder trained at scale beat sophisticated approaches. Their earlier work fit ~30M features on Claude 3 Sonnet's middle layer and found genuinely abstract features *(~00:13:34–00:15:01)*: the Golden Gate Bridge feature fires on the English phrase, translations, images, and *indirect* mentions ("driving from San Francisco to Marin"); a code-bug feature that, when suppressed, makes the model ignore bugs and, when amplified, hallucinates tracebacks.
 
 The polysemantic-neuron problem and the dictionary-learning fix come out of Anthropic's earlier published work, which states the motivation plainly:
