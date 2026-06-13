@@ -38,6 +38,11 @@ The motivation for caring is forward-looking. Models do remarkable things — hi
 
 He then sets up three claims he wants to complicate *(~00:07:34–00:08:18)* — that models merely pattern-match to similar training examples, use only shallow heuristics, and work one word at a time with no foresight. His counter-thesis: models build **abstract, composable representations**, run **heavily parallel** computations, and **plan ahead** many tokens despite emitting one at a time.
 
+<figure>
+  <img src="/assets/biology-of-an-llm/takeways.png" alt="Takeaways slide: models build abstract composable representations, run heavily parallel computations, and plan ahead across tokens">
+  <figcaption>The three takeaways, one per motif below: abstract and composable representations, heavily parallel computation, and planning ahead despite emitting one token at a time.</figcaption>
+</figure>
+
 ## The methodology: from neurons to attribution graphs *(~00:10:09–00:31:05)* {#methodology}
 
 The technical spine of the talk is the chain of abstractions that makes a forward pass interpretable.
