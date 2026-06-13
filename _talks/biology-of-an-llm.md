@@ -16,7 +16,16 @@ Anthropic's Circuits / mechanistic interpretability team (recording published
 May 13, 2025; companion paper March 27, 2025). His case is that large language
 models are grown artifacts to be studied, not built ones to be specified.
 
-## The framing: biology, not physics *(~00:01:44–00:09:54)*
+**Contents**
+
+- [The framing: biology, not physics](#framing)
+- [The methodology: from neurons to attribution graphs](#methodology)
+- [Motif 1 — Abstraction and a multilingual core](#motif-1)
+- [Motif 2 — Parallel processing and the reused arithmetic module](#motif-2)
+- [Motif 3 — Planning, hallucination, and competing mechanisms](#motif-3)
+- [Limitations and open questions](#limitations)
+
+## The framing: biology, not physics *(~00:01:44–00:09:54)* {#framing}
 
 Batson opens by justifying the "biology" metaphor. Anthropic's interpretability work treats neural networks the way biology treats living systems: a relatively simple process (gradient descent, analogous to evolution) gives rise to enormous complexity, and you're left to study the *grown* artifact to understand how it does what it does. He explicitly contrasts this with the "physics of LLMs" line of work that treats models as dynamical systems over training *(~00:02:13)*. The recurring image is that models are *grown, not built* — the architecture is just scaffolding, the data is nutrient, the loss is sunlight, and what emerges is an organic object whose internal logic you have no direct access to *(~00:09:46)*.
 
@@ -29,7 +38,7 @@ The motivation for caring is forward-looking. Models do remarkable things — hi
 
 He then sets up three claims he wants to complicate *(~00:07:34–00:08:18)* — that models merely pattern-match to similar training examples, use only shallow heuristics, and work one word at a time with no foresight. His counter-thesis: models build **abstract, composable representations**, run **heavily parallel** computations, and **plan ahead** many tokens despite emitting one at a time.
 
-## The methodology: from neurons to attribution graphs *(~00:10:09–00:31:05)*
+## The methodology: from neurons to attribution graphs *(~00:10:09–00:31:05)* {#methodology}
 
 The technical spine of the talk is the chain of abstractions that makes a forward pass interpretable.
 
@@ -51,11 +60,11 @@ The payoff is the **attribution graph** *(~00:26:00–00:27:55)*: with attention
 
 The worked toy example is "the capital of the state containing Dallas is Austin" *(~00:16:53–00:21:06)*. The graph shows Dallas → Texas → Austin, with a separate "say-a-capital" motor pathway, plus a weaker *direct* Dallas→Austin shortcut *(~00:19:09)*. Interventions confirm abstraction *(~00:29:41–00:30:32)*: swap the Texas features for California and it says Sacramento; Georgia → Atlanta; the Byzantine Empire → Constantinople. A nice epistemic point *(~00:20:00–00:20:46)*: Houston co-occurs with Dallas in training data but the model doesn't say Houston, which argues against pure co-occurrence statistics; yet the weak direct edge also shows that "the capital of Dallas is\_\_\_" (ungrammatical) still yields Austin, so proximity-plus-capital genuinely is *part* of the mechanism.
 
-## Motif 1 — Abstraction and a multilingual core *(~00:42:41–00:48:36)*
+## Motif 1 — Abstraction and a multilingual core *(~00:42:41–00:48:36)* {#motif-1}
 
 The strongest version of the abstraction claim is multilingual. Taking "the opposite of small is big" in English, French, and Mandarin *(~00:43:01–00:44:14)*, the early features are language-specific (the opening-quote feature predicts the quote will continue in the same language), but the middle of the network shares a **language-agnostic core**: features for "antonym," "smallness," "largeness" that are the same across languages, with the output language re-applied only at the end *(~00:44:14–00:45:14)*. Patching "opposite" → "synonym" in the shared core changes all three outputs consistently (small/minuscule) *(~00:45:14–00:45:43)*. Quantitatively, feature overlap between translated sentence pairs starts near zero (tokenizations share nothing), rises sharply through the middle, and falls at output — and the effect *grows with scale* (larger overlap in production Haiku than in the 18-layer model) *(~00:45:43–00:46:43)*. He agrees with an audience framing that the most abstract representation sits slightly right of center *(~00:47:23–00:47:44)*, and makes the philosophical point that good abstractions generalize, so the middle needs *fewer* features while the bespoke particulars of phrasing/grammar near the output need *more* *(~00:47:56–00:48:23)*.
 
-## Motif 2 — Parallel processing and the reused arithmetic module *(~00:51:48–00:58:54)*
+## Motif 2 — Parallel processing and the reused arithmetic module *(~00:51:48–00:58:54)* {#motif-2}
 
 This is the section Batson is most animated about, and it's the strongest evidence in the talk. The argument starts from a constraint. A transformer has a fixed number of layers, but within each layer it computes in parallel across positions. So the depth of the model caps how many serial steps a computation can take, while the width gives it room to do many things at once. Adding 100 numbers one at a time — running total, add the next, add the next — is 100 serial steps, which would need 100 layers. But you can add the numbers pairwise, then add the pairs, then the pairs of pairs, and finish in log-depth *(~00:52:03–00:52:45)*. Given how shallow these models are relative to the reasoning asked of them, it makes sense that they'd precompute pieces in parallel and combine them late, rather than march through a serial algorithm they don't have the depth for.
 
@@ -65,7 +74,7 @@ The next result is the one that best supports the reuse claim, and it's about re
 
 The takeaway is concrete. The model learned one small lookup — the ones-place sum of 6 and 9 — and it reuses that same component everywhere a computation implicitly needs it, whether the surface task is adding two numbers, continuing a table of observation times, or predicting a publication year from a volume number. That's the abstraction-and-reuse claim made about as legible as it gets: not a feature that pattern-matches "addition problems," but a unit of computation pulled into wildly different contexts because each of them, underneath, needs the same sum.
 
-## Motif 3 — Planning, hallucination, and competing mechanisms *(~00:58:54–01:10:07)*
+## Motif 3 — Planning, hallucination, and competing mechanisms *(~00:58:54–01:10:07)* {#motif-3}
 
 **Hallucination** *(~00:58:54–01:03:54)* is framed as a structural consequence of pretraining (the base model is built to emit a plausible next token, so by default it guesses a name) overlaid with fine-tuning that tries to install an "I don't know" reflex when base-model certainty is low *(~00:59:06–00:59:45)*. The circuit *(~01:00:36–01:01:31)*: an *always-on* "can't answer" feature driven by the assistant persona, which gets *suppressed* when a "known entity" feature fires. For "what sport does Michael Jordan play," recognizing Jordan suppresses the unknown-name feature and the refusal, clearing a path to "basketball"; for the fictional "Michael Batkin," nothing suppresses the refusal *(~01:00:05–01:00:25)*. The depth problem is the key insight *(~01:01:31–01:02:11)*: the decision to refuse and the attempt to recall happen *in parallel*, so the model must commit to answering before it has fully done the work — a mismatch that produces hallucinations on hard questions. Injecting the "known answer" feature makes it confidently hallucinate (Batkin plays chess; Karpathy "wrote" a famous paper he didn't) *(~01:02:26–01:03:11)*. Reflection helps — asking "are you sure?" feeds both entity and paper back as input, letting the computation redo itself *(~00:02:53, ~01:02:53)*.
 
@@ -73,6 +82,6 @@ The takeaway is concrete. The model learned one small lookup — the ones-place 
 
 **Unfaithful reasoning** *(~01:07:30–01:09:49)*: given a hint, the model sometimes works *backward* from the answer (dividing 4 by 5 to get 0.8 so that ×5 returns the hinted 4) while producing an explanation indistinguishable from faithful forward math *(~01:07:37–01:07:59)*. Faithful and hint-following are competing strategies running simultaneously; which "wins" likely depends on confidence *(~01:09:07–01:09:31)*. His major caveat lands here *(~01:09:31–01:09:49)*: because they don't model attention — which is bilinear and excellent at *selection* — they suspect attention chooses *which* strategy to deploy while MLPs *execute* it, meaning the mechanism of choice itself may be invisible to this method.
 
-## Limitations and open questions *(~00:34:33–00:36:50, 01:09:49–01:11:59)*
+## Limitations and open questions *(~00:34:33–00:36:50, 01:09:49–01:11:59)* {#limitations}
 
 Batson is consistently frank about what the method can't do. Attention is unexplained, so any computation routed through token-to-token selection is a blind spot *(~00:24:42–00:25:44)*. The decomposition is lossy and partly arbitrary. Roughly **40% of attempted prompts** yield some non-trivial insight — useful and cheap (~60 seconds to launch a graph, no a-priori hypothesis required), but far from complete *(~00:42:07–00:42:41)*. In-context dynamical-system behavior is acknowledged as likely much harder and currently intractable *(~00:36:13–00:36:50)*. On the audience's "how do you prevent hallucination" question *(~01:07:30, 01:09:49–01:11:36)*, he calls it close to impossible in principle: better calibration on self-knowledge, reasoning/thinking tags (models are better on reflection than in a single forward pass), and possibly *adaptive compute* (loop until confident) are the plausible levers — with the provocative suggestion that a non-hallucinating model might just be a *dumber* one that spends capacity checking itself *(~01:10:59–01:11:06)*. He also flags that "which token is the hallucination" is itself ill-defined outside narrowly factual questions *(~01:11:36–01:11:59)*.
