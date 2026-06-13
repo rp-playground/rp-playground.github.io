@@ -1,18 +1,20 @@
 ---
-layout: article
-title: "On the biology of an LLM: notes from Batson's CS25 talk"
-description: Talk notes on Josh Batson's Stanford CS25 lecture on Anthropic's mechanistic interpretability — dictionary learning, cross-layer transcoders, and attribution graphs, with three motifs: a multilingual abstract core, a reused arithmetic feature, and planning in poetry and hallucination.
-summary: Notes from Batson's "On the Biology of a Large Language Model" — how attribution graphs are built, and what they show about abstraction, parallel computation, and planning inside Claude.
+layout: talk
+title: "On the Biology of a Large Language Model"
+speaker: "Josh Batson"
+event: "Stanford CS25 V5"
+talk_date: 2025-05-13
 date: 2026-06-13
+link: https://www.youtube.com/watch?v=vRQs7qfIDaU&t=1947s
+link_label: "Recording (Stanford CS25 V5) ↗"
 tags: [interpretability, mechanistic-interpretability, attribution-graphs, LLM, Anthropic]
-published: true
+summary: "Notes from Batson's mechanistic-interpretability talk — how attribution graphs are built, and what they show about abstraction, parallel computation, and planning inside Claude."
 ---
 
-*Notes on Josh Batson's Stanford CS25 V5 talk,
-["On the Biology of a Large Language Model"](https://www.youtube.com/watch?v=vRQs7qfIDaU&t=1947s)
-(Anthropic, Circuits / mechanistic interpretability team; recording published
-May 13, 2025, companion paper March 27, 2025). His case is that large language
-models are grown artifacts to be studied, not built ones to be specified.*
+Notes from Josh Batson's **On the Biology of a Large Language Model**, given for
+Anthropic's Circuits / mechanistic interpretability team (recording published
+May 13, 2025; companion paper March 27, 2025). His case is that large language
+models are grown artifacts to be studied, not built ones to be specified.
 
 ## The framing: biology, not physics *(~00:01:44–00:09:54)*
 
