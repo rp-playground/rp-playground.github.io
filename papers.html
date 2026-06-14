@@ -36,6 +36,7 @@ permalink: /papers/
     .grid { display: grid; gap: 1.2rem; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
     .item-card .byline { color: var(--muted); font-size: 0.82rem; margin: 0.15rem 0 0.4rem; }
     .item-card .meta-year { margin-left: auto; color: var(--muted); font-size: 0.72rem; }
+    .item-card.pinned { border-color: var(--accent); }
 
     .empty { color: var(--muted); }
     footer { margin-top: 4rem; color: var(--muted); font-size: 0.85rem; }
@@ -85,14 +86,16 @@ permalink: /papers/
       </aside>
 
       <main>
-        {%- assign papers = site.papers | sort: "date" | reverse -%}
+        {%- assign pinned = site.papers | where: "pinned", true -%}
+        {%- assign rest = site.papers | where_exp: "p", "p.pinned != true" | sort: "date" | reverse -%}
+        {%- assign papers = pinned | concat: rest -%}
         {%- if papers.size > 0 -%}
         <section class="item-section">
           <h2>Papers</h2>
           <div class="grid">
             {%- for p in papers -%}
-            <a class="card item-card" href="{{ p.url }}"
-               data-tags="|{{ p.tags | join: '|' }}|" data-year="{{ p.date | date: '%Y' }}">
+            <a class="card item-card{% if p.pinned %} pinned{% endif %}" href="{{ p.url }}"
+               {% if p.pinned %}data-pinned="true" {% endif %}data-tags="|{{ p.tags | join: '|' }}|" data-year="{{ p.date | date: '%Y' }}">
               <h3>{{ p.title }}</h3>
               <p class="byline">{{ p.authors | escape }}{% if p.authors and p.paper_year %} · {% endif %}{{ p.paper_year }}</p>
               <p>{{ p.summary }}</p>

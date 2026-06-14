@@ -1,10 +1,10 @@
 ---
-layout: article
+layout: paper
 title: "Papers to read"
-description: A running list of papers I want to read, each with a short note on why it matters and what I hope to get out of it.
-summary: A running, opinionated reading list — interpretability, training, evaluation — with a one-line motivation per paper so I never open one without knowing why.
+pinned: true
 date: 2026-06-14
-tags: [reading list, papers, interpretability]
+tags: [reading list]
+summary: A running, opinionated reading list — interpretability, training, evaluation — with a one-line motivation per paper so I never open one without knowing why.
 ---
 
 A running list of papers I want to read, each with a short note on **why** it

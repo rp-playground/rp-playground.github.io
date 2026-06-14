@@ -4,6 +4,7 @@
   var sections = Array.prototype.slice.call(document.querySelectorAll('.item-section'));
 
   function matches(card, type, value) {
+    if (card.dataset.pinned === 'true') return true;
     if (type === 'all') return true;
     if (type === 'tag') return ('|' + card.dataset.tags + '|').indexOf('|' + value + '|') !== -1;
     if (type === 'year') return card.dataset.year === value;
