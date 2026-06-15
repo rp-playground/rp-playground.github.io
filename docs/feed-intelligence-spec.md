@@ -1,4 +1,7 @@
-# Feed Intelligence App — Specification
+# Sift — Feed Intelligence App — Specification
+
+> **Sift** — Local Python app that crawls curated AI/ML blogs & newsletters and uses the
+> Claude Code CLI (no API key) to score and digest only what's relevant to you.
 
 ## Goal
 
@@ -249,7 +252,7 @@ Two output targets:
 
 **A. Terminal digest** (primary)
 ```
-=== Feed Digest · 2026-06-15 ===
+=== Sift Digest · 2026-06-15 ===
 
 [0.91] Anthropic Research · 2026-06-14
 Title: ...
@@ -307,7 +310,7 @@ Tags:  interpretability, claude-3-7
 | Scheduling | local `cron` (macOS/Linux) |
 
 Python 3.11+. No framework. Prefer stdlib where possible to keep dependencies minimal.
-Single-file entry point (`feed.py`) with helper modules only if needed.
+Single-file entry point (`sift.py`) with helper modules only if needed.
 
 ---
 
