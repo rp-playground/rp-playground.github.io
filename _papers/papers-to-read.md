@@ -61,3 +61,24 @@ studies (multi-step reasoning, planning in poems, multilingual circuits, refusal
 hallucination) that show what the attribution graphs actually reveal about Claude's
 internals. I've taken [notes on Josh Batson's talk on it](/talks/biology-of-an-llm/),
 which is a good way in before the full read.
+
+## Getting started
+
+### How To Become A Mechanistic Interpretability Researcher
+
+[alignmentforum.org/posts/jP9KDyMkchuv6tHwm](https://www.alignmentforum.org/posts/jP9KDyMkchuv6tHwm/how-to-become-a-mechanistic-interpretability-researcher#Machine_Learning___Transformer_Basics)
+· Neel Nanda · 2025
+
+Not a paper but an opinionated roadmap into the field. Nanda's thesis is to
+**learn the minimal basics as fast as possible, then learn by doing** — a
+three-stage progression from *learning the ropes* (≤1 month) through 1–5 day
+*mini-projects* to ambitious 1–2 week *full projects*. The *Machine Learning /
+Transformer Basics* section is the concrete starting checklist: linear algebra
+(3Blue1Brown), PyTorch fluency by coding a transformer from scratch, cloud GPU
+setup, and using an LLM tutor to check understanding as you go.
+
+*Why it matters:* it's the map for turning the methods above into actual
+practice — what to learn, in what order, and when to stop reading and start
+running experiments. A useful frame to keep alongside the
+[Circuit Tracing](#circuit-tracing-revealing-computational-graphs-in-language-models)
+methods so I don't mistake understanding the technique for being able to use it.
