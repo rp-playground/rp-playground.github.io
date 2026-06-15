@@ -11,6 +11,31 @@ summary: A running, opinionated reading list — interpretability, training, eva
 A running list of papers I want to read, each with a short note on **why** it
 matters and what I expect to learn. Newest additions go on top.
 
+## Calibration & uncertainty
+
+### On Calibration of Modern Neural Networks
+
+[arxiv.org/abs/1706.04599](https://arxiv.org/abs/1706.04599) · Guo, Pleiss, Sun &
+Weinberger · 2017
+
+The paper that put calibration back on the deep-learning agenda. It shows that
+modern networks — unlike the shallower models of the 1990s — are systematically
+**overconfident**: the probability a softmax reports is far higher than the
+accuracy it actually delivers, and the gap widens with depth, width, and the
+removal of regularization. The authors make the problem measurable with
+**reliability diagrams** and **expected calibration error (ECE)**, then survey
+post-hoc fixes and land on **temperature scaling** — dividing the logits by a
+single learned scalar before the softmax — which recalibrates remarkably well
+while leaving accuracy untouched.
+
+*Why it matters:* if I want to treat a model's outputs as real probabilities —
+for thresholds, abstention, selective prediction, or any downstream decision —
+calibration is the property that makes that valid, and this is the canonical
+reference for it. It defines the vocabulary everyone still uses (ECE, reliability
+diagrams) and the cheap baseline (temperature scaling) every later method is
+measured against. A natural pairing with my own
+[MNIST calibration notes](/writing/mnist-calibration/).
+
 ## Interpretability
 
 ### Circuit Tracing: Revealing Computational Graphs in Language Models
