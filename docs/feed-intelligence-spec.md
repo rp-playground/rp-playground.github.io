@@ -18,10 +18,11 @@ the user's local machine.
 The relevance filter should be calibrated around these topics, in rough priority order:
 
 1. **Claude and Anthropic** — model releases, API updates, product announcements, company news
-2. **LLM internals and capabilities** — reasoning, tool use, agentic behavior, context handling, inference
-3. **AI safety and interpretability** — mechanistic interpretability, alignment research, model evaluation
-4. **ML research** — calibration, uncertainty, OOD detection, representation learning (the user actively reads papers in these areas)
-5. **LLM industry moves** — notable releases or findings from other frontier labs (OpenAI, Google DeepMind, Meta)
+2. **Mechanistic interpretability** — circuits, superposition, features, probing, sparse autoencoders (primary research interest; Olah/Nanda are the canonical sources)
+3. **LLM internals and capabilities** — reasoning, tool use, agentic behavior, test-time compute, chain-of-thought, context handling
+4. **AI safety and alignment** — reward hacking, RLHF, post-training, model evaluation, scalable oversight
+5. **ML research** — calibration, uncertainty, OOD detection, representation learning (the user actively reads papers in these areas)
+6. **LLM industry moves** — notable releases or findings from other frontier labs (OpenAI, Google DeepMind, Meta)
 
 **Deprioritize:**
 - Generic "AI will transform X industry" think pieces
@@ -40,6 +41,32 @@ The relevance filter should be calibrated around these topics, in rough priority
 | Anthropic Claude Blog | https://claude.com/blog | Unknown — check |
 | Anthropic Research Blog | https://anthropic.com/research | Unknown — check |
 | Claude Developer Newsletter | https://claude.com/newsletter/developers | No (email-only) |
+
+### Researcher blogs — Anthropic (highest priority)
+
+Infrequent but high-signal. The crawler should check these and treat any new post
+as automatically relevant (skip the scoring step, score = 1.0).
+
+| Name | Affiliation | URL | Has RSS |
+|---|---|---|---|
+| Chris Olah | Anthropic co-founder | https://colah.github.io | Yes (GitHub Pages) |
+| Andrej Karpathy | Anthropic (pretraining) | https://karpathy.bearblog.dev | Yes (bearblog /feed/) |
+| Dario Amodei | Anthropic CEO | https://darioamodei.com | Unknown — check |
+
+### Researcher blogs — Google DeepMind / adjacent (high priority)
+
+| Name | Affiliation | URL | Has RSS |
+|---|---|---|---|
+| Neel Nanda | Google DeepMind (ex-Anthropic mech interp) | https://www.neelnanda.io | Unknown — check |
+| Lilian Weng | OpenAI (widely cited; safety/reasoning focus) | https://lilianweng.github.io | Yes (GitHub Pages) |
+| Sebastian Raschka | Lightning AI | https://magazine.sebastianraschka.com | Yes (Substack) |
+| Nathan Lambert | Ai2 (RLHF / post-training focus) | https://www.interconnects.ai | Yes (Substack) |
+| Jay Alammar | Cohere (transformer visual explainers) | https://jalammar.github.io | Yes (GitHub Pages) |
+| Sebastian Ruder | Meta (NLP focus, slowing cadence) | https://ruder.io | Unknown — check |
+
+**Crawl note for researcher blogs:** these post infrequently (days to months between
+posts). The fetcher should still poll them on every run but not treat silence as an
+error. On first run, backfill the full available archive.
 
 ### Third-party (medium priority)
 
