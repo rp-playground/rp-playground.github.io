@@ -2,9 +2,14 @@
 
 ## Goal
 
-Build a standalone application that crawls a curated list of websites and newsletters,
-evaluates each article for relevance to the user's interests using the Claude API,
-and produces a structured digest that can be consumed by a static website, email, or CLI.
+Build a standalone local Python application that crawls a curated list of websites and
+newsletters, evaluates each article for relevance to the user's interests by invoking
+the Claude Code CLI (`claude`) as a subprocess, and produces a structured digest
+consumed via terminal output or a local file.
+
+**Key constraint:** No Anthropic API key. AI scoring is done via the `claude` CLI,
+which uses the user's existing Claude Code authentication. The app runs entirely on
+the user's local machine.
 
 ---
 
@@ -67,7 +72,7 @@ This is a decision point — see below.
 ```
 ┌─────────────────────────────────────────────────────┐
 │                    Scheduler / Runner                 │
-│              (cron / GitHub Actions / CLI)            │
+│                  (local cron / CLI)                   │
 └─────────────────────┬───────────────────────────────┘
                       │
               ┌───────▼────────┐
@@ -121,15 +126,21 @@ This is a decision point — see below.
 - Fingerprint by URL + title hash to catch syndicated duplicates
 
 #### 4. Relevance Filter
-- Model: `claude-haiku-4-5-20251001` (fast, cheap; upgrade to Sonnet if quality insufficient)
-- Batch articles into groups of 10 to minimize API calls
-- System prompt encodes the interest profile from this document
-- Per article, the API returns:
+- **No API key.** Uses the `claude` CLI (Claude Code) via subprocess:
+  ```
+  echo "<prompt>" | claude -p --output-format json
+  ```
+- Articles are passed one at a time (or in small batches as a JSON array in the prompt)
+- The prompt encodes the interest profile from this document and asks Claude to return
+  structured JSON
+- Expected output per article:
   - `relevance_score`: float 0.0–1.0
   - `tags`: list of topic labels (e.g. `["interpretability", "claude-api", "safety"]`)
   - `one_line_summary`: ≤ 20 words
   - `reason`: one sentence explaining the score (for debugging)
 - Threshold: only store articles with `relevance_score >= 0.6`
+- The subprocess call must handle `claude` not being in PATH (error with a clear message)
+- Timeout per call: 30s; skip article and log warning on timeout
 
 #### 5. Storage
 - SQLite, single file `data/articles.db`
@@ -153,33 +164,38 @@ CREATE TABLE articles (
 ```
 
 #### 6. Output Writer
-Two output targets (both generated on each run):
+Two output targets:
 
-**A. YAML digest** (for Jekyll integration)
-```yaml
-# _data/digest.yml
-generated_at: "2026-06-15T06:00:00Z"
-articles:
-  - title: "..."
-    url: "..."
-    source: "Anthropic Research"
-    published_at: "2026-06-14"
-    relevance: 0.91
-    summary: "..."
-    tags: [interpretability, claude-3-7]
-```
-
-**B. Plain-text digest** (for email or CLI)
+**A. Terminal digest** (primary)
 ```
 === Feed Digest · 2026-06-15 ===
 
-[0.91] Anthropic Research
+[0.91] Anthropic Research · 2026-06-14
 Title: ...
-URL: ...
-Summary: ...
-Tags: interpretability, claude-3-7
+URL:   https://...
+       One-line summary here.
+Tags:  interpretability, claude-3-7
 
+[0.78] TechCrunch AI · 2026-06-13
 ...
+```
+
+**B. Local JSON file** (optional, for archiving or future tooling)
+```json
+{
+  "generated_at": "2026-06-15T06:00:00Z",
+  "articles": [
+    {
+      "title": "...",
+      "url": "...",
+      "source": "Anthropic Research",
+      "published_at": "2026-06-14",
+      "relevance": 0.91,
+      "summary": "...",
+      "tags": ["interpretability", "claude-3-7"]
+    }
+  ]
+}
 ```
 
 ---
@@ -197,37 +213,39 @@ Tags: interpretability, claude-3-7
 
 ## Suggested Tech Stack
 
-| Concern | Library |
+| Concern | Library / tool |
 |---|---|
-| HTTP | `httpx` (async) |
+| HTTP | `httpx` (sync is fine for local use) |
 | RSS parsing | `feedparser` |
 | HTML content extraction | `trafilatura` |
 | HTML parsing (scraping) | `beautifulsoup4` |
-| Claude API | `anthropic` Python SDK |
+| AI scoring | `claude` CLI via `subprocess` (no SDK needed) |
 | Storage | `sqlite3` (stdlib) |
-| Config | `pydantic-settings` + `.env` file |
-| CLI | `typer` |
-| Scheduling | GitHub Actions cron or system cron |
+| Config | plain `configparser` + `config.ini` file (no .env complexity) |
+| CLI | `argparse` (stdlib) or `typer` |
+| Scheduling | local `cron` (macOS/Linux) |
 
-Python 3.11+. No framework. Single-file entry point preferred.
+Python 3.11+. No framework. Prefer stdlib where possible to keep dependencies minimal.
+Single-file entry point (`feed.py`) with helper modules only if needed.
 
 ---
 
-## Configuration (`.env`)
+## Configuration (`config.ini`)
 
+```ini
+[crawl]
+backfill_days = 90
+request_delay_seconds = 2
+
+[filter]
+min_relevance_score = 0.6
+claude_timeout_seconds = 30
+
+[output]
+digest_path = ~/feeds/digest.json
 ```
-ANTHROPIC_API_KEY=sk-ant-...
-MIN_RELEVANCE_SCORE=0.6
-BACKFILL_DAYS=90
-REQUEST_DELAY_SECONDS=2
-OUTPUT_YAML_PATH=./_data/digest.yml
-OUTPUT_EMAIL=false
-SMTP_HOST=
-SMTP_PORT=
-SMTP_USER=
-SMTP_PASSWORD=
-DIGEST_EMAIL_TO=
-```
+
+No secrets needed. The `claude` CLI handles auth via its own session.
 
 ---
 
@@ -235,26 +253,22 @@ DIGEST_EMAIL_TO=
 
 Before implementation, the following need answers from the user:
 
-1. **Where does the app run?**
-   Options: local machine (manual or cron), GitHub Actions (scheduled), lightweight VPS.
-   GitHub Actions is the simplest path if the goal is to auto-update the Jekyll site.
-
-2. **Output destination(s)?**
-   - YAML → Jekyll site (needs the app to commit `_data/digest.yml` back to the repo)
-   - Email digest (needs SMTP config)
+1. **Output format?**
+   - Plain terminal output (print digest to stdout on each run) — simplest
+   - Local JSON file (machine-readable, can be read by other tools)
    - Both
 
-3. **Crawl frequency?**
-   Daily at 06:00 UTC is a reasonable default.
+2. **Crawl frequency?**
+   Daily via local cron is a reasonable default. Or run manually on demand.
 
-4. **Email-only newsletters?**
-   The Claude Developer Newsletter, Ben's Bites, and TLDR AI are inbox-only.
-   Skip for now, or integrate a Kill the Newsletter / email-to-RSS bridge?
+3. **Email-only newsletters?**
+   The Claude Developer Newsletter, Ben's Bites, and TLDR AI are inbox-only with no RSS.
+   Skip for now, or integrate a service like Kill the Newsletter to convert to RSS?
 
-5. **Relevance score threshold?**
+4. **Relevance score threshold?**
    0.6 is the proposed default. Adjust after a first test run.
 
-6. **Archive depth on first run?**
+5. **Archive depth on first run?**
    Proposed: 90 days. Could be shorter (30) or longer (180+).
 
 ---
