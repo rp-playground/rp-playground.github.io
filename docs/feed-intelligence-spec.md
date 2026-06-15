@@ -47,10 +47,16 @@ The relevance filter should be calibrated around these topics, in rough priority
 Infrequent but high-signal. The crawler should check these and treat any new post
 as automatically relevant (skip the scoring step, score = 1.0).
 
+**Auto-pass applies only to low-cadence personal blogs** (the three above, plus Nanda,
+Weng, Alammar, Ruder below). High-volume newsletters that happen to be authored by
+researchers — **Interconnects** (Nathan Lambert) and **Ahead of AI** (Raschka) — publish
+on a regular cadence and would flood the digest if auto-passed, so they go through normal
+scoring like any other source.
+
 | Name | Affiliation | URL | Has RSS |
 |---|---|---|---|
 | Chris Olah | Anthropic co-founder | https://colah.github.io | Yes (GitHub Pages) |
-| Andrej Karpathy | Anthropic (pretraining) | https://karpathy.bearblog.dev | Yes (bearblog /feed/) |
+| Andrej Karpathy | Anthropic (joined May 2026; ex-OpenAI/Tesla) | https://karpathy.bearblog.dev | Yes (bearblog /feed/) |
 | Dario Amodei | Anthropic CEO | https://darioamodei.com | Unknown — check |
 
 ### Researcher blogs — Google DeepMind / adjacent (high priority)
@@ -58,8 +64,8 @@ as automatically relevant (skip the scoring step, score = 1.0).
 | Name | Affiliation | URL | Has RSS |
 |---|---|---|---|
 | Neel Nanda | Google DeepMind (ex-Anthropic mech interp) | https://www.neelnanda.io | Unknown — check |
-| Lilian Weng | OpenAI (widely cited; safety/reasoning focus) | https://lilianweng.github.io | Yes (GitHub Pages) |
-| Sebastian Raschka | Lightning AI | https://magazine.sebastianraschka.com | Yes (Substack) |
+| Lilian Weng | Thinking Machines Lab (ex-OpenAI; safety/reasoning focus) | https://lilianweng.github.io | Yes (GitHub Pages) |
+| Sebastian Raschka | Independent — Ahead of AI / RAIR Lab | https://magazine.sebastianraschka.com | Yes (Substack) |
 | Nathan Lambert | Ai2 (RLHF / post-training focus) | https://www.interconnects.ai | Yes (Substack) |
 | Jay Alammar | Cohere (transformer visual explainers) | https://jalammar.github.io | Yes (GitHub Pages) |
 | Sebastian Ruder | Meta (NLP focus, slowing cadence) | https://ruder.io | Unknown — check |
@@ -119,16 +125,16 @@ This is a decision point — see below.
                       │  new articles only
               ┌───────▼────────┐
               │ Relevance Filter│
-              │  (Claude API)   │
+              │  (claude CLI)   │
               └───────┬────────┘
                       │  scored + tagged articles
               ┌───────▼────────┐
-              │    Storage      │  ← SQLite or JSON
+              │    Storage      │  ← SQLite
               └───────┬────────┘
                       │
               ┌───────▼────────┐
               │  Output Writer  │
-              │  YAML · email   │
+              │ terminal · JSON │
               └────────────────┘
 ```
 
@@ -145,19 +151,31 @@ This is a decision point — see below.
 
 #### 2. Extractor
 - Use `trafilatura` for main-content extraction from HTML (strips nav, ads, boilerplate)
-- Normalize dates to ISO 8601 UTC
+- Normalize all dates to ISO 8601 UTC (e.g. `2026-06-14T00:00:00Z`); date-only sources are
+  stored as midnight UTC. `published_at` uses this format everywhere — store, digest, JSON
 - Fields to extract: `title`, `url`, `canonical_url`, `published_at`, `author`, `source_name`, `raw_text`
 
 #### 3. Deduplicator
-- Check `canonical_url` against the seen-URLs store before scoring
-- Fingerprint by URL + title hash to catch syndicated duplicates
+- Check `canonical_url` (falling back to `url`) against the `articles` table before scoring
+- Because **every scored article is persisted**, not just those above threshold (see Storage),
+  each URL is scored by the `claude` CLI at most once — previously-rejected articles are
+  skipped on later runs instead of being re-fetched and re-scored every time
+- Fingerprint by `canonical_url` + title hash to catch syndicated duplicates across sources
 
 #### 4. Relevance Filter
-- **No API key.** Uses the `claude` CLI (Claude Code) via subprocess:
+- **No API key.** Uses the `claude` CLI (Claude Code) via subprocess. Pass the prompt on
+  **stdin** (not via `echo "<prompt>"`, which mangles quotes/newlines/JSON in the prompt):
+  ```python
+  subprocess.run(["claude", "-p", "--output-format", "json"],
+                 input=prompt, capture_output=True, text=True, timeout=30)
   ```
-  echo "<prompt>" | claude -p --output-format json
-  ```
-- Articles are passed one at a time (or in small batches as a JSON array in the prompt)
+- **Two-layer parsing.** `--output-format json` returns the CLI *envelope*
+  (`{"type": ..., "result": "<model text>", "session_id": ..., ...}`), not the per-article
+  JSON directly. Parse the envelope, take `.result`, then parse the model's JSON out of that
+  string. Instruct the model to emit **strict JSON only** and strip any markdown code-fence
+  before the second parse.
+- Articles are passed one at a time (or in small batches as a JSON array in the prompt — see
+  the batching note under Throughput)
 - The prompt encodes the interest profile from this document and asks Claude to return
   structured JSON
 - Expected output per article:
@@ -165,19 +183,38 @@ This is a decision point — see below.
   - `tags`: list of topic labels (e.g. `["interpretability", "claude-api", "safety"]`)
   - `one_line_summary`: ≤ 20 words
   - `reason`: one sentence explaining the score (for debugging)
-- Threshold: only store articles with `relevance_score >= 0.6`
+- Threshold: only articles with `relevance_score >= 0.6` are surfaced in the digest/output.
+  All scored articles are still written to the `articles` table (see Storage) so the threshold
+  can be re-tuned later without re-scoring.
 - The subprocess call must handle `claude` not being in PATH (error with a clear message)
-- Timeout per call: 30s; skip article and log warning on timeout
+- Timeout per call: 30s; skip article and log warning on timeout. Timed-out / errored
+  articles are **not** recorded as seen, so they are retried on the next run (transient failures)
+- **Throughput & usage limits.** "No API key" does not mean "no limits" — each call consumes
+  the user's Claude subscription usage. A 90-day backfill across ~20 sources, serialized at
+  one ~30s call per article, can take hours and hit subscription rate caps. Therefore:
+  - **Backfill batches articles by default** (e.g. 10 per call as a JSON array), not one at a
+    time, to cut the number of CLI invocations. Per-call timeout scales with batch size.
+  - Incremental `--run` (few new articles) can score one at a time; batching is optional there.
+  - On hitting a usage-limit error, back off and stop the run cleanly rather than spinning.
 
 #### 5. Storage
 - SQLite, single file `data/articles.db`
-- Tables: `articles` (all seen), `digests` (daily rollups)
-- Schema for `articles`:
+- Tables: `articles` (every scored article), `sources` (per-source crawl state),
+  `digests` (one row per run)
+- **All scored articles are written to `articles`, regardless of `relevance`.** The 0.6
+  threshold is applied only when building the digest/output — never as an insert gate. This
+  keeps the dedup store complete (rejected URLs aren't re-scored) and lets the threshold be
+  re-tuned without re-running the `claude` CLI.
+- The extractor's `raw_text` is intentionally **not** persisted — only `summary` is kept, to
+  keep the DB small. Consequence: changing the *prompt* (not just the threshold) requires
+  re-fetching article bodies to re-score. Add a `raw_text` column if re-scoring without
+  re-fetch becomes a need.
 
 ```sql
 CREATE TABLE articles (
   id            INTEGER PRIMARY KEY,
   url           TEXT UNIQUE,
+  canonical_url TEXT,
   title         TEXT,
   source        TEXT,
   author        TEXT,
@@ -187,6 +224,23 @@ CREATE TABLE articles (
   tags          TEXT,   -- JSON array
   summary       TEXT,
   reason        TEXT
+);
+CREATE INDEX idx_articles_canonical ON articles(canonical_url);
+
+-- Per-source crawl state. Backs `--run` ("new since last run") and `--sources`.
+CREATE TABLE sources (
+  name            TEXT PRIMARY KEY,
+  url             TEXT,
+  last_fetched_at TEXT,   -- ISO 8601 UTC; high-water mark for incremental fetch
+  last_status     TEXT    -- "ok" | "error:<msg>"
+);
+
+-- One row per run, archives the emitted digest (same shape as the JSON output file).
+CREATE TABLE digests (
+  id            INTEGER PRIMARY KEY,
+  generated_at  TEXT,
+  article_count INTEGER,
+  payload       TEXT      -- JSON
 );
 ```
 
@@ -216,7 +270,7 @@ Tags:  interpretability, claude-3-7
       "title": "...",
       "url": "...",
       "source": "Anthropic Research",
-      "published_at": "2026-06-14",
+      "published_at": "2026-06-14T00:00:00Z",
       "relevance": 0.91,
       "summary": "...",
       "tags": ["interpretability", "claude-3-7"]
@@ -267,8 +321,10 @@ request_delay_seconds = 2
 [filter]
 min_relevance_score = 0.6
 claude_timeout_seconds = 30
+backfill_batch_size = 10        ; articles per claude CLI call during backfill
 
 [output]
+output_target = both            ; terminal | json | both
 digest_path = ~/feeds/digest.json
 ```
 
@@ -303,7 +359,7 @@ Before implementation, the following need answers from the user:
 ## Out of Scope (v1)
 
 - Personalization that learns from reading history
-- User interface (the output is YAML/email/CLI, not a web app)
+- User interface (the output is JSON/terminal/CLI, not a web app)
 - Paywall bypassing
 - PDF / research paper ingestion (separate concern)
 - Multi-user support
