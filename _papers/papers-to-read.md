@@ -2,6 +2,7 @@
 layout: paper
 title: "Papers to read"
 pinned: true
+collapsible: true
 date: 2026-06-14
 tags: [reading list]
 summary: A running, opinionated reading list — interpretability, training, evaluation — with a one-line motivation per paper so I never open one without knowing why.

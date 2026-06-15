@@ -57,6 +57,34 @@
 
     footer { max-width: var(--measure); margin: 0 auto; padding: 0 1.5rem 4rem; color: var(--muted); font-size: 0.85rem; }
   </style>
+  {% if page.collapsible %}
+  <style>
+    /* Collapsible reading list: index + accordion (see /assets/js/paper-toc.js). */
+    .paper .toc { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 1.1rem 1.3rem; margin: 0 auto 2.5rem; }
+    .paper .toc .toc-title { text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-size: 0.72rem; margin-bottom: 0.7rem; }
+    .paper .toc ul { list-style: none; margin: 0; padding: 0; }
+    .paper .toc ul ul { margin: 0.2rem 0 0.5rem; padding-left: 1rem; }
+    .paper .toc li { margin: 0.28rem 0; font-size: 0; }
+    .paper .toc a { color: var(--muted); border-bottom: none; font-size: 1rem; }
+    .paper .toc ul ul a { font-size: 0.92rem; }
+    .paper .toc a:hover { color: var(--accent); }
+
+    .paper summary { list-style: none; cursor: pointer; display: block; position: relative; padding-left: 1.55rem; }
+    .paper summary::-webkit-details-marker { display: none; }
+    .paper summary::before { content: "▸"; position: absolute; left: 0.1rem; top: 0; color: var(--muted); font-size: 0.85em; line-height: inherit; transition: transform 0.15s; }
+    .paper details[open] > summary::before { transform: rotate(90deg); }
+
+    .paper details.toc-section { border-top: 1px solid var(--border); margin-top: 1.6rem; }
+    .paper details.toc-section > summary { font-size: 1.5rem; font-weight: 600; letter-spacing: -0.01em; color: var(--text); margin: 1.6rem auto 1rem; }
+    .paper details.toc-section > summary:hover { color: var(--accent); }
+
+    .paper details.paper-item { margin: 1.4rem auto 0; }
+    .paper details.paper-item > summary { font-size: 1.15rem; font-weight: 600; color: var(--muted); margin: 0 auto; }
+    .paper details.paper-item > summary:hover { color: var(--text); }
+    .paper details.paper-item[open] > summary { color: #fff; }
+    .paper details.paper-item > *:not(summary):first-of-type { margin-top: 0.6rem; }
+  </style>
+  {% endif %}
 </head>
 <body>
   <div class="topbar"><a href="/papers/">← Papers</a></div>
@@ -79,5 +107,6 @@
     {{ content }}
   </article>
   <footer>Built with Jekyll · hosted on GitHub Pages · <a href="/">back home</a></footer>
+  {% if page.collapsible %}<script src="/assets/js/paper-toc.js"></script>{% endif %}
 </body>
 </html>
