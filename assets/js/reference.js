@@ -154,4 +154,60 @@
       }
     });
   }
+
+  // --- Marker badges + status panel ---
+  var MARKERS = [
+    { key: 'open', label: 'OPEN', token: '[OPEN]' },
+    { key: 'stub', label: 'STUB', token: '[STUB]' },
+    { key: 'ext',  label: 'EXT',  token: '[EXT]'  }
+  ];
+  var markerNodes = { open: [], stub: [], ext: [] };
+
+  MARKERS.forEach(function (m) {
+    var walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT, {
+      acceptNode: function (node) {
+        if (!node.nodeValue.includes(m.token)) return NodeFilter.FILTER_REJECT;
+        if (node.parentNode.closest('code, pre, .anchor, .marker')) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    });
+    var targets = [];
+    while (walker.nextNode()) targets.push(walker.currentNode);
+    targets.forEach(function (node) {
+      var parts = node.nodeValue.split(m.token);
+      var frag = document.createDocumentFragment();
+      parts.forEach(function (part, i) {
+        if (i > 0) {
+          var span = document.createElement('span');
+          span.className = 'marker marker--' + m.key;
+          span.textContent = m.label;
+          frag.appendChild(span);
+          markerNodes[m.key].push(span);
+        }
+        if (part) frag.appendChild(document.createTextNode(part));
+      });
+      node.parentNode.replaceChild(frag, node);
+    });
+  });
+
+  var statusMount = document.querySelector('.ref-status');
+  if (statusMount) {
+    var row = document.createElement('div');
+    row.className = 'ref-status-row';
+    MARKERS.forEach(function (m) {
+      var nodes = markerNodes[m.key];
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.innerHTML = '<span class="n">' + nodes.length + '</span>' + m.label;
+      btn.disabled = nodes.length === 0;
+      var i = 0;
+      btn.addEventListener('click', function () {
+        if (!nodes.length) return;
+        nodes[i % nodes.length].scrollIntoView({ block: 'center' });
+        i++;
+      });
+      row.appendChild(btn);
+    });
+    statusMount.appendChild(row);
+  }
 })();
