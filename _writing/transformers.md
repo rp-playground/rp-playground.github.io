@@ -445,10 +445,7 @@ to §3.5–3.7.
 
 ## 8. Experiments — §1, measured
 
-Running the §1 claims on **GPT-2 small** turns each sentence into a number I can point at.
-The prompt is `"The capital of France is"`; the helper functions
-(`show_per_position_distributions`, `sample_next_token`, `generate`,
-`verify_prefix_dependence`) are elided — this is the driver.
+Running the §1 claims on **GPT-2 small**; the prompt is `"The capital of France is"`.
 
 ```python
 prompt = "The capital of France is"
@@ -477,13 +474,6 @@ print("   ", generate(prompt, max_new_tokens=30, temperature=0.8, top_p=0.95))
 
 # [D] prefix dependence / causality
 verify_prefix_dependence("The quick brown fox jumps over the lazy dog", cut=6)
-
-# [E] the efficiency question (posed here, resolved in §4)
-print("\n[E] In [C], every step ran model(tokens) over the FULL sequence but used only")
-print("    logits[0, -1]. Distributions at all earlier positions were computed and")
-print("    discarded. Why compute them at all? -> §4: the causal mask makes every")
-print("    position a valid next-token problem (free supervision at train time), and a")
-print("    KV cache avoids recomputing them at inference.")
 ```
 
 Output:
@@ -517,42 +507,29 @@ Output:
 [D] max |logit diff| at position 5, full-sequence run vs prefix-only run:  6.68e-06
     ~0  =>  appending future tokens never changes an earlier position's
     distribution  =>  x_{t+1} = f(x_1..x_t), not f of the whole sequence.
-
-[E] In [C], every step ran model(tokens) over the FULL sequence but used only
-    logits[0, -1]. Distributions at all earlier positions were computed and
-    discarded. Why compute them at all? -> §4: the causal mask makes every
-    position a valid next-token problem (free supervision at train time), and a
-    KV cache avoids recomputing them at inference.
 ```
 
 Reading the numbers back against §1:
 
 - **[A] — "num_tokens in → num_tokens distributions out."** `(1, 6)` tokens → `(1, 6, 50257)`
-  logits, one length-50257 distribution per position. The per-position column makes the abstract
-  claim vivid: the model is doing language modeling at *every* position, not just the end. At
+  logits, one length-50257 distribution per position. The model is doing language modeling at *every* position, not just the end. At
   "The capital" it predicts `' of'`, at "The capital of" it predicts `' the'` (a fine guess —
   "of the" is more frequent than "of France"), at "The capital of France" it predicts `','`, and
   only at the full prompt does it commit to `' now'`. That last one is the single distribution
-  generation actually consumes; the other five are the "wasted" ones [E] flags.
+  generation actually consumes; the other five are the "wasted" ones.
 - **[B] — same logits, different decode.** Greedy gives `' now'` — also what position 5 predicted
   in [A], confirming greedy = argmax of the last row. Temperature 0.7 → `' under'`, top-`k` →
   `' on'`, top-`p` → `' already'`: different strategies, different tokens, one logit vector.
 - **[C] — the autoregressive loop, made visible.** Greedy collapses into "the world's largest
   concentration of the world's largest concentration of…" — degenerate repetition, which is
-  exactly why [B]'s sampling machinery exists; the sampled run ("under pressure to do something
+  exactly why [B] exists; the sampled run ("under pressure to do something
   about a housing crisis…") stays coherent. Greedy maximizes per-step probability and falls into
   a loop; sampling breaks the cycle. Empirical motivation for the temperature/top-`k`/top-`p`
   paragraph in §1.
 - **[D] — causality, as a measured number.** Max $$|\Delta\,\text{logit}|$$ at position 5, between
   the full-sequence run and the prefix-only run, is `6.68e-06`. Position 5's distribution is
   bit-for-bit (to float32 noise) unchanged whether or not tokens 6+ exist — the empirical proof of
-  $$x_{t+1} = f(x_1, x_2, \dots, x_t)$$. The causal structure stops being a claim and becomes a
-  number. (The `1e-6` rather than exact `0` is float non-associativity from summing over different
-  sequence lengths, not leakage.)
-- **[E] — the efficiency question, posed.** Every step ran the model over the full sequence but
-  used only `logits[0, -1]`; the earlier positions were computed and discarded. Resolved in §4:
-  the causal mask makes every position a valid next-token problem (free supervision at train time),
-  and a KV cache avoids recomputing them at inference.
+  $$x_{t+1} = f(x_1, x_2, \dots, x_t)$$.
 
 GPT-2 small never lands on `' Paris'`. At 124M parameters, "The capital of France is now/under…"
 is a fluent continuation it prefers over the factual completion: it **models the sentence rather
