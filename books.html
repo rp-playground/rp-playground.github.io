@@ -1,13 +1,13 @@
 ---
-permalink: /papers/
+permalink: /books/
 ---
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Papers — Raffaele P.</title>
-  <meta name="description" content="Papers I've read, with commentary.">
+  <title>Books — Raffaele P.</title>
+  <meta name="description" content="Books I've read, with notes.">
   <link rel="stylesheet" href="/assets/css/main.css">
   <style>
     .container { max-width: 1040px; margin: 0 auto; padding: 4rem 1.5rem; }
@@ -46,19 +46,19 @@ permalink: /papers/
   <div class="container">
     <nav class="topnav">
       <a href="/">Home</a>
-      <a href="/papers/" class="current">Papers</a>
-      <a href="/books/">Books</a>
+      <a href="/papers/">Papers</a>
+      <a href="/books/" class="current">Books</a>
       <a href="/talks/">Talks</a>
     </nav>
     <header class="site">
-      <h1>Papers</h1>
-      <p class="subtitle">Papers I've read, with commentary.</p>
+      <h1>Books</h1>
+      <p class="subtitle">Books I've read, with notes.</p>
     </header>
 
-    {%- comment -%} Tags + reading-years across the papers collection only. {%- endcomment -%}
+    {%- comment -%} Tags + reading-years across the books collection only. {%- endcomment -%}
     {%- assign tag_acc = "" -%}
     {%- assign year_acc = "" -%}
-    {%- for item in site.papers -%}
+    {%- for item in site.books -%}
       {%- for t in item.tags -%}{%- assign tag_acc = tag_acc | append: t | append: "~" -%}{%- endfor -%}
       {%- assign y = item.date | date: "%Y" -%}
       {%- assign year_acc = year_acc | append: y | append: "~" -%}
@@ -87,29 +87,29 @@ permalink: /papers/
       </aside>
 
       <main>
-        {%- assign pinned = site.papers | where: "pinned", true -%}
-        {%- assign rest = site.papers | where_exp: "p", "p.pinned != true" | sort: "date" | reverse -%}
-        {%- assign papers = pinned | concat: rest -%}
-        {%- if papers.size > 0 -%}
+        {%- assign pinned = site.books | where: "pinned", true -%}
+        {%- assign rest = site.books | where_exp: "b", "b.pinned != true" | sort: "date" | reverse -%}
+        {%- assign books = pinned | concat: rest -%}
+        {%- if books.size > 0 -%}
         <section class="item-section">
-          <h2>Papers</h2>
+          <h2>Books</h2>
           <div class="grid">
-            {%- for p in papers -%}
-            <a class="card item-card{% if p.pinned %} pinned{% endif %}" href="{{ p.url }}"
-               {% if p.pinned %}data-pinned="true" {% endif %}data-tags="|{{ p.tags | join: '|' }}|" data-year="{{ p.date | date: '%Y' }}">
-              <h3>{{ p.title }}</h3>
-              <p class="byline">{{ p.authors | escape }}{% if p.authors and p.paper_year %} · {% endif %}{{ p.paper_year }}</p>
-              <p>{{ p.summary }}</p>
+            {%- for b in books -%}
+            <a class="card item-card{% if b.pinned %} pinned{% endif %}" href="{{ b.url }}"
+               {% if b.pinned %}data-pinned="true" {% endif %}data-tags="|{{ b.tags | join: '|' }}|" data-year="{{ b.date | date: '%Y' }}">
+              <h3>{{ b.title }}</h3>
+              <p class="byline">{{ b.authors | escape }}{% if b.authors and b.book_year %} · {% endif %}{{ b.book_year }}</p>
+              <p>{{ b.summary }}</p>
               <div class="tags">
-                {%- for t in p.tags -%}<span class="tag">{{ t }}</span>{%- endfor -%}
-                <span class="meta-year">{{ p.date | date: "%Y" }}</span>
+                {%- for t in b.tags -%}<span class="tag">{{ t }}</span>{%- endfor -%}
+                <span class="meta-year">{{ b.date | date: "%Y" }}</span>
               </div>
             </a>
             {%- endfor -%}
           </div>
         </section>
         {%- else -%}
-        <p class="empty">No papers yet.</p>
+        <p class="empty">No books yet.</p>
         {%- endif -%}
       </main>
     </div>
