@@ -61,6 +61,14 @@
     .ref-body hr { border: none; border-top: 1px solid var(--border); margin: 2.5rem 0; }
 
     footer { max-width: var(--media); margin: 0 auto; padding: 0 1.5rem 4rem; color: var(--muted); font-size: 0.85rem; }
+
+    .ref-search input { width: 100%; box-sizing: border-box; padding: 0.4rem 0.6rem;
+      background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px;
+      color: var(--text); font-size: 0.9rem; }
+    .ref-search input::placeholder { color: var(--muted); }
+    .ref-search .ref-count { color: var(--muted); font-size: 0.8rem; margin-top: 0.3rem; min-height: 1em; }
+    .ref-body mark.ref-hit { background: rgba(91,157,255,0.28); color: #fff; border-radius: 3px; }
+    .ref-body mark.ref-hit.current { background: var(--accent); color: #0b0e13; }
   </style>
 </head>
 <body>

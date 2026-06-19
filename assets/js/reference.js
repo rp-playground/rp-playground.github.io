@@ -66,4 +66,92 @@
     }, { rootMargin: '0px 0px -75% 0px', threshold: 0 });
     headings.forEach(function (h) { spy.observe(h); });
   }
+
+  // --- In-page search ---
+  var searchMount = document.querySelector('.ref-search');
+  if (searchMount) {
+    var input = document.createElement('input');
+    input.type = 'search';
+    input.placeholder = 'Search this page…';
+    input.setAttribute('aria-label', 'Search this page');
+    var count = document.createElement('div');
+    count.className = 'ref-count';
+    searchMount.appendChild(input);
+    searchMount.appendChild(count);
+
+    var hits = [];
+    var cursor = -1;
+
+    function clearHighlights() {
+      body.querySelectorAll('mark.ref-hit').forEach(function (m) {
+        var t = document.createTextNode(m.textContent);
+        m.parentNode.replaceChild(t, m);
+      });
+      body.normalize();
+      hits = [];
+      cursor = -1;
+    }
+
+    function highlight(term) {
+      var lower = term.toLowerCase();
+      var walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT, {
+        acceptNode: function (node) {
+          if (!node.nodeValue.toLowerCase().includes(lower)) return NodeFilter.FILTER_REJECT;
+          var p = node.parentNode;
+          // skip code, the anchors, and already-marked nodes
+          if (p.closest('code, pre, .anchor, mark')) return NodeFilter.FILTER_REJECT;
+          return NodeFilter.FILTER_ACCEPT;
+        }
+      });
+      var targets = [];
+      while (walker.nextNode()) targets.push(walker.currentNode);
+      targets.forEach(function (node) {
+        var text = node.nodeValue, idx, last = 0, frag = document.createDocumentFragment();
+        var lc = text.toLowerCase();
+        while ((idx = lc.indexOf(lower, last)) !== -1) {
+          if (idx > last) frag.appendChild(document.createTextNode(text.slice(last, idx)));
+          var mark = document.createElement('mark');
+          mark.className = 'ref-hit';
+          mark.textContent = text.slice(idx, idx + term.length);
+          frag.appendChild(mark);
+          hits.push(mark);
+          last = idx + term.length;
+        }
+        if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
+        node.parentNode.replaceChild(frag, node);
+      });
+    }
+
+    function filterToc(term) {
+      var lower = term.toLowerCase();
+      Object.keys(tocLinks).forEach(function (id) {
+        var li = tocLinks[id].parentNode;
+        li.style.display = (!term || tocLinks[id].textContent.toLowerCase().includes(lower)) ? '' : 'none';
+      });
+    }
+
+    function run() {
+      clearHighlights();
+      var term = input.value.trim();
+      filterToc(term);
+      if (!term) { count.textContent = ''; return; }
+      highlight(term);
+      count.textContent = hits.length + (hits.length === 1 ? ' match' : ' matches');
+      if (hits.length) { cursor = 0; focusHit(); }
+    }
+
+    function focusHit() {
+      hits.forEach(function (m, i) { m.classList.toggle('current', i === cursor); });
+      if (hits[cursor]) hits[cursor].scrollIntoView({ block: 'center' });
+    }
+
+    input.addEventListener('input', run);
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && hits.length) {
+        e.preventDefault();
+        cursor = (cursor + (e.shiftKey ? -1 + hits.length : 1)) % hits.length;
+        focusHit();
+      }
+    });
+  }
 })();
