@@ -150,9 +150,3 @@ dependent on the exact values. Controlling time is the one that would have
 prevented it: a clock-mocker like time-machine runs the real code inside a frozen
 "forty days ago", so every timestamp reads one clock, not two real `now()` calls
 a millisecond apart. The browser path is already Playwright.
-
-The oracle stays mine either way: that 17 of 25 reviews make 68% is the logic
-under test, so computing it by hand is the substance of the test. And a
-clock-mocker only moves Python's clock — my timestamps come from Postgres, out of
-its reach. That is why I backdated with a second `UPDATE`; the cleaner fix is to
-pass the time into the SQL rather than freeze a clock the database never reads.
