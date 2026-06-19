@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ page.title }} — Raffaele P.</title>
+  {% if page.description %}<meta name="description" content="{{ page.description }}">{% endif %}
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <style>
+    .topbar { max-width: var(--media); margin: 0 auto; padding: 1.5rem 1.5rem 0; }
+    .topbar a { font-size: 0.9rem; text-decoration: none; color: var(--muted); }
+    .topbar a:hover { color: var(--accent); }
+
+    /* Two-column reference layout */
+    .ref { max-width: var(--media); margin: 0 auto; padding: 1rem 1.5rem 5rem;
+           display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 2.5rem; }
+    .ref-sidebar { position: sticky; top: 1rem; align-self: start;
+                   max-height: calc(100vh - 2rem); overflow-y: auto; font-size: 0.9rem; }
+    .ref-sidebar > * + * { margin-top: 1.25rem; }
+
+    .ref-toc ul { list-style: none; margin: 0; padding: 0; }
+    .ref-toc li { margin: 0.15rem 0; line-height: 1.4; }
+    .ref-toc li.lvl-3 { padding-left: 0.9rem; }
+    .ref-toc a { display: block; text-decoration: none; color: var(--muted);
+                 border-left: 2px solid transparent; padding: 0.1rem 0 0.1rem 0.6rem; }
+    .ref-toc a:hover { color: var(--text); }
+    .ref-toc a.active { color: var(--accent); border-left-color: var(--accent); }
+
+    .ref-header { margin-bottom: 1.5rem; }
+    .ref-header h1 { font-size: 2.1rem; font-weight: 600; letter-spacing: -0.02em; line-height: 1.15; }
+    .ref-meta { color: var(--muted); font-size: 0.95rem; margin-top: 0.6rem; }
+
+    /* Heading anchors */
+    .ref-body h2, .ref-body h3 { scroll-margin-top: 1rem; }
+    .ref-body .anchor { opacity: 0; text-decoration: none; color: var(--muted);
+                        margin-left: 0.4rem; font-weight: 400; }
+    .ref-body h2:hover .anchor, .ref-body h3:hover .anchor { opacity: 1; }
+
+    /* ---- Prose typography: copied from article.html, scoped to .ref-body ---- */
+    .ref-body p, .ref-body li { font-size: 1.08rem; line-height: 1.7; color: #d7dade; }
+    .ref-body p { margin: 1.1rem 0; }
+    .ref-body ul, .ref-body ol { margin: 1.1rem 0; padding-left: 1.4rem; }
+    .ref-body li { margin: 0.4rem 0; }
+    .ref-body h2 { font-size: 1.5rem; font-weight: 600; letter-spacing: -0.01em; margin: 2.6rem 0 1rem; padding-top: 0.5rem; }
+    .ref-body h3 { font-size: 1.12rem; font-weight: 600; color: var(--muted); margin: 1.8rem 0 0.7rem; }
+    .ref-body strong { color: #fff; }
+    .ref-body em { color: #c8ccd2; }
+    .ref-body a { text-decoration: none; border-bottom: 1px solid rgba(91,157,255,0.35); }
+    .ref-body a:hover { border-bottom-color: var(--accent); }
+    .ref-body blockquote { border-left: 3px solid var(--accent); padding: 0.2rem 0 0.2rem 1.3rem; margin: 1.4rem 0; color: var(--muted); font-style: italic; }
+    .ref-body code { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace; font-size: 0.88em; background: var(--code-bg); padding: 0.15em 0.4em; border-radius: 5px; border: 1px solid var(--border); }
+    .ref-body pre, .ref-body .highlighter-rouge, .ref-body .highlight { background: var(--code-bg); border: 1px solid var(--border); border-radius: 10px; margin: 1.4rem 0; overflow-x: auto; }
+    .ref-body pre, .ref-body .highlight pre { padding: 1rem 1.2rem; }
+    .ref-body pre code { background: none; border: none; padding: 0; font-size: 0.92rem; line-height: 1.6; color: var(--text); }
+    .ref-body table { width: 100%; border-collapse: collapse; margin: 1.6rem 0; font-size: 0.98rem; }
+    .ref-body th, .ref-body td { border: 1px solid var(--border); padding: 0.5rem 0.8rem; text-align: left; vertical-align: middle; }
+    .ref-body th { background: var(--card); font-weight: 600; }
+    .ref-body hr { border: none; border-top: 1px solid var(--border); margin: 2.5rem 0; }
+
+    footer { max-width: var(--media); margin: 0 auto; padding: 0 1.5rem 4rem; color: var(--muted); font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <div class="topbar"><a href="/">← Home</a></div>
+  <div class="ref">
+    <aside class="ref-sidebar">
+      <div class="ref-search"></div>
+      <div class="ref-status"></div>
+      <nav class="ref-toc" aria-label="Contents"></nav>
+    </aside>
+    <main class="ref-main">
+      <header class="ref-header">
+        <h1>{{ page.title }}</h1>
+        <p class="ref-meta">
+          {% if page.date %}{{ page.date | date: "%B %Y" }}{% endif %}
+          {% if page.reading %} · {{ page.reading }}{% endif %}
+        </p>
+      </header>
+      <div class="ref-body">{{ content }}</div>
+    </main>
+  </div>
+  <footer>Built with Jekyll · hosted on GitHub Pages · <a href="/">back home</a></footer>
+  <script src="/assets/js/reference.js"></script>
+</body>
+</html>
