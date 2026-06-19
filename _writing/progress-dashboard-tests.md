@@ -139,3 +139,20 @@ screen itself builds the call, so it is the one that would catch the drift.
   <img src="/assets/slovo/recording-paths.svg" alt="A left-to-right diagram of two paths into the database. Top path: 'student session UI (one scenario)' to 'submitReview server action' to 'record_review'. Bottom path: 'every other scenario calls directly' arrows straight into 'record_review', skipping the screen. From 'record_review' a final arrow goes to 'review_log + srs_state'.">
   <figcaption>Two ways a review reaches the database. One scenario drives the real session screen, so the UI to <code>submitReview</code> to <code>record_review</code> chain runs once. Every other scenario calls <code>record_review</code> directly, entering below the screen — so a change in what the screen passes would slip past them.</figcaption>
 </figure>
+
+## The off-the-shelf version
+
+Claude and I built all of this by hand, so afterwards I looked up what production
+suites use. Each of the three jobs has a standard tool. The scenario plan — the
+students, cards, and graded reviews — is what factory_boy and Faker generate, and
+their fixed random seeds would have made the off-by-one reproducible instead of
+dependent on the exact values. Controlling time is the one that would have
+prevented it: a clock-mocker like time-machine runs the real code inside a frozen
+"forty days ago", so every timestamp reads one clock, not two real `now()` calls
+a millisecond apart. The browser path is already Playwright.
+
+The oracle stays mine either way: that 17 of 25 reviews make 68% is the logic
+under test, so computing it by hand is the substance of the test. And a
+clock-mocker only moves Python's clock — my timestamps come from Postgres, out of
+its reach. That is why I backdated with a second `UPDATE`; the cleaner fix is to
+pass the time into the SQL rather than freeze a clock the database never reads.
