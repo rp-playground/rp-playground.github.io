@@ -24,11 +24,9 @@ A transformer maps a sequence of tokens to next-token probability distributions.
 
 ## 2. Inside attention
 
-The scaled dot-product, written here as plain text for now:
+The scaled dot-product attention:
 
-```
-Attn(X) = softmax( mask( Q·K^T / sqrt(d_k) ) ) · V
-```
+$$\mathrm{Attn}(X) = \mathrm{softmax}\!\left( \mathrm{mask}\!\left( \frac{Q\cdot K^{\top}}{\sqrt{d_k}} \right) \right) \cdot V$$
 
 A reference implementation stays a code block, never math:
 

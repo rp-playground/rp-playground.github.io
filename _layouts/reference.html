@@ -6,6 +6,9 @@
   <title>{{ page.title }} — Raffaele P.</title>
   {% if page.description %}<meta name="description" content="{{ page.description }}">{% endif %}
   <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
   <style>
     .topbar { max-width: var(--media); margin: 0 auto; padding: 1.5rem 1.5rem 0; }
     .topbar a { font-size: 0.9rem; text-decoration: none; color: var(--muted); }
@@ -80,6 +83,23 @@
     </main>
   </div>
   <footer>Built with Jekyll · hosted on GitHub Pages · <a href="/">back home</a></footer>
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      if (window.renderMathInElement) {
+        renderMathInElement(document.querySelector(".ref-body"), {
+          delimiters: [
+            // kramdown converts $$…$$ → \[…\] at build time, so we match both
+            { left: "\\[", right: "\\]", display: true },
+            { left: "$$", right: "$$", display: true },
+            { left: "\\(", right: "\\)", display: false },
+            { left: "$", right: "$", display: false }
+          ],
+          ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code"],
+          throwOnError: false
+        });
+      }
+    });
+  </script>
   <script src="/assets/js/reference.js"></script>
 </body>
 </html>
