@@ -116,6 +116,11 @@ two timestamps come from `now()` calls milliseconds apart, so "1 day later"
 computes as 0.9999 and `floor` drops it a bucket. Aiming for the middle of each
 bucket instead (38.5, 37.5, 36.5) gives half a day of margin and fixes it.
 
+<figure>
+  <img src="/assets/slovo/off-by-one.svg" alt="A number line of days since graduation, split at the 1.0-day boundary into buckets g0 (left) and g1 (right). A red dot sits just left of the boundary, labelled 'integer: 0.9999 → g0', with a note 'two now() calls, ~1 ms apart'. A green dot sits in the middle of g1, labelled 'half-day: 1.5 → g1', with a note 'graduate −40 d, review −38.5 d'. A caption reads: the same one-bucket slip hits every integer offset; half-day offsets (1.5, 2.5, 3.5) stay clear.">
+  <figcaption>Why the integer offsets were off by one. A review one day after graduation lands exactly on the g0/g1 edge; since the graduation and review timestamps come from two <code>now()</code> calls a millisecond apart, the gap computes as 0.9999 and <code>floor</code> files it under g0 instead of g1. Reviewing at 1.5 days sits mid-bucket, where <code>floor</code> can't slip.</figcaption>
+</figure>
+
 ## What I take from it
 
 I expected a dashboard bug and found none. What the simulation did instead was
