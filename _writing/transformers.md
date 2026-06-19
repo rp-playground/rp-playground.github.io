@@ -28,9 +28,9 @@ re-deriving the rest.
     other; I flag the switch where it happens.
   - $$d_e$$ = embedding / model width (the residual-stream width, a.k.a. $$d_{\mathrm{model}}$$).
 - **Greppable markers** (search these to navigate the living parts):
-  - [OPEN] — a question or thing to verify.
-  - [STUB] — section is thin on purpose; expand later.
-  - [EXT] — a hook where attached / future material plugs in.
+  - `[OPEN]` — a question or thing to verify.
+  - `[STUB]` — section is thin on purpose; expand later.
+  - `[EXT]` — a hook where attached / future material plugs in.
 - **Two reference models** — the 2017 paper and GPT-2 small. Their specs differ and are easy to
   conflate; §2 pins down both.
 

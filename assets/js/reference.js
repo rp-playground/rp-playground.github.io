@@ -34,8 +34,9 @@
       li.className = 'lvl-' + (h.tagName === 'H3' ? '3' : '2');
       var a = document.createElement('a');
       a.href = '#' + h.id;
-      // exclude the trailing "#" anchor text from the TOC label
-      a.textContent = h.firstChild ? h.firstChild.textContent : h.textContent;
+      // exclude the trailing "#" anchor text from the TOC label; strip trailing marker tokens
+      var rawLabel = h.firstChild ? h.firstChild.textContent : h.textContent;
+      a.textContent = rawLabel.replace(/\s*\[(OPEN|STUB|EXT)\]\s*$/, '').trim();
       li.appendChild(a);
       ul.appendChild(li);
     });
@@ -99,7 +100,7 @@
           if (!node.nodeValue.toLowerCase().includes(lower)) return NodeFilter.FILTER_REJECT;
           var p = node.parentNode;
           // skip code, the anchors, and already-marked nodes
-          if (p.closest('code, pre, .anchor, mark')) return NodeFilter.FILTER_REJECT;
+          if (p.closest('code, pre, .anchor, mark, .katex, .marker')) return NodeFilter.FILTER_REJECT;
           return NodeFilter.FILTER_ACCEPT;
         }
       });
@@ -167,7 +168,7 @@
     var walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT, {
       acceptNode: function (node) {
         if (!node.nodeValue.includes(m.token)) return NodeFilter.FILTER_REJECT;
-        if (node.parentNode.closest('code, pre, .anchor, .marker')) return NodeFilter.FILTER_REJECT;
+        if (node.parentNode.closest('code, pre, .anchor, .marker, .katex')) return NodeFilter.FILTER_REJECT;
         return NodeFilter.FILTER_ACCEPT;
       }
     });
