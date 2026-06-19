@@ -145,6 +145,14 @@ V &: T \times d_v
 \end{aligned}
 $$
 
+**Roles.** All three are the same kind of object — a learned linear projection of the same
+residual stream — but they play different parts. For a **destination** position, the **query**
+$$q_i$$ encodes *what information am I looking for*; for a **source** position, the **key** $$k_j$$
+encodes *what do I have to offer*, and the **value** $$v_j$$ is the *payload* that actually gets
+moved if the match is good. Attention is then a **soft dictionary lookup**: match each query
+against every key, then take a weighted blend of the corresponding values. The query and key
+*look* interchangeable because $$W_Q$$ and $$W_K$$ are built alike — but they are not; why is §5.1.
+
 ### 3.5 Scaled dot-product + causal mask + softmax
 
 **Scores** are the scaled dot product of queries against keys:
@@ -181,6 +189,39 @@ def attention(Q, K, V, causal=True):
     weights = F.softmax(scores, dim=-1)                     # rows sum to 1
     return weights @ V                                      # (..., T, d_v)
 ```
+
+#### 3.5.1 Naming & TransformerLens hooks
+
+**The row-wise softmax, precisely.** For destination $$i$$, softmax runs over source positions
+$$j \le i$$ — the prior tokens **and $$i$$ itself** ($$j = i$$ is on the diagonal, not above it, so the
+causal mask keeps it). Each row is a distribution over $$[0..i]$$ summing to 1, and the full matrix
+is **lower-triangular** (zeros strictly above the diagonal). Consequence: a token can always
+attend to itself, and position 0 has nothing else to attend to — so row 0 is forced to $$1.0$$ on
+the diagonal.
+
+**Terminology — not all the same object.** It's worth keeping two of these apart:
+
+- **Attention pattern = attention weights = $$A_{ij}$$** — the **post-softmax** $$T \times T$$ matrix, row $$i$$
+  a distribution over sources. *These three names are genuinely synonyms.*
+- **Self-attention** names the whole **sublayer/operation** — Q, K, V, the softmax, *and* the
+  value-weighted sum $$A\cdot V$$ plus the output projection. "Self" = Q, K, V all come from the same
+  sequence (vs cross-attention). **Not** a synonym for the weight matrix.
+- **"Attention"** bare is ambiguous (sublayer, weights, or the output $$\sum_j A_{ij} v_j$$ depending on
+  the writer) — avoid treating it as a label for the pattern.
+
+**TransformerLens hooks** (shapes `[batch, head, query_pos, key_pos]` for the $$T \times T$$ ones):
+
+| Hook | What it is | Formula |
+| --- | --- | --- |
+| `hook_attn_scores` | pre-softmax logits, causal-masked (masked entries $$\approx -\infty$$ here) | $$Q\cdot K^{\top}/\sqrt{d_k}$$ |
+| `hook_pattern` | post-softmax — the distribution above; TL's "pattern" | $$A_{ij}$$ |
+| `hook_z` | value-weighted sum (TL's $$z$$ == $$r_i$$ from §3.6, pre-$$W_O$$) | $$z_i = \sum_j A_{ij}\cdot v_j$$ |
+| `hook_result` | per-head output — the residual-stream write (needs `use_attn_result=True`; memory-heavy, off by default) | $$z_i \cdot W_O$$ |
+
+So the precise statement: softmax is applied **row-wise over `hook_attn_scores` along the
+`key_pos` axis** (masked to $$j \le i$$) to produce `hook_pattern`. The pipeline is
+$$\mathrm{scores} \to \mathrm{pattern} \to z \to \mathrm{result}$$, which maps onto §3.6 as
+$$(Q\cdot K^{\top}/\sqrt{d_k}) \to A_{ij} \to r_i \to r_i\cdot W_O$$.
 
 ### 3.6 What an attention head does (positions, not tokens)
 
@@ -330,6 +371,27 @@ linear map $$W_V\cdot W_O^h$$ (the **OV circuit**, $$d_e \times d_e$$) applied t
 **position-blind**: it knows only "given this residual content, write this." All the
 position/relevance logic lives in QK; all the content transformation lives in OV; the head's write
 is the pattern-weighted sum of OV-transformed source content, $$\sum_j A_{ij} \cdot (x_j\cdot W_V\cdot W_O^h)$$.
+
+**Why query ≠ key (the asymmetry).** $$Q$$ and $$K$$ are symmetric only in *construction* — same kind
+of projection, same shape — not in *role*. The operative object $$M = W_Q\cdot W_K^{\top}$$ is **not** a
+symmetric matrix (no reason it equals $$W_K\cdot W_Q^{\top}$$), so $$s_{ij} \ne s_{ji}$$: how much $$i$$ attends to $$j$$
+differs from how much $$j$$ attends to $$i$$, and the attention matrix is asymmetric even before the
+causal mask. The asymmetry lives in *which position enters through which matrix* — the
+**destination** always goes through $$W_Q$$ ("what am I looking for"), the **source** through $$W_K$$
+("what do I advertise") — and the softmax normalizes over keys *for a fixed query*: one asker,
+many candidates competing. The source side also carries the **value** that flows source →
+destination; the destination carries only the query. None of that placement is symmetric.
+
+The clean way to see why untying matters — tie $$W_Q = W_K = W$$. Then $$M = W\cdot W^{\top}$$ *is* symmetric,
+$$s_{ij} = s_{ji}$$, and (pre-mask) attention becomes **mutual**: $$i$$ attends to $$j$$ exactly as much as
+the reverse. Keeping the two projections separate is precisely what buys **directional** attention
+in content space — a token's query can look for property $$P$$ while its own key advertises property
+$$Q$$. The induction head (§5.2) is the sharp case: the query asks "what followed the previous copy of
+me?" while a candidate's key advertises "I'm preceded by token X." Genuinely different functions
+of the same residual content; the head works only because $$W_Q$$ and $$W_K$$ are allowed to disagree.
+So the only real symmetry is that the dot product $$q\cdot k$$ is a symmetric *operation* on its two
+arguments — but $$q_i$$ and $$k_j$$ are not interchangeable arguments, so that symmetry never reaches
+the mechanism.
 
 **The "separate-ish" caveat.** The parameters genuinely are separable — $$\{W_Q, W_K\}$$ vs
 $$\{W_V, W_O\}$$ — so each circuit can be read off independently, which is what lets you analyze
