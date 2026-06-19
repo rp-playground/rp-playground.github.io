@@ -37,7 +37,35 @@
 
     section.item-section h2 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 1.2rem; }
     section.item-section + section.item-section { margin-top: 2.5rem; }
-    .grid { display: grid; gap: 1.2rem; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+    .layout > main { min-width: 0; }
+    .scroller { position: relative; min-width: 0; }
+    /* Two fixed rows; extra items flow into new columns and scroll horizontally. */
+    .grid {
+      display: grid;
+      grid-auto-flow: column;
+      grid-template-rows: repeat(2, auto);
+      grid-auto-columns: clamp(260px, 80vw, 330px);
+      gap: 1.2rem;
+      overflow-x: auto;
+      scroll-behavior: smooth;
+      scroll-snap-type: x proximity;
+      padding: 4px 0 0.85rem;
+      margin-top: -4px;
+      scrollbar-width: thin;
+    }
+    .grid > .item-card { scroll-snap-align: start; }
+    .scroll-btn {
+      position: absolute; top: calc(50% - 2px); transform: translateY(-50%);
+      width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;
+      border: 1px solid var(--border); background: var(--card); color: var(--text);
+      border-radius: 50%; cursor: pointer; z-index: 3; font-size: 1.25rem; line-height: 1;
+      padding: 0; box-shadow: 0 2px 8px rgba(0,0,0,0.45);
+    }
+    .scroll-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .scroll-btn:disabled { opacity: 0.3; cursor: default; box-shadow: none; }
+    .scroll-btn.left { left: -12px; }
+    .scroll-btn.right { right: -12px; }
+    @media (max-width: 680px) { .scroll-btn { display: none; } }
     .item-card .meta-year { margin-left: auto; color: var(--muted); font-size: 0.72rem; }
 
     footer { margin-top: 4rem; color: var(--muted); font-size: 0.85rem; }
@@ -99,6 +127,8 @@
         {%- if projects.size > 0 -%}
         <section class="item-section">
           <h2>Projects</h2>
+          <div class="scroller">
+          <button class="scroll-btn left" type="button" aria-label="Scroll left">‹</button>
           <div class="grid">
             {%- for p in projects -%}
             <a class="card item-card" href="{{ p.url }}"
@@ -112,6 +142,8 @@
             </a>
             {%- endfor -%}
           </div>
+          <button class="scroll-btn right" type="button" aria-label="Scroll right">›</button>
+          </div>
         </section>
         {%- endif -%}
 
@@ -119,6 +151,8 @@
         {%- if writing.size > 0 -%}
         <section class="item-section">
           <h2>Writing</h2>
+          <div class="scroller">
+          <button class="scroll-btn left" type="button" aria-label="Scroll left">‹</button>
           <div class="grid">
             {%- for w in writing -%}
             <a class="card item-card" href="{{ w.url }}"
@@ -132,6 +166,8 @@
             </a>
             {%- endfor -%}
           </div>
+          <button class="scroll-btn right" type="button" aria-label="Scroll right">›</button>
+          </div>
         </section>
         {%- endif -%}
       </main>
@@ -140,5 +176,43 @@
     <footer>Built with Jekyll · hosted on GitHub Pages</footer>
   </div>
   <script src="/assets/js/filter.js"></script>
+  <script>
+    // Horizontal scrollers for the Projects / Writing sections (two fixed rows).
+    (function () {
+      var scrollers = Array.prototype.slice.call(document.querySelectorAll('.scroller'));
+      function wire(scroller) {
+        var grid = scroller.querySelector('.grid');
+        var left = scroller.querySelector('.scroll-btn.left');
+        var right = scroller.querySelector('.scroll-btn.right');
+        if (!grid || !left || !right) return;
+        function update() {
+          var max = grid.scrollWidth - grid.clientWidth;
+          var overflow = max > 2;
+          left.style.display = right.style.display = overflow ? '' : 'none';
+          left.disabled = grid.scrollLeft <= 1;
+          right.disabled = grid.scrollLeft >= max - 1;
+        }
+        function step() { return Math.max(grid.clientWidth * 0.85, 240); }
+        left.addEventListener('click', function () { grid.scrollBy({ left: -step(), behavior: 'smooth' }); });
+        right.addEventListener('click', function () { grid.scrollBy({ left: step(), behavior: 'smooth' }); });
+        grid.addEventListener('scroll', update, { passive: true });
+        window.addEventListener('resize', update);
+        grid.__update = update;
+        update();
+      }
+      scrollers.forEach(wire);
+      // A filter change re-packs the cards; reset scroll and refresh the arrows.
+      Array.prototype.slice.call(document.querySelectorAll('.filter')).forEach(function (f) {
+        f.addEventListener('click', function () {
+          setTimeout(function () {
+            scrollers.forEach(function (s) {
+              var g = s.querySelector('.grid');
+              if (g) { g.scrollLeft = 0; if (g.__update) g.__update(); }
+            });
+          }, 0);
+        });
+      });
+    })();
+  </script>
 </body>
 </html>
