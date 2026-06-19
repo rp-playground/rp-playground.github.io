@@ -10,7 +10,7 @@
       .replace(/-+/g, '-');
   }
 
-  var headings = Array.prototype.slice.call(body.querySelectorAll('h2, h3'));
+  var headings = Array.prototype.slice.call(body.querySelectorAll('h2, h3, h4'));
   var used = {};
   headings.forEach(function (h) {
     var base = slugify(h.textContent) || 'section';
@@ -31,7 +31,7 @@
     var ul = document.createElement('ul');
     headings.forEach(function (h) {
       var li = document.createElement('li');
-      li.className = 'lvl-' + (h.tagName === 'H3' ? '3' : '2');
+      li.className = 'lvl-' + h.tagName.charAt(1);
       var a = document.createElement('a');
       a.href = '#' + h.id;
       // exclude the trailing "#" anchor text from the TOC label; strip trailing marker tokens

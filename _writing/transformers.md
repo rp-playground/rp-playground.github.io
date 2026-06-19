@@ -199,7 +199,7 @@ is **lower-triangular** (zeros strictly above the diagonal). Consequence: a toke
 attend to itself, and position 0 has nothing else to attend to — so row 0 is forced to $$1.0$$ on
 the diagonal.
 
-**Terminology — not all the same object.** It's worth keeping two of these apart:
+**Terminology — not all the same object.** It's worth keeping three of these apart:
 
 - **Attention pattern = attention weights = $$A_{ij}$$** — the **post-softmax** $$T \times T$$ matrix, row $$i$$
   a distribution over sources. *These three names are genuinely synonyms.*
