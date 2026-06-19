@@ -80,6 +80,13 @@
       border-radius: 6px; color: var(--muted); font-size: 0.78rem; padding: 0.35rem 0.2rem; text-align: center; }
     .ref-status button:hover { color: var(--text); border-color: var(--accent); }
     .ref-status button .n { display: block; font-size: 1.05rem; font-weight: 600; color: var(--text); }
+
+    @media (max-width: 900px) {
+      .ref { grid-template-columns: 1fr; gap: 1.25rem; }
+      .ref-sidebar { position: static; max-height: none; overflow: visible;
+        border-bottom: 1px solid var(--border); padding-bottom: 1rem; }
+      .ref-toc { max-height: 40vh; overflow-y: auto; }
+    }
   </style>
 </head>
 <body>
