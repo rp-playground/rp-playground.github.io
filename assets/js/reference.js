@@ -41,4 +41,29 @@
     });
     tocEl.appendChild(ul);
   }
+
+  // --- Scrollspy ---
+  var tocLinks = {};
+  if (tocEl) {
+    Array.prototype.slice.call(tocEl.querySelectorAll('a')).forEach(function (a) {
+      tocLinks[a.getAttribute('href').slice(1)] = a;
+    });
+  }
+  var visible = {};
+  function refreshActive() {
+    var current = null;
+    headings.forEach(function (h) {
+      if (visible[h.id]) { current = current || h.id; }
+    });
+    Object.keys(tocLinks).forEach(function (id) {
+      tocLinks[id].classList.toggle('active', id === current);
+    });
+  }
+  if ('IntersectionObserver' in window && headings.length) {
+    var spy = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { visible[e.target.id] = e.isIntersecting; });
+      refreshActive();
+    }, { rootMargin: '0px 0px -75% 0px', threshold: 0 });
+    headings.forEach(function (h) { spy.observe(h); });
+  }
 })();
