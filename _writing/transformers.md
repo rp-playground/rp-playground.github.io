@@ -158,6 +158,35 @@ Information is *accumulated* additively along the stream rather than transformed
 additive read/write-into-a-shared-channel picture is the framing the circuits literature builds
 on, so it is worth holding from the start.
 
+<figure>
+  <img src="/assets/transformers/residual-stream-forward-pass.jpeg" alt="A decoder-only (GPT-2-style) forward pass drawn as a residual stream: tokens are embedded (x0 = W_E t), then one residual block adds the summed attention-head outputs (x_{i+1} = x_i + sum over heads h(x_i)) and then the MLP (x_{i+2} = x_{i+1} + m(x_{i+1})); the final stream x_{-1} is unembedded to logits (T(t) = W_U x_{-1}).">
+  <figcaption>The GPT-2-style (decoder-only) forward pass as a residual stream. Each attention head and the MLP <em>read</em> the stream, compute, and <em>add</em> their output back — the stream itself is never overwritten. Source: Elhage et al., <a href="https://transformer-circuits.pub/2021/framework/index.html"><em>A Mathematical Framework for Transformer Circuits</em></a> (Anthropic, 2021).</figcaption>
+</figure>
+
+#### 3.3.1 The residual stream as a communication channel  [STUB]
+
+The framing from Elhage et al.: the residual stream has **no processing of its own** — it is pure
+linear storage that every sublayer reads from and writes to. Components don't talk to each other
+directly; they communicate *through* the stream. An early head writes a feature into some subspace,
+and any later head or MLP that wants it reads from that same subspace — the stream is the **bus**
+between them.
+
+Two consequences worth holding:
+
+- **Fixed bandwidth.** The stream width $$d_e$$ never changes (§2 invariant), but far more
+  components want to read and write than there are dimensions. So the stream is a
+  **bandwidth-limited channel**: subspaces are a scarce resource the components must share — the
+  pressure behind superposition, and behind the observation that some heads/MLPs seem to spend their
+  capacity *clearing* dimensions for others to reuse.
+- **Linearity is what makes it legible.** Because every write is an addition (§3.3, §3.7), the
+  stream at any depth is a *sum* of contributions, each attributable to a specific head or MLP —
+  the property §5 leans on for circuit analysis.
+
+[EXT] Expand with subspace read/write ("memory management" heads), the virtual-weights /
+composition picture, and how this grounds the OV/QK circuits of §5.1. Source:
+[*A Mathematical Framework for Transformer Circuits*](https://transformer-circuits.pub/2021/framework/index.html)
+(Elhage et al., Anthropic, 2021).
+
 ### 3.4 Inside attention: Q, K, V
 
 The matrix $$X$$ ($$T \times d_e$$) enters the self-attention sublayer. Three linear projections:
