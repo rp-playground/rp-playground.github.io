@@ -86,6 +86,33 @@ The next token conditions on the **entire prefix** — that is the whole point o
 exactly $$d_e$$ and the residual-stream width never changes. (Head dim is 64 in both models above —
 $$768/12 = 512/8 = 64$$.)
 
+### 2.1 Architectural differences at a glance
+
+The dimensions above are the easy-to-conflate part; the bigger difference is *shape*. The 2017 base
+model is an **encoder–decoder** (built for translation); GPT-2 small is **decoder-only**. The table
+collects both, structure first.
+
+| Feature | 2017 base Transformer | GPT-2 small |
+|---|---|---|
+| **Structure** | Encoder–decoder (seq2seq) | Decoder-only (autoregressive) |
+| **Primary task** | Machine translation | Causal language modeling |
+| **Parameters** | ~65M | 117M (2019 report) · 124M (recomputed) |
+| **Layers (blocks)** | 6 encoder + 6 decoder | 12 decoder |
+| **Hidden size ($$d_{\mathrm{model}}$$)** | 512 | 768 |
+| **Attention heads** | 8 | 12 |
+| **Cross-attention** | Yes — each decoder block attends into the encoder | None (no encoder to attend to) |
+| **LayerNorm** | Post-LN (after the residual add) | Pre-LN (before each sublayer) + final LN |
+| **Positional encoding** | Sinusoidal (fixed) | Learned absolute |
+| **Context window** | variable (trained at 512) | 1024 |
+
+The **cross-attention** row is the structural consequence of "encoder–decoder vs decoder-only": the
+2017 decoder block has *three* sublayers — masked self-attention, then cross-attention reading the
+encoder output, then the MLP — whereas a GPT-2 block has only masked self-attention + MLP. Sources
+in §6.
+
+> **Note on the parameter count.** The GPT-2 paper (2019) reports the small model at 117M; the
+> widely-used recomputed figure (e.g. HuggingFace) is 124M. §8 uses 124M. Same model, two counts.
+
 ---
 
 ## 3. The forward pass, end to end
@@ -309,6 +336,33 @@ attention mixes across positions, the MLP mixes across *features*. [EXT] Expand 
   residual path clean, plus a **final LayerNorm** after the last block. Pre-LN trains stably at
   depth, which is why GPT-2 and most successors use it.
 
+#### 3.9.1 Post-LN vs Pre-LN, one block side by side  [STUB]
+
+The same block under each scheme (attention sublayer shown; the MLP sublayer repeats the identical
+pattern):
+
+$$
+\textbf{Post-LN (2017):}\qquad
+\begin{aligned}
+a &= x + \mathrm{Attn}(x) \\
+x &\leftarrow \mathrm{LN}(a)
+\end{aligned}
+\qquad\qquad
+\textbf{Pre-LN (GPT-2):}\qquad
+x \leftarrow x + \mathrm{Attn}(\mathrm{LN}(x))
+$$
+
+The difference is **what the residual path carries.** In Pre-LN the skip connection is an
+*unnormalized identity* running from the embeddings to the final LN — the clean residual stream of
+§3.3 / §5 — so the LN sits *inside* each branch and gradients flow straight down the backbone;
+deep stacks train without learning-rate warmup. In Post-LN the LN sits *on* the residual path,
+renormalizing the running sum at the end of every block; this couples the stream's scale to depth
+and is the reason the original recipe needed warmup to stay stable. The two are not the same
+function — moving the LN changes the map, not just the training dynamics.
+
+[EXT] Expand with the gradient-norm argument (Xiong et al. 2020, *On Layer Normalization in the
+Transformer Architecture*) and a minimal side-by-side `nn.Module` for each block.
+
 ### 3.10 Unembedding → logits
 
 The final stream (after the last LayerNorm) is projected to vocabulary size — the **unembedding**
@@ -425,12 +479,15 @@ one circuit.
 
 ## 6. Sources
 
-- Vaswani et al., *Attention Is All You Need* (2017) — base architecture, sinusoidal PE, post-LN.
-- Radford et al., *Language Models are Unsupervised Multitask Learners* (GPT-2, 2019) — pre-LN,
-  learned absolute PE, tied embeddings, the 12/12/768 small config.
+- Vaswani et al., [*Attention Is All You Need*](https://arxiv.org/abs/1706.03762) (2017) — base
+  architecture, sinusoidal PE, post-LN.
+- Radford et al., [*Language Models are Unsupervised Multitask Learners*](https://cdn.openai.com/better-language-models/language_models_are_unsupervised_multitask_learners.pdf)
+  (GPT-2, 2019) — pre-LN, learned absolute PE, tied embeddings, the 12/12/768 small config.
 - Elhage et al., *A Mathematical Framework for Transformer Circuits* (Anthropic, 2021) — residual
   stream, the concatenate≡additive identity, OV/QK circuits.
 - Shaw et al. (relative position), Transformer-XL, RoPE — the relative-position family (§3.2).
+- Xiong et al., *On Layer Normalization in the Transformer Architecture* (2020) — the Pre-LN vs
+  Post-LN gradient analysis (§3.9.1).
 
 ---
 
