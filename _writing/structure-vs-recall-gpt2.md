@@ -5,6 +5,7 @@ subtitle: "Structure vs. Recall in GPT-2 Small"
 description: GPT-2 small continues "The capital of France is" with " now", not " Paris". A walk through the tools — logit lens, tuned lens, direct logit attribution, activation and path patching — that test whether the model is continuing a form or failing to retrieve a fact, and where the answer actually lives.
 summary: Feed GPT-2 small "The capital of France is" and it answers " now", not " Paris". The tempting reading is language-as-structure over fact-recall; this is the attempt to check that reading with real tools — and the trivial explanation (token frequency and training data) that comes back instead.
 date: 2026-06-20
+published: false
 tags: [mech-interp, transformers, interpretability, GPT-2]
 permalink: /writing/structure-vs-recall-gpt2/
 ---
