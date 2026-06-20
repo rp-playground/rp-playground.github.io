@@ -120,6 +120,11 @@ in §6.
 The spine. Each subsection is one stage; the residual stream (§3.3) is the thread running through
 all of them.
 
+<figure>
+  <img src="/assets/transformers/gpt2-small-architecture.jpeg" alt="GPT-2 small (decoder-only) architecture, bottom to top: Inputs into a Token Embedding, a +-node adding the Positional Embedding, then a block repeated 12× — Layer Norm, Masked Multi-Head Self-Attention, a residual + (skip connection from the block input), Layer Norm, Feed Forward, a second residual + (skip from after the first add). After the 12 blocks: a final Layer Norm, a Linear layer, Softmax, then Output Probabilities. Pre-LN placement: each Layer Norm sits on the input to its sublayer, with the residual skip connections bypassing them.">
+  <figcaption>GPT-2 small (decoder-only), end to end — the map for this section. Note the <strong>pre-LN</strong> placement (§3.9): each LayerNorm sits inside a sublayer branch while the residual skip bypasses it, and a final LayerNorm follows the 12 blocks. The two <code>+</code> nodes per block are the residual adds of §3.3. <em>Figure: Claude design.</em></figcaption>
+</figure>
+
 ### 3.1 Embedding
 
 Each token id is mapped to a vector of width $$d_e$$ via a lookup table. Stacking them makes the
