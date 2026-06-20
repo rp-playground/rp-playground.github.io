@@ -2,7 +2,7 @@
 layout: article
 title: "The capital of France is ` now`"
 subtitle: "Structure vs. Recall in GPT-2 Small"
-description: GPT-2 small continues "The capital of France is" with " now", not " Paris". A walk through the tools — logit lens, per-position traces, token frequency — that test whether the model is continuing a form or failing to retrieve a fact, and what they actually show.
+description: GPT-2 small continues "The capital of France is" with " now", not " Paris". A walk through the tools — logit lens, tuned lens, direct logit attribution, activation and path patching — that test whether the model is continuing a form or failing to retrieve a fact, and where the answer actually lives.
 summary: Feed GPT-2 small "The capital of France is" and it answers " now", not " Paris". The tempting reading is language-as-structure over fact-recall; this is the attempt to check that reading with real tools — and the trivial explanation (token frequency and training data) that comes back instead.
 date: 2026-06-20
 tags: [mech-interp, transformers, interpretability, GPT-2]
@@ -219,28 +219,28 @@ What both lenses genuinely support is modest: `·Paris` rises in the mid-stack r
 
 | promotes `·Paris` (vs `·now`) | DLA | | suppresses (writes `·now`) | DLA |
 |---|---|---|---|---|
-| **L9H8** | **+1.81** | | `10_mlp_out`   | −1.17 |
-| L11H3 | +0.45 | | `0_mlp_out`    | −1.01 |
-| L10H0 | +0.38 | | `7_mlp_out`    | −0.77 |
+| **L9H8** | **+1.81** | | `L10_mlp`   | −1.17 |
+| L11H3 | +0.45 | | `L0_mlp`    | −1.01 |
+| L10H0 | +0.38 | | `L7_mlp`    | −0.77 |
 | L11H2 | +0.31 | | unembed bias   | −0.67 |
 | L8H11 | +0.27 | | L8H10          | −0.30 |
-| L9H3  | +0.24 | | `5_mlp_out`    | −0.28 |
+| L9H3  | +0.24 | | `L5_mlp`    | −0.28 |
 
-**Promotion is localized to one head.** A single attention head, **L9H8, writes +1.81** to the `·Paris` − `·now` logit — more than three times the next component. **Suppression is the MLPs and the unembed bias**, all writing toward the generic continuation. The faithful per-step trajectory shows the duel directly: L9's attention lifts `·Paris` from rank 576 to 69, `10_mlp_out` shoves it back to 107, and the output settles at rank 92.
+**Promotion is localized to one head.** A single attention head, **L9H8, writes +1.81** to the `·Paris` − `·now` logit — more than three times the next component. **Suppression is the MLPs and the unembed bias**, all writing toward the generic continuation. The faithful per-step trajectory shows the duel directly: L9's attention lifts `·Paris` from rank 576 to 69, `L10_mlp` shoves it back to 107, and the output settles at rank 92.
 
 | step | Δ(`·Paris`−`·now`) | rank |
 |---|---|---|
-| `8_mlp_out`     | −0.06 | 576 |
-| **`9_attn_out`** | **+1.84** | **69** |
-| `9_mlp_out`     | −0.26 | 72 |
-| `10_attn_out`   | +0.31 | **38** |
-| `10_mlp_out`    | −1.17 | 107 |
-| `11_attn_out`   | +0.67 | 55 |
-| `11_mlp_out`    | +0.03 | **92** |
+| `L8_mlp`     | −0.06 | 576 |
+| **`L9_attn`** | **+1.84** | **69** |
+| `L9_mlp`     | −0.26 | 72 |
+| `L10_attn`   | +0.31 | **38** |
+| `L10_mlp`    | −1.17 | 107 |
+| `L11_attn`   | +0.67 | 55 |
+| `L11_mlp`    | +0.03 | **92** |
 
-So "computed mid-stack, then outranked toward the surface" is no longer a lens inference — it is the measured behaviour: a specific recall head writes the name, the MLPs (and the bias) write the generic continuation more strongly, and the name loses. The mechanism is **competition, not a gate**, and §6's "generic mass" has a face — the late MLPs.
+So "computed mid-stack, then outranked toward the surface" is no longer a lens inference — it is the measured behaviour: a specific recall head writes the name, the MLPs (and the bias) write the generic continuation more strongly, and the name loses. The mechanism at the output is **competition, not a dedicated suppressor circuit**, and §6's "generic mass" has a face — the late MLPs. (Note this already inverts the §3 prediction's ROME expectation: the writer is a single *attention head*, not the mid-layer MLPs, and the MLPs here *suppress* the fact rather than store it.)
 
-Two honest corrections come with it. First, the DLA-faithful trajectory — which differs from §3's logit lens *only* by using the final fixed scale instead of per-layer scales — bottoms at **rank 38** (at `10_attn_out`), not ~13: the deeper dip the logit lens showed was partly a per-layer-scale artifact, and the direction-only internal best is shallower. Second, DLA credits only the *direct* path component → logit, so a head acting *through* a later component would be miscredited to that component; the clean complement is the path patching of §5, which confirms it directly — and shows L9H8's own output is then routed *suppressively*. The shape, though, is now a fact: promoted to the high tens by L9H8, pushed back to 92 by the late MLPs.
+Two honest corrections come with it. First, the DLA-faithful trajectory — which differs from §3's logit lens *only* by using the final fixed scale instead of per-layer scales — bottoms at **rank 38** (at `L10_attn`), not ~13: the deeper dip the logit lens showed was partly a per-layer-scale artifact, and the direction-only internal best is shallower. Second, DLA credits only the *direct* path component → logit, so a head acting *through* a later component would be miscredited to that component; the clean complement is the path patching of §5, which confirms it directly — and shows L9H8's own output is then routed *suppressively*. The shape, though, is now a fact: lifted to the 60s by L9H8 (a low of rank 38 by `L10_attn`), then pushed back to 92 by the late MLPs.
 
 ### 4. Frame-sensitivity sweep
 
@@ -324,7 +324,9 @@ So **computation, writer, and gate are three different places**: `L9H8` writes `
   <figcaption>BONUS — patch ≠ write. Per MLP, the donor patch effect (total) against the direct write to `·Paris`. The MLPs that dominate the patch (<code>L0</code>, <code>L7</code>, <code>L10</code>) write *negatively* to the name: their patch effect is frame-routing, while their direct contribution suppresses `·Paris`.</figcaption>
 </figure>
 
-*Where the routing lands.* One thread was left: L9H8's own output is routed *suppressively* (−1.12), but through what? A last-writer decomposition answers it exactly — the per-component edges reconstruct the ablated-minus-clean final residual to machine precision (Δ ≈ 3.5e-7), and the linear total matches the true ablation to within the LayerNorm nonlinearity (0.002). The surprise: the suppression is **not** the MLPs, it is downstream **attention**. `L10_attn` carries −0.54 (48 % of the −1.12) and `L11_attn` −0.47 (42 %); the MLPs contribute almost nothing (`L9_mlp` −0.12, `L10_mlp` −0.03 — so the suspected `L10_mlp` was a red herring). Per head it concentrates in **two: L10H0 (−0.39) and L11H2 (−0.50)**. And the twist worth keeping: those two heads are *direct positive writers* of `·Paris` (+0.38 and +0.31 in the DLA table) — they help the name at the output while reading L9H8's write and turning *that* contribution against it. The gate is not a separate module from the writer: a single head can write `·Paris` directly and, in the same pass, suppress L9H8's `·Paris` signal through its own attention. That is what makes a head that writes +1.80 directly net only +0.68.
+*Where the routing lands — and what it is.* One thread was left: L9H8's own output is routed *suppressively* (−1.12), but through what? A last-writer decomposition answers exactly — the per-component edges reconstruct the ablated-minus-clean final residual to machine precision (Δ ≈ 3.5e-7; linear total −0.687 vs the true ablation −0.685). The obvious guess is refuted. This *routed* suppression is **not** the MLPs — those suppress `·Paris` *directly* and independently of L9H8 (`L10_mlp`'s routed share is only ~3 %, the MLP stack's ~10 %, and `L11_mlp` even *helps*). It is downstream **attention**: `L10_attn` (48 % of the −1.12) and `L11_attn` (42 %), 90 % between them, concentrated in two heads — **L10H0 (−0.39) and L11H2 (−0.50)**.
+
+And those two heads are themselves `·Paris` writers — the #3 and #4 in the DLA table (+0.38 and +0.31). What L9H8 does is *halve their write*: without L9H8 they would contribute +0.77 and +0.81; with it, +0.38 and +0.31. The dominant Paris-writing head **downregulates the weaker, redundant Paris writers below it** — an *explaining-away* among the name's own writers. That is where more than half of L9H8's +1.80 direct write goes, and why it nets only +0.68: most of it is spent inhibiting L10H0 and L11H2, not feeding the MLPs. So the gate on `·Paris` has **two distinct parts**, not one: the MLP stack writes the generic continuation directly and independently (§6), and on top of it L9H8 suppresses its own redundant downstream echoes. The single distributed suppressor the SAE pass alone suggested was the obvious-but-wrong channel — the kind of miss this whole piece is about.
 
 <figure>
   <img src="/assets/structure-vs-recall/section_10_l9h8.png" alt="A horizontal bar chart, effect on the Paris-minus-now logit for each downstream receiver of L9H8's output (negative = suppresses Paris). L10_attn (about −0.54) and L11_attn (about −0.47) are the two large negative bars; L9_mlp (−0.12), L10_mlp (−0.03) are small, and L11_mlp is slightly positive. Total indirect routing −1.12.">
@@ -406,7 +408,7 @@ The rhetorical statement — *"a small model follows structure instead of recall
 
 **Complicated: capacity helps — unevenly — and France is an outlier.** The original framing implied a clean capacity story: `·Paris` wins once the model is big enough. Run as a distribution over the twelve-capital probe set, capacity *does* mostly win — by gpt2-xl the median capital is the argmax (six of twelve), up from none at gpt2 small (§2, §7). But it wins **non-monotonically** — `gpt2-large` is a real regression — and **France→Paris is the exception that doesn't**: rank 2 even at 1.5B, among the worst capitals at every scale. For this subject the limitation lives in the **construction and the data** — the `…is ___` slot is appositive-dominated and `P(capital | "the capital of X is")` is soft in the training distribution — while for most subjects raw size eventually carries it. And within gpt2 small the suppression is distributed, not a single circuit: no single SAE feature carries the `·Paris` readout — at L7 the strongest active features are generic-continuation promoters, not a France→Paris circuit (§6).
 
-**Open: the parts that didn't resolve.** Three things stay genuinely unexplained, and a faithful account should keep them in view rather than round them off. *Why the scale curve zigzags.* Running the §7 probe set at every scale settled that the dip is **real, not single-prompt noise** — the population median regresses at gpt2-large too (§2). What stays unexplained is *why* a larger model recalls these capitals worse; that is a question about data and tokenization across the released checkpoints, not one more rank. *Why those heads gate the recall head.* The −1.12 is now localized (§5): two downstream attention heads, `L10H0` and `L11H2`, carry it — and they are the same heads that *write* `·Paris` directly, helping the name at the output while turning L9H8's contribution against it. What they attend to, and why one head plays both roles, is the open mechanistic question — and the clearest sign here that the "gate" is not a module separate from the writer. *What the suppressing features represent.* §6's strongest live L7 features are continuation-promoters, and the component-level DLA agrees the L7 MLP suppresses `·Paris` (−0.77) — so the suppression is genuinely distributed across the MLP stack, not an artifact of the wrong layer. What those features *mean* (their Neuronpedia labels) is the cheap next look that would turn "generic mass" into named features. None of these is cosmetic; each is a seam where the clean story could still split.
+**Open: the parts that didn't resolve.** Three things stay genuinely unexplained, and a faithful account should keep them in view rather than round them off. *Why the scale curve zigzags.* Running the §7 probe set at every scale settled that the dip is **real, not single-prompt noise** — the population median regresses at gpt2-large too (§2). What stays unexplained is *why* a larger model recalls these capitals worse; that is a question about data and tokenization across the released checkpoints, not one more rank. *How L9H8 inhibits the other writers.* The routing is now understood as *explaining-away* (§5): L9H8 halves the `·Paris` write of L10H0 and L11H2. What's left is the *channel* — does L9H8 move those heads' attention pattern away from the Paris-bearing position (QK), or change what they read from it (OV)? A path patch splitting `L9H8 → {L10H0, L11H2}` into their `hook_q`/`hook_k` versus `hook_v` would say which, turning the explaining-away from located to mechanistically explained. *What the suppressing features represent.* §6's strongest live L7 features are continuation-promoters, and the component-level DLA agrees the L7 MLP suppresses `·Paris` (−0.77) — so the suppression is genuinely distributed across the MLP stack, not an artifact of the wrong layer. What those features *mean* (their Neuronpedia labels) is the cheap next look that would turn "generic mass" into named features. None of these is cosmetic; each is a seam where the clean story could still split.
 
 With that owed, the headline. It is not "small models can't recall"; it is that in this frame, at every scale, a structural-continuation prior outranks a present-but-soft factual signal, and the softness is as much in the data as in the model. That is the more interesting half — and, by the lights of the Perse passage, the one still closest to its own lamasery: a clean sentence is exactly the kind of thing that turns out to have a less flattering explanation waiting.
 
