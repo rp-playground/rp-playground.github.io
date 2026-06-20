@@ -34,6 +34,26 @@ a { color: var(--accent); }
 .card:hover { border-color: var(--accent); transform: translateY(-2px); }
 .card h3 { font-size: 1.05rem; font-weight: 600; margin-bottom: 0.4rem; }
 .card p { color: var(--muted); font-size: 0.9rem; }
+/* Search box (sidebar) */
+.search {
+  width: 100%; font: inherit; color: var(--text);
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 8px; padding: 0.45rem 0.6rem; margin-bottom: 1.1rem;
+}
+.search::placeholder { color: var(--muted); }
+.search:focus { outline: none; border-color: var(--accent); }
+.search-empty { color: var(--muted); font-size: 0.9rem; margin-top: 1rem; }
+/* The .filter rule (display:block) would otherwise override [hidden]. */
+.filter[hidden] { display: none; }
+/* When the full tag list is expanded it can be long — cap and scroll. */
+.tag-list.scrolling { max-height: 40vh; overflow-y: auto; scrollbar-width: thin; }
+.tags-more {
+  display: block; cursor: pointer; background: none; border: none;
+  color: var(--accent); font: inherit; font-size: 0.82rem;
+  padding: 0.3rem 0.55rem; margin-top: 0.15rem;
+}
+.tags-more:hover { text-decoration: underline; }
+
 .tags { margin-top: 0.9rem; display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
 .tag {
   font-size: 0.72rem; color: var(--accent);

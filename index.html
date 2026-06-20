@@ -37,35 +37,26 @@
 
     section.item-section h2 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 1.2rem; }
     section.item-section + section.item-section { margin-top: 2.5rem; }
+    /* Tabs that switch between the Writing / Projects panels. */
+    .section-tabs { display: flex; gap: 1.4rem; border-bottom: 1px solid var(--border); margin-bottom: 1.4rem; }
+    .section-tab {
+      background: none; border: none; cursor: pointer; font: inherit;
+      color: var(--muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em;
+      padding: 0.5rem 0.1rem; border-bottom: 2px solid transparent; margin-bottom: -1px;
+    }
+    .section-tab:hover { color: var(--text); }
+    .section-tab.active { color: var(--text); border-bottom-color: var(--accent); }
+    .section-tab .tab-count { color: var(--muted); font-size: 0.85em; }
+    .section-tab:disabled { opacity: 0.35; cursor: default; }
+    .section-tab:disabled:hover { color: var(--muted); }
     .layout > main { min-width: 0; }
-    .scroller { position: relative; min-width: 0; }
-    /* Two fixed rows; extra items flow into new columns and scroll horizontally. */
+    /* One full-width card per row; each section is a fixed-height box that
+       scrolls vertically inside. */
     .grid {
-      display: grid;
-      grid-auto-flow: column;
-      grid-template-rows: repeat(2, auto);
-      grid-auto-columns: clamp(260px, 80vw, 330px);
-      gap: 1.2rem;
-      overflow-x: auto;
-      scroll-behavior: smooth;
-      scroll-snap-type: x proximity;
-      padding: 4px 0 0.85rem;
-      margin-top: -4px;
-      scrollbar-width: thin;
+      display: grid; grid-template-columns: 1fr; gap: 1rem;
+      max-height: 60vh; overflow-y: auto;
+      padding-right: 0.5rem; scrollbar-width: thin;
     }
-    .grid > .item-card { scroll-snap-align: start; }
-    .scroll-btn {
-      position: absolute; top: calc(50% - 2px); transform: translateY(-50%);
-      width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;
-      border: 1px solid var(--border); background: var(--card); color: var(--text);
-      border-radius: 50%; cursor: pointer; z-index: 3; font-size: 1.25rem; line-height: 1;
-      padding: 0; box-shadow: 0 2px 8px rgba(0,0,0,0.45);
-    }
-    .scroll-btn:hover { border-color: var(--accent); color: var(--accent); }
-    .scroll-btn:disabled { opacity: 0.3; cursor: default; box-shadow: none; }
-    .scroll-btn.left { left: -12px; }
-    .scroll-btn.right { right: -12px; }
-    @media (max-width: 680px) { .scroll-btn { display: none; } }
     .item-card .meta-year { margin-left: auto; color: var(--muted); font-size: 0.72rem; }
 
     footer { margin-top: 4rem; color: var(--muted); font-size: 0.85rem; }
@@ -90,69 +81,28 @@
       </div>
     </header>
 
-    {%- comment -%} Build the union of tags and years across both collections. {%- endcomment -%}
     {%- assign all_items = site.projects | concat: site.writing -%}
-    {%- assign tag_acc = "" -%}
-    {%- assign year_acc = "" -%}
-    {%- for item in all_items -%}
-      {%- for t in item.tags -%}{%- assign tag_acc = tag_acc | append: t | append: "~" -%}{%- endfor -%}
-      {%- assign y = item.date | date: "%Y" -%}
-      {%- assign year_acc = year_acc | append: y | append: "~" -%}
-    {%- endfor -%}
-    {%- assign all_tags = tag_acc | split: "~" | uniq | sort -%}
-    {%- assign all_years = year_acc | split: "~" | uniq | sort | reverse -%}
-
     <div class="layout">
       <aside>
-        <div class="label">Filter</div>
-        <button class="filter active" data-filter="all">All</button>
-
-        {%- if all_tags.size > 0 -%}
-        <div class="label">Tags</div>
-        {%- for t in all_tags -%}
-        <button class="filter" data-filter="tag" data-value="{{ t }}">{{ t }}</button>
-        {%- endfor -%}
-        {%- endif -%}
-
-        {%- if all_years.size > 0 -%}
-        <div class="label">Year</div>
-        {%- for y in all_years -%}
-        <button class="filter" data-filter="year" data-value="{{ y }}">{{ y }}</button>
-        {%- endfor -%}
-        {%- endif -%}
+        {%- include filter-aside.html items=all_items -%}
       </aside>
 
       <main>
-        {%- assign projects = site.projects | sort: "date" | reverse -%}
-        {%- if projects.size > 0 -%}
-        <section class="item-section">
-          <h2>Projects</h2>
-          <div class="scroller">
-          <button class="scroll-btn left" type="button" aria-label="Scroll left">‹</button>
-          <div class="grid">
-            {%- for p in projects -%}
-            <a class="card item-card" href="{{ p.url }}"
-               data-tags="|{{ p.tags | join: '|' }}|" data-year="{{ p.date | date: '%Y' }}">
-              <h3>{{ p.title }}</h3>
-              <p>{{ p.summary }}</p>
-              <div class="tags">
-                {%- for t in p.tags -%}<span class="tag">{{ t }}</span>{%- endfor -%}
-                <span class="meta-year">{{ p.date | date: "%Y" }}</span>
-              </div>
-            </a>
-            {%- endfor -%}
-          </div>
-          <button class="scroll-btn right" type="button" aria-label="Scroll right">›</button>
-          </div>
-        </section>
-        {%- endif -%}
-
         {%- assign writing = site.writing | sort: "date" | reverse -%}
+        {%- assign projects = site.projects | sort: "date" | reverse -%}
+
+        <div class="section-tabs" role="tablist">
+          {%- if writing.size > 0 -%}
+          <button class="section-tab active" type="button" role="tab" data-section="writing">Writing <span class="tab-count"></span></button>
+          {%- endif -%}
+          {%- if projects.size > 0 -%}
+          <button class="section-tab{% if writing.size == 0 %} active{% endif %}" type="button" role="tab" data-section="projects">Projects <span class="tab-count"></span></button>
+          {%- endif -%}
+        </div>
+        <p class="search-empty" style="display:none">No matches.</p>
+
         {%- if writing.size > 0 -%}
-        <section class="item-section">
-          <h2>Writing</h2>
-          <div class="scroller">
-          <button class="scroll-btn left" type="button" aria-label="Scroll left">‹</button>
+        <section class="item-section" data-section="writing">
           <div class="grid">
             {%- for w in writing -%}
             <a class="card item-card" href="{{ w.url }}"
@@ -166,7 +116,23 @@
             </a>
             {%- endfor -%}
           </div>
-          <button class="scroll-btn right" type="button" aria-label="Scroll right">›</button>
+        </section>
+        {%- endif -%}
+
+        {%- if projects.size > 0 -%}
+        <section class="item-section" data-section="projects">
+          <div class="grid">
+            {%- for p in projects -%}
+            <a class="card item-card" href="{{ p.url }}"
+               data-tags="|{{ p.tags | join: '|' }}|" data-year="{{ p.date | date: '%Y' }}">
+              <h3>{{ p.title }}</h3>
+              <p>{{ p.summary }}</p>
+              <div class="tags">
+                {%- for t in p.tags -%}<span class="tag">{{ t }}</span>{%- endfor -%}
+                <span class="meta-year">{{ p.date | date: "%Y" }}</span>
+              </div>
+            </a>
+            {%- endfor -%}
           </div>
         </section>
         {%- endif -%}
@@ -176,43 +142,5 @@
     <footer>Built with Jekyll · hosted on GitHub Pages</footer>
   </div>
   <script src="/assets/js/filter.js"></script>
-  <script>
-    // Horizontal scrollers for the Projects / Writing sections (two fixed rows).
-    (function () {
-      var scrollers = Array.prototype.slice.call(document.querySelectorAll('.scroller'));
-      function wire(scroller) {
-        var grid = scroller.querySelector('.grid');
-        var left = scroller.querySelector('.scroll-btn.left');
-        var right = scroller.querySelector('.scroll-btn.right');
-        if (!grid || !left || !right) return;
-        function update() {
-          var max = grid.scrollWidth - grid.clientWidth;
-          var overflow = max > 2;
-          left.style.display = right.style.display = overflow ? '' : 'none';
-          left.disabled = grid.scrollLeft <= 1;
-          right.disabled = grid.scrollLeft >= max - 1;
-        }
-        function step() { return Math.max(grid.clientWidth * 0.85, 240); }
-        left.addEventListener('click', function () { grid.scrollBy({ left: -step(), behavior: 'smooth' }); });
-        right.addEventListener('click', function () { grid.scrollBy({ left: step(), behavior: 'smooth' }); });
-        grid.addEventListener('scroll', update, { passive: true });
-        window.addEventListener('resize', update);
-        grid.__update = update;
-        update();
-      }
-      scrollers.forEach(wire);
-      // A filter change re-packs the cards; reset scroll and refresh the arrows.
-      Array.prototype.slice.call(document.querySelectorAll('.filter')).forEach(function (f) {
-        f.addEventListener('click', function () {
-          setTimeout(function () {
-            scrollers.forEach(function (s) {
-              var g = s.querySelector('.grid');
-              if (g) { g.scrollLeft = 0; if (g.__update) g.__update(); }
-            });
-          }, 0);
-        });
-      });
-    })();
-  </script>
 </body>
 </html>

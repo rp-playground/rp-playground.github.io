@@ -33,7 +33,12 @@ permalink: /talks/
     .filter.active { background: rgba(91,157,255,0.18); color: var(--accent); }
 
     section.item-section h2 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 1.2rem; }
-    .grid { display: grid; gap: 1.2rem; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+    /* One full-width card per row; fixed-height box scrolling vertically inside. */
+    .grid {
+      display: grid; grid-template-columns: 1fr; gap: 1rem;
+      max-height: 60vh; overflow-y: auto;
+      padding-right: 0.5rem; scrollbar-width: thin;
+    }
     .item-card .byline { color: var(--muted); font-size: 0.82rem; margin: 0.15rem 0 0.4rem; }
     .item-card .meta-year { margin-left: auto; color: var(--muted); font-size: 0.72rem; }
 
@@ -54,38 +59,13 @@ permalink: /talks/
       <p class="subtitle">Notes from talks I've attended or watched.</p>
     </header>
 
-    {%- comment -%} Tags + years across the talks collection only. {%- endcomment -%}
-    {%- assign tag_acc = "" -%}
-    {%- assign year_acc = "" -%}
-    {%- for item in site.talks -%}
-      {%- for t in item.tags -%}{%- assign tag_acc = tag_acc | append: t | append: "~" -%}{%- endfor -%}
-      {%- assign y = item.talk_date | default: item.date | date: "%Y" -%}
-      {%- assign year_acc = year_acc | append: y | append: "~" -%}
-    {%- endfor -%}
-    {%- assign all_tags = tag_acc | split: "~" | uniq | sort -%}
-    {%- assign all_years = year_acc | split: "~" | uniq | sort | reverse -%}
-
     <div class="layout">
       <aside>
-        <div class="label">Filter</div>
-        <button class="filter active" data-filter="all">All</button>
-
-        {%- if all_tags.size > 0 -%}
-        <div class="label">Tags</div>
-        {%- for t in all_tags -%}
-        <button class="filter" data-filter="tag" data-value="{{ t }}">{{ t }}</button>
-        {%- endfor -%}
-        {%- endif -%}
-
-        {%- if all_years.size > 0 -%}
-        <div class="label">Year</div>
-        {%- for y in all_years -%}
-        <button class="filter" data-filter="year" data-value="{{ y }}">{{ y }}</button>
-        {%- endfor -%}
-        {%- endif -%}
+        {%- include filter-aside.html items=site.talks year_field="talk_date" -%}
       </aside>
 
       <main>
+        <p class="search-empty" style="display:none">No matches.</p>
         {%- assign talks = site.talks | sort: "talk_date" | reverse -%}
         {%- if talks.size > 0 -%}
         <section class="item-section">
