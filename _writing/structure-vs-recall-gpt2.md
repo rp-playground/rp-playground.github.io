@@ -238,18 +238,32 @@ with the per-country distribution below.
   <figcaption>Rank (left, log axis) and log-prob (right) of the leading-space token <code>·Paris</code> across the GPT-2 family, for the France prompt. The dashed line marks rank 1: for France, `·Paris` never crosses it. The improvement is real but non-monotonic; across the twelve-capital population (table above) most capitals do reach the argmax by gpt2-xl — France is the outlier.</figcaption>
 </figure>
 
-### 3. Layer-wise emergence (logit lens, tuned lens, direct logit attribution)
+### 3.1 Layer-wise emergence by logit lens
 
-Apply the logit lens (nostalgebraist) or, better, a tuned lens (Belrose et al., 2023) across layers to see *where* `·Paris` gets promoted, if it does.
+Apply the logit lens (nostalgebraist) or, better, a tuned lens (Belrose et al., 2023) across layers to find
+*where* `·Paris` is promoted, if at all.
 
-*Prediction:* in the larger models the `·Paris` logit jumps at specific late mid-layer MLPs, consistent with the ROME localization; in 124M the promotion may never cross the generic-continuation mass. Pinning the layer of promotion in medium/large and showing the corresponding step is weak-or-absent in small is the within-family version of the scale argument.
+Apply the logit lens (nostalgebraist), or better a tuned lens (Belrose et al., 2023), across layers to find where `·Paris` is promoted, if at all.
 
-*Result (gpt2 small).* The promotion happens — and then it settles, it doesn't collapse. Reading the logit lens across all 26 stages (`0_pre … final_post`), `·Paris` stays buried through the early blocks (rank ~10⁴), is promoted from the middle of the stack, reaches an **internal minimum of rank ≈ 13 around `9_mid`**, and then eases back up to **`final_post` = rank 92**. Because the final-layer logit lens (`ln_final` then `W_U`, applied to the last residual) *is* the model's output, that 92 is exactly the §1 number — asserted in code, not a lens estimate.
+*Prediction:* if ROME's localization holds, the `·Paris` logit should jump at specific late mid-layer MLPs in 
+the larger models, while in 124M the promotion may never rise above the generic-continuation mass. 
+Locating that promotion in medium/large and showing the same step is weak or absent in small would be the 
+§2 scale argument run across layers rather than across model sizes.
+
+*Result (gpt2 small):* 
+Across all 26 stages (`0_pre … final_post`), `·Paris` hides through the early blocks (rank ~10⁴), 
+is promoted through the middle to an internal minimum of rank ≈ 13 around `9_mid`, 
+then loses ranks up to `final_post` = rank 92. 
+Because the final-layer logit lens (`ln_final` then `W_U` on the last residual) is the model's output, 
+that 92 is exactly the §1 number.
+
 
 <figure>
   <img src="/assets/structure-vs-recall/section_3_logit-lens.png" alt="A line plot, logit-lens rank of the ' Paris' token by stage on a log y-axis, across 26 stages from 0_pre to final_post for gpt2 small. The rank stays around 10^4 for the early stages, declines through the middle, drops steeply to an internal minimum near rank 13 around 9_mid, bumps up slightly, and the final_post stage settles around rank 10^2 — the model's true output rank of 92.">
   <figcaption>Logit-lens rank of the leading-space token <code>·Paris</code> across 26 stages in gpt2 small (log axis). Promoted from rank ~10⁴ to an internal minimum of <strong>rank ≈ 13 around <code>9_mid</code></strong>, then easing back to <code>final_post</code> = rank 92, the model's true output (§1). A lens trajectory — a mid-stack rise and a return to the surface level — suggestive, but a lens read, not a direct measurement of the Paris logit.</figcaption>
 </figure>
+
+### 3.2 Layer-wise emergence by tuned lens
 
 A trained **tuned lens** (Belrose et al., 2023) confirms the shape with an independent translator. Its 13 per-stage reads trace the same arc and end at **rank 4** (log-prob −3.43):
 
@@ -263,11 +277,29 @@ A trained **tuned lens** (Belrose et al., 2023) confirms the shape with an indep
 | 5 | 1 462  | −9.54  | | 12 | **4** | **−3.43** |
 | 6 | 1 174  | −9.53  | |    |     |       |
 
-The two lenses agree on the *shape* — buried, then rising through the mid stack — but not on the *level*, and the disagreement is the more instructive part. At the one stage with an answer key, the final one, the raw logit lens gives 92 (exact, by construction) while the tuned lens reads rank 4: it **overshoots** `·Paris` exactly where it can be checked. So between the two, trust the raw lens here, and discount the tuned lens's sharper mid-stack numbers as the same optimism applied earlier rather than extra promotion. (That overshoot even cuts toward the thesis: a tuned lens trained on average text expects `·Paris` more available than this adversarial frame delivers — the gap is a signature of how atypical the input is, the §1 data-dilution point from another angle.)
+Comparing the two lenses and looking at where they disagree is quite interesting. 
+At the final stage, the only one with a known answer, the raw logit lens gives 92 
+(exact, by construction) while the tuned lens gives rank 4: it ranks `·Paris` too high. 
 
-What both lenses genuinely support is modest: `·Paris` rises in the mid-stack reads and is not at the top at the output. The stronger sentence — that the name is *computed* mid-stack and then *outcompeted* — is a lens inference, not yet a measurement, so I measured it directly (next).
+By construction the tuned lens (see https://tuned-lens.readthedocs.io/en/latest/) 
+replaces the upper layers with one affine map, fit to match the model's output 
+on average across text, so it cannot reproduce a suppression specific to one frame. 
+Removing `·Paris` here is exactly that kind of input-specific operation (§3–§6): 
+the lens applies its average-case mapping, under which the capital is more available, 
+and reads rank 4 where the model says 92. The size of that overshoot measures how far this frame 
+sits from the text the lens was fit on — the §1 data-dilution point once more.
 
-*Direct logit attribution (the lens-free version).* Decompose the real final-position residual into per-component contributions, apply the model's own fixed `ln_final` scale, and project each onto the `·Paris` − `·now` logit direction. The pieces sum back to the true logit difference — the reconstruction check passes to within ≈ 1e-6, and that is the whole point: every number here is a fact about the model, not a lens read. Two things fall out, and they are the competition story, now measured:
+What both lenses support is modest: `·Paris` rises in the mid-stack reads, and is not the top token at the output. 
+The stronger claim — that the name is computed mid-stack and then outcompeted — is a lens inference, not a measurement, 
+so I measured it directly (next).
+
+### 3.3 Layer-wise emergence by direct logit attribution
+
+*Direct logit attribution (the lens-free version).* Decompose the real final-position residual 
+into per-component contributions, apply the model's own fixed `ln_final` scale, and project each onto 
+the `·Paris` − `·now` logit direction. The pieces sum back to the true logit difference — the reconstruction 
+check passes to within ≈ 1e-6. 
+Two things fall out:
 
 | promotes `·Paris` (vs `·now`) | DLA | | suppresses (writes `·now`) | DLA |
 |---|---|---|---|---|
@@ -278,7 +310,13 @@ What both lenses genuinely support is modest: `·Paris` rises in the mid-stack r
 | L8H11 | +0.27 | | L8H10          | −0.30 |
 | L9H3  | +0.24 | | `L5_mlp`    | −0.28 |
 
-**Promotion is localized to one head.** A single attention head, **L9H8, writes +1.81** to the `·Paris` − `·now` logit — more than three times the next component. **Suppression is the MLPs and the unembed bias**, all writing toward the generic continuation. The faithful per-step trajectory shows the duel directly: L9's attention lifts `·Paris` from rank 576 to 69, `L10_mlp` shoves it back to 107, and the output settles at rank 92.
+**Promotion is localized to one head.** A single attention head, **L9H8, writes +1.81** to the `·Paris` − `·now` logit 
+— more than three times the next component. 
+
+**Suppression is the MLPs and the unembed bias**, all writing toward the generic continuation.
+
+L9's attention lifts `·Paris` from rank 576 to 69,
+`L10_mlp` shoves it back to 107, and the output settles at rank 92.
 
 | step | Δ(`·Paris`−`·now`) | rank |
 |---|---|---|
@@ -290,9 +328,18 @@ What both lenses genuinely support is modest: `·Paris` rises in the mid-stack r
 | `L11_attn`   | +0.67 | 55 |
 | `L11_mlp`    | +0.03 | **92** |
 
-So "computed mid-stack, then outranked toward the surface" is no longer a lens inference — it is the measured behaviour: a specific recall head writes the name, the MLPs (and the bias) write the generic continuation more strongly, and the name loses. The mechanism at the output is **competition, not a dedicated suppressor circuit**, and §6's "generic mass" has a face — the late MLPs. (Note this already inverts the §3 prediction's ROME expectation: the writer is a single *attention head*, not the mid-layer MLPs, and the MLPs here *suppress* the fact rather than store it.)
+So a specific recall head writes the name, the MLPs (and the bias) write 
+the generic continuation more strongly, and the name loses. 
 
-Two honest corrections come with it. First, the DLA-faithful trajectory — which differs from §3's logit lens *only* by using the final fixed scale instead of per-layer scales — bottoms at **rank 38** (at `L10_attn`), not ~13: the deeper dip the logit lens showed was partly a per-layer-scale artifact, and the direction-only internal best is shallower. Second, DLA credits only the *direct* path component → logit, so a head acting *through* a later component would be miscredited to that component; the clean complement is the path patching of §5, which confirms it directly — and shows L9H8's own output is then routed *suppressively*. The shape, though, is now a fact: lifted to the 60s by L9H8 (a low of rank 38 by `L10_attn`), then pushed back to 92 by the late MLPs.
+In §6 we talked about a "generic mass"; now we can give a name to that mass, the late MLPs.
+Furthermore, this inverts the ROME expectation from §3: the writer is a single attention head — L9H8, 
+contributing +1.81 to the `·Paris` − `·now` logit, more than three times the next component — not the mid-layer MLPs, 
+and those MLPs here suppress the name (`L10_mlp` −1.17, `L7_mlp` −0.77) rather than store it.
+
+A note: DLA credits only a component's *direct* contribution to the logit, so a head that acts *through* a later 
+component is credited to that component instead. 
+Path patching (§5) is the test that separates the two, and it confirms L9H8 directly
+— while showing that L9H8's own output is then routed *suppressively*. 
 
 ### 4. Frame-sensitivity sweep
 
@@ -314,7 +361,11 @@ Hold scale fixed and vary only the syntactic frame, measuring the rank of `·Par
 | QA                   | `"Q: What is the capital of France? A:"` | 4 | −3.64 | no |
 | cloze / definitional | `"The capital of France is the city of"` | **0** | −2.33 | **yes** |
 
-The appositive (`…France,`) and the cloze (`…is the city of`) both put `·Paris` first; the QA frame surfaces it to rank 4. Nothing about the model changed — only the syntax of the slot. So the knowledge is unambiguously *present and gated by frame*: `·now` wins the predicate-nominative slot not because the model can't recall Paris, but because that specific construction routes around the name. The central claim is now directly observable, not inferred.
+The appositive (`…France,`) and the cloze (`…is the city of`) both put `·Paris` first; 
+the QA frame surfaces it to rank 4. Nothing about the model changed — only the syntax of the slot. 
+
+So `·now` wins the predicate-nominative slot not because the model cannot recall Paris, 
+but because this construction favors a generic predicate over the name — the knowledge is *present and gated by frame*.
 
 ### 5. Causal test: activation patching
 
