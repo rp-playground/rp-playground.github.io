@@ -17,37 +17,32 @@ permalink: /writing/structure-vs-recall-gpt2/
 * TOC
 {:toc}
 
-## draft - Intro
+## Introduction
 
-Feed GPT-2 small (124M) the prompt `"The capital of France is"`, decode greedily, and 
-the next token is `·now`. The capital of France is *now*. Cosa esattamente impedisce al modello di 
-rispondere Paris e cosa gli fa invece preferire la forma del linguaggio?
+Feed GPT-2 small (124M) the prompt "The capital of France is", decode greedily, 
+and the next token is ·now. The capital of France is now. What exactly stops the model 
+from answering Paris, and what makes it prefer the form of language instead?
 
-The per-position trace shows the same behaviour at every step: each prefix is continued with the 
-locally most grammatical token rather than with content.
+Maybe Paris simply isn’t there. But can it really be that GPT-2 small, small as it is, 
+holds no notion of Paris at all? More likely it holds one, and the signal is just too weak 
+to ever beat the form. How weak, though? The prefix certainly doesn’t help. 
+The phrasing "the capital of France is ___", with the name straight after the verb, 
+belongs to encyclopedias and grammar books and almost nowhere else. 
+And encyclopedias and grammar books are not among the fifteen domains that contributed 
+the most data by volume to WebText, as the model card records.
 
-```
-pos 2  '...The capital'            -> ' of'
-pos 3  '...The capital of'         -> ' the'
-pos 4  '...The capital of France'  -> ','
-pos 5  '...The capital of France is' -> ' now'
-```
+[Wikipedia wasn’t just underrepresented in WebText — it was deliberately removed during 
+construction (the GPT-2 paper’s dataset section says they stripped Wikipedia documents 
+to avoid overlap with evaluation sets). Worth verifying against the source, but if it 
+holds, “the canonical encyclopedia was explicitly excluded” is a sharper claim
+ than “encyclopedias aren’t in the top fifteen.”]
 
-The easy conclusion is that Paris simply isn't there — that the model continues the form at every 
-step and never retrieves the fact. Ma è mai possibile che GPT-2 small non abbia,
-per quanto piccolo, nessuna idea di Parigi? Allora forse ce l'ha, ma si tratta di un segnale 
-troppo debole che non riesce a prevalere mai sulla forma. Ma quanto debole? Il prefisso certo non 
-aiuta, così si scrive solo nelle enciclopedie e nei libri di grammatica. E enciclopedie e 
-libri di grammatica non compaiono tra i 15 domini che hanno contribuito 
-di più in termini di volume di dati a WebText, come si legge nella model card
-https://github.com/openai/gpt-2/blob/master/model_card.md .
+What follows is a beginner’s attempt to investigate the question thoroughly and answer it 
+plainly, using the concepts and tools of mechanistic interpretability.
 
-L'articolo che segue, scritto da un principiante nella materia, si propone di investigare
-la materia a fondo e di misurare le ipotesi espresse qui sopra. Nel far questo ci si servirà 
-dell'armamentario concettuale e strumentale della mechanistic interpretability.
-Si potrebbe anche dire che l'obiettivo principale dell'autore di questo articolo è duplice: 
-da una parte di essere in grado di affrontare la questione specifica in termini scientifici, 
-dall'altra di introduzione alla mechanistic interpretability.
+Its value, I think, lies less in the subject or the answers — the field is by now saturated 
+with similar and better explorations — than in the introduction to mechanistic interpretability 
+it gave me.
 
 ## A preliminary rumbling
 
