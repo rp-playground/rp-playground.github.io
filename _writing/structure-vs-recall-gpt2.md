@@ -16,6 +16,38 @@ permalink: /writing/structure-vs-recall-gpt2/
 * TOC
 {:toc}
 
+## draft - Intro
+
+Feed GPT-2 small (124M) the prompt `"The capital of France is"`, decode greedily, and 
+the next token is `·now`. The capital of France is *now*. Cosa esattamente impedisce al modello di 
+rispondere Paris e cosa gli fa invece preferire la forma del linguaggio?
+
+The per-position trace shows the same behaviour at every step: each prefix is continued with the 
+locally most grammatical token rather than with content.
+
+```
+pos 2  '...The capital'            -> ' of'
+pos 3  '...The capital of'         -> ' the'
+pos 4  '...The capital of France'  -> ','
+pos 5  '...The capital of France is' -> ' now'
+```
+
+The easy conclusion is that Paris simply isn't there — that the model continues the form at every 
+step and never retrieves the fact. Ma è mai possibile che GPT-2 small non abbia,
+per quanto piccolo, nessuna idea di Parigi? Allora forse ce l'ha, ma si tratta di un segnale 
+troppo debole che non riesce a prevalere mai sulla forma. Ma quanto debole? Il prefisso certo non 
+aiuta, così si scrive solo nelle enciclopedie e nei libri di grammatica. E enciclopedie e 
+libri di grammatica non compaiono tra i 15 domini che hanno contribuito 
+di più in termini di volume di dati a WebText, come si legge nella model card
+https://github.com/openai/gpt-2/blob/master/model_card.md .
+
+L'articolo che segue, scritto da un principiante nella materia, si propone di investigare
+la materia a fondo e di misurare le ipotesi espresse qui sopra. Nel far questo ci si servirà 
+dell'armamentario concettuale e strumentale della mechanistic interpretability.
+Si potrebbe anche dire che l'obiettivo principale dell'autore di questo articolo è duplice: 
+da una parte di essere in grado di affrontare la questione specifica in termini scientifici, 
+dall'altra di introduzione alla mechanistic interpretability.
+
 ## A preliminary rumbling
 
 Feed GPT-2 small (124M) the prompt `"The capital of France is"`, decode greedily, and the next token is `·now`. 
