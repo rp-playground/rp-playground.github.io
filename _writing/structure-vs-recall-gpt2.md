@@ -20,12 +20,18 @@ permalink: /writing/structure-vs-recall-gpt2/
 ## Introduction
 
 Feed GPT-2 small (124M) the prompt "The capital of France is", decode greedily, 
-and the next token is ·now. The capital of France is now. What exactly stops the model 
+and the next token is `·now`. The capital of France is now. What exactly stops the model 
 from answering Paris, and what makes it prefer the form of language instead?
 
 Maybe Paris simply isn’t there. But can it really be that GPT-2 small, small as it is, 
 holds no notion of Paris at all? More likely it holds one, and the signal is just too weak 
-to ever beat the form. How weak, though? The prefix certainly doesn’t help. 
+to ever beat the form. How weak, though?
+That is the first thing to measure, and the answer decides which story to tell: 
+the story of a name resting just below the surface and never popping up as argmax,
+or the story of a name buried thousands of tokens down, almost in real absence, where data-dilution 
+makes its signal extremely weak.
+
+The prefix certainly doesn’t help. 
 The phrasing "the capital of France is ___", with the name straight after the verb, 
 belongs to encyclopedias and grammar books and almost nowhere else. 
 And encyclopedias and grammar books are not among the fifteen domains that contributed 
@@ -37,50 +43,22 @@ to avoid overlap with evaluation sets). Worth verifying against the source, but 
 holds, “the canonical encyclopedia was explicitly excluded” is a sharper claim
  than “encyclopedias aren’t in the top fifteen.”]
 
-What follows is a beginner’s attempt to investigate the question thoroughly and answer it 
+What follows is a beginner’s attempt to investigate the questions thoroughly and answer it 
 plainly, using the concepts and tools of mechanistic interpretability.
 
 Its value, I think, lies less in the subject or the answers — the field is by now saturated 
 with similar and better explorations — than in the introduction to mechanistic interpretability 
 it gave me.
 
-## A preliminary rumbling
-
-Feed GPT-2 small (124M) the prompt `"The capital of France is"`, decode greedily, and the next token is `·now`. 
-The capital of France is *now*. The fragment is *delectable to my palate which I never quite managed to rinse of* 
-all that reading I do of Heidegger ("Die Sprache ist das Haus des Seins") and Hölderlin ("Seit ein Gespräch wir sind"), 
-and the reading it tempts me into is that the structure of language is the ground a small model is built 
-on — the thing learned first and most deeply, what the model is rather than what it stores — and that this 
-primacy is what pushes the fact, Paris, out past the form's edge.
-
-I think that reading is a trap. This post is about the tools I need to check a reading like that, 
-and what they show when I apply them here.
-
-Here is the kind of trap I mean, and the "very delectable" gets clarified. 
-Saint-John Perse, quoted in Archibald MacLeish's "A Note on Alexis Saint-Léger Léger" (*Poetry*, 1942):
-
-> On the threshold of a Mongol hut, in the middle of the Gobi desert, just as I was remounting my horse, 
-> someone translated to me the beautiful guttural sentence of a migrant lama of the Great Red Sect: 
-> "Man is born in the house, but he dies in the desert…" 
-> For days and days, in the course of long silent rides, I thought over and over that phrase, 
-> delectable to the palate of an Occidental who can never be sure of having rinsed his mouth sufficiently 
-> of all romantic after-taste… until the day when in a lamasery on the border of the desert 
-> I was given this trivial explanation: "A dying man must be exposed outside the tent so as not to soil 
-> the dwelling place of the living".
->
-> A beautiful snub for the incurable associations of ideas of literary culture!
-
-I'm the Occidental in that passage. "The capital of France is now" — language as structure, the model as a machine 
-that continues a form rather than retrieving a fact — is the romantic after-taste. 
-The lama's sentence had a trivial explanation waiting at the lamasery, and I expect mine does too. 
-
-Most of the rest of this document is the attempt to find it. 
-The explanation that comes back is partly about token frequency and partly about what the training data actually 
-contains, not about language being the house of Being.
-
 ## The observation
 
-Feeding GPT-2 small (124M) the prompt `"The capital of France is"` and decoding greedily, the next token is `·now`. (Tokens are written in code with a middot for the leading space, so `·now` is the BPE token *␣now* and `·Paris` is *␣Paris* — distinct from the bare `Paris`.) The per-position trace shows the same behaviour at every step: each prefix is continued with the locally most grammatical token rather than with content.
+First, a note on how tokens are written. A token with a leading space is shown with a middot: `·now` means 
+the token `␣now` (the word "now" with a space in front), and `·Paris` means `␣Paris`. This is different from the 
+bare token `Paris` with no space. 
+
+The `·now` we saw isn't special to the end of the sentence. 
+If you let the model predict greedily at every position, not just the last one, it does the same thing each time — it picks 
+the word that fits the grammar, not a word that adds a fact:
 
 ```
 pos 2  '...The capital'            -> ' of'
@@ -89,20 +67,21 @@ pos 4  '...The capital of France'  -> ','
 pos 5  '...The capital of France is' -> ' now'
 ```
 
-The easy conclusion is that Paris simply isn't there — that the model continues the form at every step and never retrieves
-the fact. That is almost right.
+I see a promise of Paris at pos 4, after the predicted comma. It appears to me the comma like setting up the phrase 
+"The capital of France, Paris, is…". We will verify it, in the Experiments section.
 
-## Correcting the naive reading
+## A note on the greedy decoding
 
 Greedy decoding reports only the **argmax** — the single most probable token. So the trace shows that `·now` beats every other token for *first place*; it does **not** show that `·Paris` is absent from the distribution. Tokens like `·now`, `·a`, `·home`, `·one` are generic post-copula continuations that are valid across essentially every topic in the corpus. For `·Paris` to take the top slot it has to outscore that entire mass of generic continuations, and at 124M it doesn't.
 
-Recall is most likely present but sub-argmax — pushed down, not missing.
+Recall is most likely present but pushed down, not missing.
 
 ## Two reasons structure wins here
 
 Two forces make the generic continuation win.
 
-The first is distributional frequency. `is now / is a / is home to` is extremely high-frequency everywhere in text, whereas `·Paris` is a rarer token that only pays off under one specific subject–attribute association. Absent a sharp signal, the model defaults to the high-frequency continuation.
+The first is distributional frequency. `is now / is a / is home to` is extremely high-frequency everywhere in text, 
+whereas `·Paris` requires a pretty specific subject–attribute association. 
 
 The second force is in the data itself, and this one I checked by googling `"The capital of France is"`.
 
@@ -121,34 +100,65 @@ The slot after `is` holds most of the times a predicate, because the name alread
 One docs page even calls `"The capital of France is"` a poorly designed example, I'd guess for the same reason.
 
 So in this text, `"the capital of France … is ___"` takes a description more often than `Paris`. 
-`P(Paris | this prefix)` is softer than it feels. 
-The dominant construction must be the appositive, with Paris named before the verb.
+`P(Paris | this prefix)` must be a quite weak conditional probability. 
+
+The two forces differ in scope. The first, frequency, is general: the generic predicate is common after "…is ___" 
+for any subject, so it should suppress every capital, not just Paris. 
+The second, the data, is subject-specific: France's phrase is unusually appositive-dominated and "Paris" 
+has many non-capital senses, so France should rank lower than subjects whose data is cleaner. 
+If only frequency applies, France is one instance of a general frame effect; 
+if the data penalty also applies, France is partly a special case. 
+§7 settles the question across a dozen subjects.
 
 ## The mechanistic picture
 
-This is the recall-vs-structure split in miniature, and the two channels have different mechanistic signatures.
+## The mechanistic picture
 
-Grammatical continuation is learned early and is robust — roughly high-order n-gram competence that pervades all text and is cheap to represent. Factual recall is a specific stored lookup. In the key–value-memory view of MLPs (Geva et al., 2021), the subject representation accumulates attribute information across mid layers, and a later attention head moves the object token to the final position. Causal tracing (Meng et al., 2022, ROME) localizes the decisive step to mid-layer MLPs at the *last subject token*. To whatever extent that machinery exists in a 124M model, it is weak: the France→Paris write isn't sharp enough to promote `·Paris` past the generic continuation.
+Grammatical continuation is learned early and robust — roughly high-order n-gram statistics.
+
+Factual recall is a specific stored lookup. In the key–value-memory view of MLPs (Geva et al., 2021), 
+the subject representation accumulates attributes across mid layers, and a later attention head moves 
+the object token to the final position.
+
+Causal tracing (Meng et al., 2022, ROME) localizes the decisive step to mid-layer MLPs at the last subject token.
+
+If that picture holds in a model this small, it predicts where to look: the `·Paris` write should sit in the 
+mid-layer MLPs, with a layer-wise read showing the name promoted there before the output settles. 
+The prediction can fail in two telling ways — a single attention head might carry the write instead, 
+or the MLPs might suppress the name rather than store it. §3's lenses and direct attribution decide which.
+
+Whatever recall machinery exists at 124M is weak: the France→Paris write isn't sharp enough to outrank 
+the generic continuation. The obvious lever is a larger model. If this is capacity-limited recall, 
+scaling up should sharpen the write and, at some size, lift `·Paris` to the top along a clean monotone 
+curve — which would separate "too small to recall yet" from "structurally unable to." A ragged curve, 
+or a name that never reaches the top at any size, would point back to the data rather than the parameter count. 
+§2 runs the scale.
 
 ## The most telling line is pos 4, not pos 5
 
-At `"The capital of France"` the argmax is a comma. The most natural reading of that comma is that the model is setting up an **appositive**: *"The capital of France, Paris, is…"*. That is precisely the construction in which the model most wants to name Paris.
+At `"The capital of France"` the argmax is a comma. The most natural reading of that comma is that the model is 
+setting up an **appositive**: *"The capital of France, Paris, is…"*. 
 
 The prompt's trailing `"…is"` forecloses the appositive and forces a predicate-nominative slot — and that slot is exactly where the generic continuation wins. The same logic runs through the whole trace: pos 3 `"The capital of"` → `·the` (a determiner, not a country), pos 4 → comma (appositive setup), pos 5 → `·now` (generic predicate). At every position the model takes the locally grammatical continuation and never commits to content.
 
-The upshot is that the knowledge isn't simply missing; it is **more accessible under one syntactic frame than another**. Recall here is *frame-sensitive*. That is a cleaner and stronger claim than "small models don't recall," and it is falsifiable.
+We can assume that Paris, the knowledge, isn't simply missing; it is **more accessible under one syntactic 
+frame than another**. Recall here is *frame-sensitive* — and this is the sharpest of the bets, because it can 
+be settled at fixed weights: if changing only the syntax, an appositive or a cloze in place of the 
+predicate-nominative, lifts `·Paris` toward the top, then the knowledge was present and gated by form; 
+if the frame makes no difference, the reading is wrong. §4 makes the swap.
 
-## The defensible headline
-
-> For this subject, under greedy decoding, in the predicate-nominative frame, the structural-continuation prior outranks a weak-but-present factual signal — at every scale tested, never losing even at 1.5B, and by a margin that widens as the cue weakens.
-
-Structure and recall are separable, and greedy decoding simply happens to read out the structural channel. The original one-liner survives, but only in this narrower and more precise form — and note it is *not* a small-model story: the prior wins at every size here, just most starkly at the bottom.
-
----
 
 ## Experiments
 
-The argument above is mostly analytical; the claims it rests on are measurable. Each experiment below pairs the original *prediction* with the *result* from running it, roughly in order of effort-to-payoff:
+Each section above makes a claim the following experiments will test: 
+the name is present but outranked (§1); larger models should raise `·Paris` until it ranks first (§2); 
+the component that writes `·Paris` should be a mid-layer MLP (§3); 
+rewording the prompt, at fixed weights, should lift `·Paris` toward the top (§4);
+and France's low rank is either the general frame effect that holds for every capital, 
+or partly a penalty specific to France — §7 settles which.
+
+Two further experiments depend on these rather than testing claims of their own — the causal check in §5 and 
+the feature-level analysis in §6 — and are introduced where they appear.
 
 ### 1. Locate `·Paris` in the distribution
 
@@ -172,13 +182,15 @@ for s in (" Paris", "Paris"):
 | `" Paris"` | `[" Paris"]` | 92 | −6.42 | False |
 | `"Paris"`  | `["Paris"]`  | 12 973 | −14.57 | False |
 
-Rank 92 out of ~50 k is exactly the "outcompeted, not absent" regime: top hundred, not rank 0, and nowhere near ≫ 1000. Recall is there — the open question is what holds it down, which is what (4) and (5) test.
+Rank 92 out of ~50 k shows clearly that recall is there — the open question is what holds it down, 
+which is what (4) and (5) test.
 
 ### 2. The scale curve
 
-This is the load-bearing experiment for the whole framing. Run the same measurement across `gpt2` (124M) → `gpt2-medium` (355M) → `gpt2-large` (774M) → `gpt2-xl` (1.5B) and track the rank/log-prob of `·Paris` and whether it eventually wins the argmax.
+Run the same measurement across `gpt2` (124M) → `gpt2-medium` (355M) → `gpt2-large` (774M) → `gpt2-xl` (1.5B) and track the rank/log-prob of `·Paris` and whether it eventually wins the argmax.
 
-*Prediction:* `·Paris` climbs monotonically with scale and crosses into first place at some size. A clean monotone curve is the actual evidence that this is **capacity-limited recall** rather than impossibility — it converts a single anecdote into a claim about where the recall circuit sharpens enough to beat the structural prior.
+*Prediction:* `·Paris` climbs monotonically with scale and crosses into first place at some size. 
+A clean monotone curve is the actual evidence that this is **capacity-limited recall** rather than impossibility.
 
 *Result.* The curve does **not** behave as predicted. `·Paris` improves sharply but **non-monotonically**, and it **never wins the argmax** — not even at 1.5B:
 
@@ -189,11 +201,15 @@ This is the load-bearing experiment for the whole framing. Run the same measurem
 | `gpt2-large`  | 774M | 54 | −5.93 | no |
 | `gpt2-xl`     | 1.5B | 2  | −3.08 | no |
 
-<small>(Nominal totals, matching the first mention above. `cfg.n_params` reports the lower non-embedding counts — 85M / 302M / 708M / 1.475B — which is what the run printed.)</small>
 
-Two things break the clean capacity-limited story **for France**. First, the curve is non-monotonic: `gpt2-medium` pulls `·Paris` to rank 3, but `gpt2-large` regresses to 54 before `gpt2-xl` recovers to rank 2. Second, the winning token shifts (`·now` → `·the` → `·a`) but stays generic; at gpt2-xl `·Paris` actually outscores `·now` (logit diff +1.26) yet still lands second, losing to ` a` — so for France, `·Paris` is *never* the argmax, at any scale here.
+Two things contradict the capacity-limited prediction **for France**. 
+First, the curve is non-monotonic: `gpt2-medium` 
+pulls `·Paris` to rank 3, but `gpt2-large` regresses to 54 before `gpt2-xl` recovers to rank 2. 
+Second, the winning token shifts (`·now` → `·the` → `·a`) but stays generic; at gpt2-xl `·Paris` actually 
+outscores `·now` (logit diff +1.26) but loses to ` a` — so for France, `·Paris` is *never* the argmax, at any scale here.
 
-But four ranks on one prompt can't carry a claim about capacity, so I re-ran the measurement as a distribution over the twelve-capital probe set of §7 at every scale:
+But four ranks on one prompt can't carry a claim about capacity, so I re-ran the measurement 
+as a distribution over the twelve-capital probe set of §7 at every scale:
 
 | model | median rank | IQR | capitals at argmax |
 |---|---|---|---|
@@ -202,11 +218,19 @@ But four ranks on one prompt can't carry a claim about capacity, so I re-ran the
 | `gpt2-large`  | 33  | [18, 50] | 0 / 12 |
 | `gpt2-xl`     | 0.5 | [0, 1]   | 6 / 12 |
 
-This both sharpens the story and corrects it. The **non-monotonicity is real, not a single-prompt artifact**: the population median zigzags the same way (27 → 2 → 33 → 0.5), with `gpt2-large` a genuine regression. But capacity is clearly **not** irrelevant — by gpt2-xl the median capital *is* the argmax (median 0.5, six of twelve winning), so for most subjects scale does eventually carry the recall. **France→Paris is the outlier**: it sits among the worst capitals (rank 2 at xl while the median is 0), exactly the §1 data-dilution signature. So the honest split is that capacity does most of the work across subjects — unevenly, with a real mid-scale regression — while for *this* subject the construction-and-data penalty keeps the name down at every scale. The clean "capacity-limited recall" prediction is wrong in both directions: too pessimistic for the population, too optimistic for France.
+The **non-monotonicity** is real: the population median zigzags the same way (27 → 2 → 33 → 0.5), 
+with `gpt2-large` regressing. 
+But capacity is clearly **not** irrelevant — by gpt2-xl the median capital *is* the argmax 
+(median 0.5, six of twelve winning), so for most subjects scale favours the recall. 
+
+**France→Paris is the outlier**: it sits among the worst capitals (rank 2 at xl while the median is 0), 
+which is the §1 data-dilution pattern again. 
 
 <figure>
   <img src="/assets/structure-vs-recall/section_8_median-ranks.png" alt="Top: median rank of the capital token (log y) versus model size (log x) for gpt2, gpt2-medium, gpt2-large, gpt2-xl, with IQR error bars — 27, 2, 33, 0.5, a non-monotonic curve where gpt2-large regresses well above gpt2-medium and gpt2-xl reaches the rank-1 line. Bottom: per-country rank distributions (box plots with points) at each scale, showing the same non-monotonic spread.">
-  <figcaption>RUN A — median rank of the capital across the twelve-capital probe set, by scale (IQR bars), with the per-country distribution below. The dip is real, not single-prompt noise: <code>gpt2-large</code> regresses. But by <code>gpt2-xl</code> the median capital is the argmax (6 / 12) — capacity does most of the work across subjects; France is the outlier.</figcaption>
+  <figcaption>RUN A — median rank of the capital across the twelve-capital probe set, by scale (IQR (the interquartile range) bars), 
+with the per-country distribution below. 
+<code>gpt2-large</code> regresses, but by <code>gpt2-xl</code> the median capital is the argmax (6 / 12) — capacity does most of the work across subjects; France is the outlier.</figcaption>
 </figure>
 
 <figure>
