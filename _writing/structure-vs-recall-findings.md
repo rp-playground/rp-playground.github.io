@@ -1,21 +1,34 @@
 ---
 layout: article
-title: "Findings: Structure vs. Factual Recall in GPT-2 Small"
-subtitle: "How a small model balances syntactic habit against factual retrieval"
-description: A synthesis of structural experiments on GPT-2 Small — the capital of France sits at rank 92 under the "is ___" frame yet jumps to argmax under an appositive or cloze, factual recall gated by syntax, with the attention heads and MLPs fighting over the output.
-summary: GPT-2 Small knows Paris — it sits at rank 92, not absent. Change the grammatical frame and it jumps to rank 0. A synthesis of the structure-vs-recall experiments — the syntax gate, the writer head L9H8 against the late-layer MLP suppressors, and why France stays a scaling outlier.
+title: "Structural vs. Factual Recall in GPT-2 Small"
+subtitle: "Syntactic against factual retrieval in a small model"
+description: A synthesis of structural experiments on GPT-2 Small — the capital of France sits at rank 92 under the "is ___" frame 
+  yet jumps to argmax under an appositive or cloze, factual recall gated by syntax, with the attention heads and MLPs fighting over the output.
+summary: GPT-2 Small knows Paris — it sits at rank 92, not absent. Change the grammatical frame and it jumps to rank 0. 
+  A synthesis of the structure-vs-recall experiments — the syntax gate, the writer head L9H8 against the late-layer MLP suppressors, 
+  and why France stays a scaling outlier.
 date: 2026-06-23
 tags: [mech-interp, transformers, interpretability, GPT-2, DLA]
 published: false
 permalink: /writing/structure-vs-recall-findings/
 ---
 
-This document synthesizes results from experiments I ran to understand
-how GPT-2 Small operates between two opposite forces: the force that pushes toward syntactic structures 
-and the force that pushes toward factual retrieval. 
-It examines the mechanisms that cause the model to favor 
-one over the other, structural continuations over facts, and the internal circuitry that allows it 
-to retrieve knowledge when properly cued.
+This document synthesizes experimental findings on how GPT-2 Small manages the competing priorities of syntactic continuation 
+and factual retrieval. It examines the mechanisms that cause the model to favor grammatical structure over factual recall,
+structural continuations over facts,
+as well as the internal circuitry responsible for retrieving knowledge when properly cued.
+
+First, we examine the zero-shot case under a weak syntactic frame, where late-layer suppressors 
+overpower the model's factual knowledge in favor of generic grammatical continuations. 
+
+[are we sure that is because of late layer suppessors?]
+
+Second, we explore the few-shot case, detailing the internal circuitry that allows the model to bypass 
+those grammatical suppressors and successfully retrieve factual knowledge when given a strong pattern.
+
+This document represents my first practical application of the mechanistic interpretability tools I explored in 
+[Replicating a GPT-2 Transformer Block from the Residual Stream](/writing/replicating-gpt2-block/)—an earlier project where I manually rebuilt GPT-2’s block 0 and cross-checked every step against
+transformer_lens to understand exactly what each hook holds.
 
 {:.no_toc}
 
@@ -26,12 +39,11 @@ to retrieve knowledge when properly cued.
 
 ---
 
-## 1. The zero-shot limitation: facts are outranked, not missing
+## 1. The zero-shot
 
 Feeding GPT-2 Small (124M) the zero-shot prompt "The capital of France is" 
 results in the prediction `·now` instead of `·Paris`.
 
-And the `·now` isn't special to the end of the sentence. 
 If you let the model predict greedily at every position, not just the last one, 
 it does the same thing each time — it picks 
 the word that fits the grammar, not a word that adds a fact:
@@ -45,20 +57,23 @@ pos 5  '...The capital of France is' -> ' now'
 
 I see a promise of Paris at pos 4, after the predicted comma. 
 It appears to me the comma like setting up the phrase 
-"The capital of France, Paris, is…". More on frame-sensitivity below.
+"The capital of France, Paris, is…"—an intuition that is confirmed by our frame-sensitivity experiments below.
 
-For now it is important to say that the model does not return Paris not because it
-lacks the knowledge. The factual token `·Paris` is
-not absent; it sits at Rank 92 (log-prob −6.42) in the final distribution. It 
-is simply outcompeted by a "generic mass" of continuation words (`·now`, `·a`, `·the`).
+For now, it is important to note that the model's failure to return Paris is not due to a lack of knowledge.
+The factual token `·Paris` is
+not absent; it sits at Rank 92 (log-prob −6.42) in the final distribution 
+(see [Experiment 1](#experiment-1-locate-paris-in-the-distribution)). It 
+is simply outcompeted by a "generic mass" of continuation words (`·now`, `·a`, `·the`)—a 
+suppression that persists across larger model scales, where `·Paris` 
+improves non-monotonically but never wins the argmax (see [Experiment 2](#experiment-2-the-scale-curve)).
 
 This suppression is not unique to France. Across a 12-country probe set, the capital 
-is never the top prediction in the ...is frame (median rank 27). The model 
-prioritizes grammatical continuation—learned early and robustly—over specific 
+is never the top prediction in the ...is frame (median rank 27) (see [Experiment 3](#experiment-3-the-scale-curve-over-twelve-capitals)). The model 
+prioritizes grammatical continuation over specific 
 factual lookups.
 
 
-### Locate `·Paris` in the distribution
+### Experiment 1: Locate `·Paris` in the distribution
 
 The first thing to settle empirically is whether `·Paris` is sub-argmax or genuinely suppressed. Report its rank and log-prob in the final-position distribution, for both the leading-space token `·Paris` and the bare `Paris`, and check the BPE segmentation so nothing is missed.
 
@@ -80,7 +95,7 @@ for s in (" Paris", "Paris"):
 
 Rank 92 out of ~50 k shows clearly that recall is there — the open question is what holds it down.
 
-### The scale curve
+### Experiment 2: The scale curve
 
 Run the same measurement across `gpt2` (124M) → `gpt2-medium` (355M) → `gpt2-large` (774M) → `gpt2-xl` (1.5B) and track the rank/log-prob of `·Paris` and whether it eventually wins the argmax.
 
@@ -100,7 +115,9 @@ pulls `·Paris` to rank 3, but `gpt2-large` regresses to 54 before `gpt2-xl` rec
 Second, the winning token shifts (`·now` → `·the` → `·a`) but stays generic; at gpt2-xl `·Paris` actually 
 outscores `·now` (logit diff +1.26) but loses to `·a` — so for France, `·Paris` is *never* the argmax, at any scale here.
 
-I re-ran the measurement 
+### Experiment 3: The scale curve over twelve capitals
+
+Re-ran the measurement in [Experiment 2](#experiment-2-the-scale-curve)
 as a distribution over the twelve-capital probe set at every scale:
 
 | model | median rank | IQR | capitals at argmax |
@@ -115,8 +132,23 @@ with `gpt2-large` regressing.
 But capacity is clearly **not** irrelevant — by gpt2-xl the median capital *is* the argmax 
 (median 0.5, six of twelve winning), so for most subjects scale favours the recall. 
 
+#### The limits of scale
 
-## 2. The syntax gate: frame-sensitivity
+While scaling the model resolves this issue for most subjects, France remains a stubborn outlier 
+due to training data distributions.
+
+Moving from GPT-2 Small (124M) to GPT-2 XL (1.5B) pushes the median capital prediction to Rank 0.5 
+across the 12-country probe set. However, for France, `·Paris` only reaches Rank 2 at 1.5B. This indicates 
+a deep data-dilution issue: the specific string "The capital of France is" is likely rarely followed by "Paris" 
+in the training corpus, often preceding a description instead (e.g., in appositives).
+
+The phrasing "the capital of France is ___", with the name straight after the verb, 
+belongs to encyclopedias and grammar books and almost nowhere else. 
+And encyclopedias and grammar books are not among the fifteen domains that contributed 
+the most data by volume to WebText, as the model card records.
+
+
+### Experiment 4: The syntax gate: frame-sensitivity
 
 Factual knowledge in this model is gated by grammatical framing. At entirely 
 fixed weights, altering only the prompt's syntax completely changes the result.
@@ -148,11 +180,8 @@ the QA frame surfaces it to rank 4. Nothing about the model changed — only the
 So `·now` wins the predicate-nominative slot not because the model cannot recall Paris, 
 but because this construction favors a generic predicate over the name — the knowledge is *present and gated by frame*.
 
----
 
-## 3. The internal circuitry: writers vs. suppressors
-
-### The Zero-Shot Battle
+### Experiment 5: The internal circuitry in the Zero-Shot case
 
 Without a strong structural cue, the zero-shot run becomes a direct competition between opposing components:
 
@@ -181,7 +210,7 @@ Two things fall out:
 | L9H3  | +0.24 | | `L5_mlp`    | −0.28 |
 
 
-### The Few-Shot Handoff
+## The Few-Shot
 
 When given a structural pattern ("The capital of Italy is Rome... France is"), the network operates 
 differently, utilizing an assembly line to bypass the suppressors:
@@ -213,26 +242,35 @@ residual stream, spiking its probability to near 100%.
 
 ---
 
-## 4. The limits of scale
-
-While scaling the model resolves this issue for most subjects, France remains a stubborn outlier 
-due to training data distributions.
-
-Moving from GPT-2 Small (124M) to GPT-2 XL (1.5B) pushes the median capital prediction to Rank 0.5 
-across the 12-country probe set. However, for France, `·Paris` only reaches Rank 2 at 1.5B. This indicates 
-a deep data-dilution issue: the specific string "The capital of France is" is likely rarely followed by "Paris" 
-in the training corpus, often preceding a description instead (e.g., in appositives).
-
-The phrasing "the capital of France is ___", with the name straight after the verb, 
-belongs to encyclopedias and grammar books and almost nowhere else. 
-And encyclopedias and grammar books are not among the fifteen domains that contributed 
-the most data by volume to WebText, as the model card records.
-
----
-
 ## Conclusion
 
-Small language models do not lack factual knowledge; rather, their factual-retrieval circuits
-(like L9H8 and the mid-layer MLPs) are frequently overpowered by structural and syntactic priors
-encoded in late-layer MLPs. The knowledge is highly accessible — provided the syntactic frame (or
-an in-context few-shot cue) correctly unlocks it.
+The experiments on GPT-2 Small reveal that the model's failure to retrieve `·Paris` is (unsurprisingly) not due to absent knowledge; 
+rather, factual recall is deeply entangled with and gated by syntactic priors. 
+The model continually balances competing priorities, with structural continuation often overpowering 
+factual retrieval unless explicitly cued.  
+
+This dynamic is defined by a clear mechanical contrast between zero-shot suppression and few-shot activation:
+
+* Zero-Shot Suppression: Under weak syntactic frames (e.g., the predicate-nominative "is ___"), the model retains 
+the latent fact—with ·Paris explicitly present in the distribution—but it is heavily penalized.
+Late-layer MLPs and unembed biases act as aggressive suppressors, overpowering the network's dedicated factual 
+writer heads (such as L9H8) in favor of generic grammatical continuations like `·now`.  
+
+* The Syntax Gate: Factual retrieval can be unlocked instantly by altering the grammatical frame. 
+Simply using an appositive or cloze construction completely bypasses the late-layer suppressors, 
+elevating the target fact directly to the argmax.  
+
+* The Few-Shot Assembly Line: When provided with a strong structural pattern via in-context examples, 
+the network utilizes a coordinated circuit to actively bypass grammatical suppressors. Early and mid-layer 
+"Gathering Heads" (Layers 4-7) scan the context, paying disproportionate attention to previous answers (like `·Rome` or `·Berlin`) 
+and structural schema words.  
+
+* Targeted Factual Overwrite: These gathering heads push a definitive signal into the residual stream indicating that 
+a specific entity type (a city) is required next. Mid-layer MLPs (such as Layer 8) read this combined structural 
+and contextual signal, operating as a Key-Value memory to violently inject the mathematical representation of the correct
+fact into the stream, spiking its probability to near 100%.  
+
+Ultimately, GPT-2 Small demonstrates that its factual knowledge is highly accessible. However, whether that knowledge 
+surfaces depends entirely on an internal routing battle: default late-layer circuits will stubbornly prioritize generic grammar, 
+whereas strong syntactic frames or in-context few-shot patterns empower early and mid-layer circuits to execute a definitive 
+factual overwrite.
