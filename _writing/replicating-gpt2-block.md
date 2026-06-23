@@ -12,7 +12,7 @@ permalink: /writing/replicating-gpt2-block/
 
 This article rebuilds **block 0** of GPT-2 by hand — recomputing each step from its parts
 and checking it against *TransformerLens*'s activation cache.
-I wrote it to introduce myself to the mechanistic-interpretability tooling:
+I wrote it to introduce myself to the tools available for doing mechanistic-interpretability:
 reconstructing a block this way is a good way to learn what
 each hook actually holds. It follows the dataflow diagram exactly:
 
