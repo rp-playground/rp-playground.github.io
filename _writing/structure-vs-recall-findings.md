@@ -1,7 +1,7 @@
 ---
 layout: article
 title: "Structural vs. Factual Recall in GPT-2 Small"
-subtitle: "Syntactic against factual retrieval in a small model"
+subtitle: "Syntactic vs. factual retrieval in a small model"
 description: A synthesis of structural experiments on GPT-2 Small — the capital of France sits at rank 92 under the "is ___" frame 
   yet jumps to argmax under an appositive or cloze, factual recall gated by syntax, with the attention heads and MLPs fighting over the output.
 summary: GPT-2 Small knows Paris — it sits at rank 92, not absent. Change the grammatical frame and it jumps to rank 0. 
@@ -9,19 +9,16 @@ summary: GPT-2 Small knows Paris — it sits at rank 92, not absent. Change the 
   and why France stays a scaling outlier.
 date: 2026-06-23
 tags: [mech-interp, transformers, interpretability, GPT-2, DLA]
-published: false
+published: true
 permalink: /writing/structure-vs-recall-findings/
 ---
 
 This document synthesizes experimental findings on how GPT-2 Small manages the competing priorities of syntactic continuation 
-and factual retrieval. It examines the mechanisms that cause the model to favor grammatical structure over factual recall,
-structural continuations over facts,
+and factual retrieval. It examines the mechanisms that cause the model to favor grammatical structure over factual recall, 
 as well as the internal circuitry responsible for retrieving knowledge when properly cued.
 
 First, we examine the zero-shot case under a weak syntactic frame, where late-layer suppressors 
 overpower the model's factual knowledge in favor of generic grammatical continuations. 
-
-[are we sure that is because of late layer suppessors?]
 
 Second, we explore the few-shot case, detailing the internal circuitry that allows the model to bypass 
 those grammatical suppressors and successfully retrieve factual knowledge when given a strong pattern.
@@ -39,7 +36,7 @@ transformer_lens to understand exactly what each hook holds.
 
 ---
 
-## 1. The zero-shot
+## 1. The Zero-Shot
 
 Feeding GPT-2 Small (124M) the zero-shot prompt "The capital of France is" 
 results in the prediction `·now` instead of `·Paris`.
@@ -210,7 +207,7 @@ Two things fall out:
 | L9H3  | +0.24 | | `L5_mlp`    | −0.28 |
 
 
-## The Few-Shot
+## 2. The Few-Shot
 
 When given a structural pattern ("The capital of Italy is Rome... France is"), the network operates 
 differently, utilizing an assembly line to bypass the suppressors:
@@ -239,6 +236,23 @@ name is required next.
 Factual Overwrite: Mid-layer MLPs (like Layer 8) read this combined signal ("France" + "City required"). 
 Acting as a Key-Value memory, they violently inject the mathematical representation of `·Paris` into the 
 residual stream, spiking its probability to near 100%.
+
+### Steering the capital-city features (quick check)
+
+A quick causal probe — not a full analysis, just a reference for future work: 
+if these capital/city features are what carries the factual answer, suppressing them should remove `·Paris`. 
+Using Neuronpedia's steering on the few-shot circuit, I negatively steered (−5.0×) the features that fire 
+on the city slot — `City Names` (L22), `European locations` (L21), and `city centers, capitals` (L2):
+
+<figure>
+  <img src="/assets/structure-vs-recall-findings/steering-capitals-1.png" alt="Neuronpedia 'Features to Steer' panel on the few-shot prompt 'The capital of Italy is Rome. The capital of France is'. Three capital/city features are listed — 'City Names' (Layer 22, index 9335, activation 42.17 at the final ' is'), 'European locations' (Layer 21, index 14331, activation 29.94 at ' is'), and 'city centers, capitals' (Layer 2, index 11838, activation 12.84 at ' capital') — with per-token sliders all set to −5.0× to negatively steer the features across every position.">
+  <figcaption>The steering setup: the capital/city features (<code>City Names</code> L22, <code>European locations</code> L21, <code>city centers, capitals</code> L2) negatively steered at −5.0× across all positions.</figcaption>
+</figure>
+
+<figure>
+  <img src="/assets/structure-vs-recall-findings/steering-capitals-2.png" alt="Side-by-side 'Results' comparison. Default Output: 'The capital of Italy is Rome. The capital of France is Paris. The capital of the United States is Washington'. Steered Output: 'The capital of Italy is Rome. The capital of France is at the top of the is at the top of'.">
+  <figcaption>Impact: with the capital/city features suppressed, the answer flips from <code>·Paris</code> (default) to the generic filler "<code>at the top of</code>" (steered). Knocking out those features removes the factual recall and the model falls back to grammatical continuation — consistent with the "factual overwrite" story above. This is only a quick steering check; a proper ablation/DLA pass is left to future analysis.</figcaption>
+</figure>
 
 ---
 
