@@ -369,45 +369,36 @@ but because this construction favors a generic predicate over the name — the k
 
 ### 5. Causal test: activation patching
 
-Take Frame 4 where `·Paris` wins, run it, 
-and patch its residual-stream vector at the final token position into Frame 1, 
-the predicate-nominative frame. Check whether the argmax flips to `·Paris`.
+#### 5.1 The obvious result
+Patching the full residual stream from a frame where ·Paris wins (the appositive) 
+into one where it loses (the predicate-nominative) cleanly flips the argmax to ·Paris. 
+But this is a trivial result. Because the two frames differ only by their final token 
+(, vs is), injecting the entire final-position state simply overwrites the token 
+difference everywhere, yielding a flat effect across all twelve layers that localizes nothing.
 
-```python
-# cache a Paris-surfacing frame, patch its final-pos resid into the predicate-nominative frame
-_, cache = model.run_with_cache(appositive_frame)
-def patch_resid(resid, hook):
-    resid[:, -1, :] = cache[hook.name][:, -1, :]
-    return resid
-patched = model.run_with_hooks(pn_frame,
-    fwd_hooks=[(utils.get_act_name("resid_post", L), patch_resid)])
-```
+The real causal structure only appears when we restrict the patch to individual components.
 
-*Prediction:* patching from a Rank-0 frame raises `·Paris` in the predicate-nominative frame, 
-and the effect concentrates in a small set of mid-to-late layers.
+#### 5.2 Component-level patch, with a control. 
 
-*Result.* Patching the donor (appositive) frame's final-position `resid_post` into the predicate-nominative 
-frame **flips `·Paris` to rank 0** (argmax), with Δ log-prob +5.17 over baseline. 
-The effect is **high and nearly flat across all twelve layers** (≈ +5.17 at each) — 
-patching at layer 0 helps about as much as patching at layer 11.
+To find the exact location of the memory, we try patching one component's 
+final-position output at a time (each head's `z`, each layer's `mlp_out`) from the appositive donor, 
+with a non-Paris control alongside — confirms the causal direction and then springs a trap. 
+The control passes cleanly: the appositive donor flips `·Paris` to the argmax, while a 
+different-country donor (`"The capital of Germany is"`) moves it by at most Δ = 0.86, 
+never to the top (best rank 65 vs baseline 92) — **11.5× weaker**. So the flip is real 
+and **donor-specific**, not "any patch saturates the output". 
 
-<figure>
-  <img src="/assets/structure-vs-recall/section_5_per-layer-patch-effect.png" alt="A bar chart, per-layer patch effect. For each patched layer 0 through 11 (resid_post at the final position), the bar shows the change in log-prob of ' Paris' versus baseline. Every bar is the same height, about 5.17.">
-  <figcaption>Patching the donor frame's final-position residual into the predicate-nominative frame, one layer at a time. Δ log-prob of `·Paris` is a flat ≈ +5.17 at every depth, and the argmax flips to `·Paris` in all cases.</figcaption>
-</figure>
-
-Two caveats keep this from being an independent pillar. First, the donor frame `"The capital of France,"` is just 
-the predicate-nominative frame with its final token swapped from `is` to a comma — same subject, same length — so 
-the patch largely re-derives §4 rather than adding new causal content.
-
-Second, the flatness: the donor differs from the receiver only at the final token, 
-so that difference sits in the final-position residual at every layer — patching the whole `resid_post` therefore 
-flips the readout at any injection layer, and the patch localizes nothing.
-
-
-What the layer-0 end of the flat line *does* sharpen is the §4 reading: injecting an early comma-state into the final position already flips the output, which means the receiver's own downstream layers compute Paris once the copula is gone. The cleaner claim is therefore not "one residual edit away" but that **the `is` token in the final slot is itself the suppressor** — the same point the pos-4 comma made (§"The most telling line"), now from the causal side.
-
-*Component-level patch, with a control.* Running exactly that — patching one component's final-position output at a time (each head's `z`, each layer's `mlp_out`) from the appositive donor, with a non-Paris control alongside — confirms the causal direction and then springs a trap. The control passes cleanly: the appositive donor flips `·Paris` to the argmax, while a different-country donor (`"The capital of Germany is"`) moves it by at most Δ = 0.86, never to the top (best rank 65 vs baseline 92) — **11.5× weaker**. So the flip is real and **donor-specific**, not "any patch saturates the output". But the *localization* half fails, revealingly. The biggest effect is neither the DLA writer `L9H8` (only +0.47 under patching, rank 55) nor a mid-to-late circuit; it is **`L0_mlp`** (Δ = +9.86, the only single component that reaches the argmax alone). The reason is a confound: donor and receiver are a *minimal pair*, differing only in their final token (`,` vs `is`), so patching the earliest token-carrying component swaps the frame at its root and lets the rest of the network recompute appositive-style. The patch is localizing **the frame lever — the final token — not a Paris circuit**: it is the early-layer twin of the full-residual saturation above (flat there because the whole state is injected, concentrated at `L0_mlp` here because that is where the token difference enters). The mid-stack MLP gradient (`L5`–`L10`, Δ ≈ +2 to +3) sits downstream of the same token difference, so it isn't an independent recall circuit either.
+But the *localization* half fails, 
+revealingly. The biggest effect is neither the DLA writer `L9H8` (only +0.47 under patching, rank 55) 
+nor a mid-to-late circuit; it is **`L0_mlp`** (Δ = +9.86, the only single component that reaches the 
+argmax alone). The reason is a confound: donor and receiver are a *minimal pair*, differing only in 
+their final token (`,` vs `is`), so patching the earliest token-carrying component swaps the frame 
+at its root and lets the rest of the network recompute appositive-style. The patch is localizing 
+**the frame lever — the final token — not a Paris circuit**: it is the early-layer twin of the 
+full-residual saturation above (flat there because the whole state is injected, concentrated 
+at `L0_mlp` here because that is where the token difference enters). The mid-stack MLP gradient 
+(`L5`–`L10`, Δ ≈ +2 to +3) 
+sits downstream of the same token difference, so it isn't an independent recall circuit either.
 
 | patched component (real donor) | Δ logit(`·Paris`−`·now`) | rank(`·Paris`) |
 |---|---|---|
