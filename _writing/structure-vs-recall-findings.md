@@ -13,19 +13,20 @@ published: true
 permalink: /writing/structure-vs-recall-findings/
 ---
 
-This document synthesizes experimental findings on how GPT-2 Small manages the competing priorities of syntactic continuation 
-and factual retrieval. It examines the mechanisms that cause the model to favor grammatical structure over factual recall, 
-as well as the internal circuitry responsible for retrieving knowledge when properly cued.
+This document explores how GPT-2 Small manages two competing goals: following grammar rules versus factual retrieval. 
+We examine why the model often favors grammatical structure over factual recall, 
+and how its internal circuitry successfully retrieve facts when given the right cues.
 
 First, we examine the zero-shot case under a weak syntactic frame, where late-layer suppressors 
-overpower the model's factual knowledge in favor of generic grammatical continuations. 
+overpower the model's factual knowledge, forcing it to output generic grammatical continuations. 
 
-Second, we explore the few-shot case, detailing the internal circuitry that allows the model to bypass 
-those grammatical suppressors and successfully retrieve factual knowledge when given a strong pattern.
+Second, we explore the few-shot case, and the consequent activation of specific internal circuits.
+These circuits allow the model to bypass the grammatical suppressors and 
+successfully retrieve factual knowledge when given a strong pattern.
 
-This document represents my first practical application of the mechanistic interpretability tools I explored in 
-[Replicating a GPT-2 Transformer Block from the Residual Stream](/writing/replicating-gpt2-block/)—an earlier project where I manually rebuilt GPT-2’s block 0 and cross-checked every step against
-transformer_lens to understand exactly what each hook holds.
+**Background** This is my first practical application of mechanistic interpretability tools. It builds on my earlier project,  
+[Replicating a GPT-2 Transformer Block from the Residual Stream](/writing/replicating-gpt2-block/), 
+where I manually rebuilt GPT-2’s first block to understand exactly how its internal components function.
 
 {:.no_toc}
 
