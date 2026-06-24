@@ -150,8 +150,8 @@ But capacity is clearly **not** irrelevant — by gpt2-xl the median capital *is
 
 #### The limits of scale
 
-While scaling the model resolves this issue for most subjects, France remains a stubborn outlier 
-due to training data distributions.
+While scaling the model resolves this issue for most subjects, France remains an outlier, 
+likely due to training data distributions.
 
 Moving from GPT-2 Small (124M) to GPT-2 XL (1.5B) pushes the median capital prediction to Rank 0.5 
 across the 12-country probe set. However, for France, `·Paris` only reaches Rank 2 at 1.5B. This indicates 
