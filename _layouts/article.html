@@ -14,9 +14,8 @@
 
     .article { max-width: var(--media); margin: 0 auto; padding: 2rem 1.5rem 5rem; }
     .article > * { max-width: var(--measure); margin-left: auto; margin-right: auto; }
-    /* Single reading column: text, code and figures all share --measure.
-       Only wide data tables may extend to --media (they'd be too cramped at the measure). */
-    .article > table { max-width: var(--media); }
+    /* Single reading column: text, code, figures and tables all share --measure
+       so nothing extends past the text width. */
 
     .article-header { margin-bottom: 2.5rem; }
     .article-header h1 { font-size: 2.4rem; font-weight: 600; letter-spacing: -0.02em; line-height: 1.15; }

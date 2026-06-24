@@ -38,6 +38,40 @@ measured against. A natural pairing with my own
 
 ## Interpretability
 
+### Interpreting Key Mechanisms of Factual Recall in Transformer-Based Language Models
+
+[arxiv.org/abs/2403.19521](https://arxiv.org/abs/2403.19521) · Lv, Chen, Zhang,
+Wang, Liu, Wen, Xie & Yan · 2024
+
+A circuit-level account of how transformers retrieve facts. It identifies the
+attention head **L9H8** in GPT-2 Small as an "Argument Passer" that maps a
+subject (a country) to its attribute (its capital), and documents a universal
+**anti-overconfidence mechanism** in the final MLP layers that prefers "safe"
+generic predictions over specific facts.
+
+*Why it matters:* it names the exact components I bumped into independently in my
+[Structure vs. Recall findings](/writing/structure-vs-recall-findings/) — the
+L9H8 writer head and the late-layer MLP suppressors — so it's the benchmark I
+need to read closely to turn my informal observations into a proper, formal
+comparison.
+
+### Beyond Importance: Interchange-Sobol Sensitivity Reveals Task-Specific Content Channels in Transformer Components
+
+[arxiv.org/abs/2606.20678](https://arxiv.org/abs/2606.20678) · Guo, Du & Chen ·
+2026
+
+Introduces an interchange-Sobol sensitivity method to find **task-specific
+content channels** inside transformer components. It reports an early-versus-late
+routing split: early channels transport relation-frame content while late
+attention transports subject-retrieval content — refining at head granularity
+down to the known **L9H8** head.
+
+*Why it matters:* it corroborates the early-vs-late routing dynamic I saw in my
+[Structure vs. Recall findings](/writing/structure-vs-recall-findings/) and adds
+a sensitivity-based methodology I don't yet use. Reading it should give me a more
+principled tool than direct logit attribution alone for attributing behaviour to
+specific channels.
+
 ### Circuit Tracing: Revealing Computational Graphs in Language Models
 
 [transformer-circuits.pub/2025/attribution-graphs/methods.html](https://transformer-circuits.pub/2025/attribution-graphs/methods.html)
