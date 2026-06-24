@@ -13,20 +13,38 @@ published: true
 permalink: /writing/structure-vs-recall-findings/
 ---
 
-This document explores how GPT-2 Small manages two competing goals: following grammar rules versus factual retrieval. 
-We examine why the model often favors grammatical structure over factual recall, 
-and how its internal circuitry successfully retrieve facts when given the right cues.
+**Background** 
 
-First, we examine the zero-shot case under a weak syntactic frame, where late-layer suppressors 
-overpower the model's factual knowledge, forcing it to output generic grammatical continuations. 
-
-Second, we explore the few-shot case, and the consequent activation of specific internal circuits.
-These circuits allow the model to bypass the grammatical suppressors and 
-successfully retrieve factual knowledge when given a strong pattern.
-
-**Background** This is my first practical application of mechanistic interpretability tools. It builds on my earlier project,  
+This is my first practical application of mechanistic interpretability tools. It builds on my earlier project,  
 [Replicating a GPT-2 Transformer Block from the Residual Stream](/writing/replicating-gpt2-block/), 
 where I manually rebuilt GPT-2’s first block to understand exactly how its internal components function.
+
+**The Investigation**
+
+While playing with GPT-2 Small, I've noticed that it is quite sensitive to the prompt. 
+Even minor variations are decisive in making it either adhere to grammar rules or focus on factual recall. 
+Here, I will examine more closely why the model favors one over the other, 
+and how its internal circuitry retrieves facts when prompted the right way.
+
+The analysis consists of two parts:
+
+* The Zero-Shot Case: First, I examine the model's behavior under a weak syntactic frame. 
+In this scenario, late-layer suppressors overpower the model's factual knowledge, forcing it to output generic, 
+grammatical continuations.
+
+* The Few-Shot Case: Second, I explore the consequent activation of specific internal circuits when the model 
+is given a strong pattern. These circuits allow the model to bypass the grammatical suppressors 
+and successfully retrieve targeted factual knowledge.
+
+
+**Findings**
+
+The most important findings are:
+* the role of the L9H8 attention head as a factual writer 
+* the function of late-layer MLPs as generic suppressors
+
+These results align closely with existing mechanistic interpretability literature — see the 
+[Discussion](#discussion-alignment-with-the-literature) after the experiments for the full comparison.
 
 {:.no_toc}
 
@@ -289,3 +307,31 @@ Ultimately, GPT-2 Small demonstrates that its factual knowledge is highly access
 surfaces depends entirely on an internal routing battle: default late-layer circuits will stubbornly prioritize generic grammar, 
 whereas strong syntactic frames or in-context few-shot patterns empower early and mid-layer circuits to execute a definitive 
 factual overwrite.
+
+---
+
+## Discussion: alignment with the literature
+
+These results align closely with existing mechanistic interpretability literature. 
+Independent studies have similarly documented these exact components balancing factual recall 
+and grammatical constraints within GPT-2 Small. For instance, [Lv et al. (2024)](#ref-lv-2024) explicitly identified 
+L9H8 as an "Argument Passer" capable of mapping country names to capitals, while also noting a universal 
+anti-overconfidence mechanism in the final MLP layers that prefers "safe" grammatical predictions over specific facts. 
+Furthermore, [recent work by other researchers (2026)](#ref-beyond-importance-2026) corroborates the early-versus-late routing dynamic, 
+finding that early transformer channels transport relation-frame content, while late attention transports 
+subject-retrieval content—specifically refining at the head granularity to the known L9H8 head. 
+
+## Moving forward
+
+The immediate next task for this project will be to thoroughly study these cited articles to conduct a proper, 
+formal comparison, mapping my independent circuit-level observations directly against these established published benchmarks.
+
+## References
+
+* <a name="ref-lv-2024"></a>Lv, A., Chen, Y., Zhang, K., Wang, Y., Liu, L., Wen, J.-R., Xie, J., & Yan, R. (2024). 
+Interpreting Key Mechanisms of Factual Recall in Transformer-Based Language Models. 
+arXiv:[2403.19521](https://arxiv.org/abs/2403.19521).
+
+* <a name="ref-beyond-importance-2026"></a>Guo, Y., Du, J.-H., & Chen, X. (2026). Beyond Importance: 
+Interchange-Sobol Sensitivity Reveals Task-Specific Content Channels in Transformer Components (June 2026). 
+arXiv:[2606.20678](https://arxiv.org/abs/2606.20678).
