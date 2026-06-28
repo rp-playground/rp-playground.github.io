@@ -1,6 +1,6 @@
 # Semantic Search in Dante's Divine Comedy — Solution Design
 
-> **Status:** Draft · **Version:** 0.13 · **Last updated:** 2026-06-28
+> **Status:** Draft · **Version:** 0.14 · **Last updated:** 2026-06-28
 
 ---
 
@@ -8,6 +8,7 @@
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 0.14 | 2026-06-28 | Four targeted improvements: modern Italian paraphrase generation spec tightened (Phase 0: stronger LLM + few-shot from Hollander, stratified spot-check); CoT prompting strategy added to §3.4 query expansion; UMAP moved from Phase 3 to Phase 1a as a diagnostic checkpoint; neighboring tercet display added to Phase 1b milestones |
 | 0.13 | 2026-06-28 | Research-level extensions section added (§13): translation variance as confidence signal, ColBERT-style multi-vector retrieval, interpretability layer; §3 Architecture intro tightened to remove repeated Italian-exclusion rationale; simplified pipeline flow added; §7 phasing intro added; §11 Open Questions restructured to separate open from closed items |
 | 0.12 | 2026-06-28 | Known failure modes section added (§10): abstract thematic queries, multi-tercet concepts, irony/rhetorical inversion, character relational queries; index composition risk added (§5.4): paraphrase dominance in embedding space, detection procedure, and mitigations |
 | 0.11 | 2026-06-28 | Training data redesigned: cross-translation pairs made explicit as hard positives; negative mining restructured into three tiers with adjacent-tercet structural negatives as Tier 1; pair counts updated |
@@ -171,6 +172,17 @@ The setup is inherently asymmetric: the query is short, user-generated, in moder
 For thematic queries, a small LLM reformulates the user's query into terms closer to what the fine-tuned retriever expects. This is a thin agentic wrapper — not generative RAG — and does not replace the retrieval backbone.
 
 **Design choice rationale:** agentic query expansion handles the semantic gap between modern vernacular ("avevo 35 anni") and the poem's conceptual vocabulary ("viaggio di mezzo cammino", midlife, exile). Fine-tuned embeddings handle tercet-level alignment. Neither alone is sufficient for Phase 2.
+
+**Prompting strategy — chain-of-thought before reformulation:**
+
+Do not ask the LLM to produce the reformulation string directly. Instead, prompt it to reason in steps:
+
+1. What Dantesque themes or concepts does this query map to?
+2. Which characters, canticles, or episodes are most likely relevant?
+3. What vocabulary was the retriever trained on (translations + modern paraphrases)?
+4. Given the above — produce a reformulated query in that vocabulary.
+
+CoT intermediate reasoning catches hallucination and overspecification before they propagate to the retrieval step: an LLM that has to commit to a Dantesque concept in step 1 is less likely to invent one in step 4. Log both the CoT trace and the final reformulation string. This prompting approach must be fully evaluated (via retrieval delta, §6.5) before considering the mT5 fine-tune path.
 
 **Logging specification:**
 
@@ -575,7 +587,7 @@ The implementation follows four sequential phases. Each phase has a concrete del
 
 - [ ] Assemble and clean corpus: original Italian + 3 English translations, aligned at tercet level; assign stable `tercet_id` keys
 - [ ] Build lookup table: `tercet_id → original Italian text`
-- [ ] Generate modern Italian paraphrases for all ~4,740 tercets (LLM-assisted, manually spot-checked)
+- [ ] Generate modern Italian paraphrases for all ~4,740 tercets: use a capable instruction-tuned LLM (e.g. GPT-4o) with few-shot examples drawn from Hollander's prose commentary — these exemplify the right register (scholarly yet accessible modern Italian, tercet-scoped, meaning-faithful rather than word-for-word). Spot-check a stratified sample of ~100 tercets across all three Canticles before indexing; reject and regenerate any paraphrase that hallucinates content or misidentifies the speaker
 - [ ] Extract and store Hollander commentaries as metadata JSON keyed on `tercet_id`
 - [ ] Build evaluation benchmark (200 paraphrase queries, ground truth)
 - [ ] Implement BM25 retrieval; measure Recall@1, MRR@10
@@ -592,8 +604,9 @@ The implementation follows four sequential phases. Each phase has a concrete del
 - [ ] Fine-tune `multilingual-e5-large` with `MultipleNegativesRankingLoss`
 - [ ] Evaluate on benchmark; ablate random vs. hard negatives
 - [ ] Cross-lingual alignment audit: plot cosine similarity distribution for IT↔EN tercet pairs, pre/post fine-tuning
+- [ ] **UMAP diagnostic** (pre- and post-fine-tuning): embed all ~24K index documents; plot colored by Canticle, then by Canto. If Canticle boundaries are not visible post-training, the model is not learning the poem's semantic structure — a signal to revisit training data or loss formulation before proceeding to Phase 1b. This is a diagnostic checkpoint, not a presentation artifact.
 
-**Deliverable:** fine-tuned bi-encoder checkpoint; alignment audit plot; ablation table
+**Deliverable:** fine-tuned bi-encoder checkpoint; alignment audit plot; UMAP pre/post comparison; ablation table
 
 ---
 
@@ -603,6 +616,7 @@ The implementation follows four sequential phases. Each phase has a concrete del
 - [ ] Add cross-encoder reranker on top-50 shortlist
 - [ ] Full ablation: BM25 / dense / hybrid / hybrid+reranker
 - [ ] Latency profiling: bi-encoder, reranker, full pipeline (p50, p95, p99)
+- [ ] Display layer: show retrieved tercet plus immediate neighbors (±1) — mitigates the multi-tercet concept failure mode (§10.2) at display time with no retrieval cost; confirm this does not hurt precision on verse recall queries (neighbors should be clearly secondary)
 
 **Deliverable:** full retrieval pipeline; ablation table; latency report
 
@@ -623,7 +637,7 @@ The implementation follows four sequential phases. Each phase has a concrete del
 
 ### Phase 3 — Visualization and Calibration
 
-- [ ] UMAP of tercet embeddings colored by Canticle, then by Canto — do embeddings reflect the poem's structure?
+- [ ] UMAP extended visualization (building on Phase 1a diagnostic): if Canticle/Canto structure is visible, add coloring by sin category (Inferno circles), stage of purification (Purgatorio terraces), and sphere (Paradiso heavens) — does fine-grained moral/theological structure emerge in embedding space?
 - [ ] Retrieval score calibration: plot score vs. precision; apply temperature scaling if needed
 - [ ] If reformulation delta analysis (Phase 2) reveals systematic failure modes: fine-tune a small reformulator (mT5-base) on positive delta examples — only if prompt engineering has failed to close the gap and ≥ 200 annotated thematic queries are available
 - [ ] Interactive Hugging Face Space demo
