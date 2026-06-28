@@ -1,6 +1,6 @@
 # Semantic Search in Dante's Divine Comedy — Solution Design
 
-> **Status:** Draft · **Version:** 0.2 · **Last updated:** 2026-06-28
+> **Status:** Draft · **Version:** 0.3 · **Last updated:** 2026-06-28
 
 ---
 
@@ -8,6 +8,7 @@
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 0.3 | 2026-06-28 | Retrieval architecture changed: original Italian is a display target (lookup), not a retrieval corpus; FAISS index holds translations and paraphrases only; BM25 repurposed as Italian-language lexical track; dataset, infrastructure, and design decisions updated |
 | 0.2 | 2026-06-28 | Retrieval unit changed from verse to tercet; corpus size updated; dataset structure, evaluation counts, and open questions updated accordingly |
 | 0.1 | 2026-06-28 | Initial draft — project framing, architecture, dataset strategy, phasing |
 
@@ -43,53 +44,65 @@ The bounded, exhaustive nature of the corpus is a design asset: ground truth can
 
 ## 3. Architecture Overview
 
-The system uses a **two-stage retrieval pipeline** — the current best practice for dense retrieval:
+The system uses a **two-stage retrieval pipeline** — the current best practice for dense retrieval. A key architectural decision (v0.3) is that the **original Italian is not part of the retrieval index**. It is a display target, recovered via a static lookup after retrieval. The dense index and BM25 index operate entirely over modern-language representations (translations and paraphrases), which are semantically accessible to pre-trained multilingual models without the archaic vocabulary problem.
 
 ```
 User query
     │
-    ▼
-[Phase 2 only] Query Expansion (LLM)
-    │
-    ▼
-Bi-encoder embedding  ──────────────────────────────────┐
-    │                                                    │
-    ▼                                                    ▼
-ANN index (FAISS)                               Parallel BM25 index
-    │                                                    │
-    └──────────────── Reciprocal Rank Fusion ────────────┘
+    ├─────────────────────────────────────────────────────────┐
+    ▼                                                         ▼
+[Phase 2 only] Query Expansion (LLM)                  BM25 index
+    │                                          (original Italian —
+    ▼                                           lexical track for
+Bi-encoder embedding                            Italian queries)
+    │                                                         │
+    ▼                                                         │
+FAISS index                                                   │
+(translations + paraphrases only)                             │
+    │                                                         │
+    └──────────────── Reciprocal Rank Fusion ─────────────────┘
                                │
                                ▼
-                    Top-K candidates (K = 50–100)
+              Top-K tercet IDs, deduplicated across representations
                                │
                                ▼
                     Cross-encoder reranker
                                │
                                ▼
-                    Final ranked results (with scores)
+                    Ranked tercet IDs (with scores)
+                               │
+                               ▼
+              Lookup table: tercet_id → original Italian tercet
+                               │
+                               ▼
+              Display: original Italian + all translations side by side
 ```
 
 ### 3.1 Bi-Encoder (Dense Retrieval)
 
-Encodes query and passages independently into a shared embedding space. At search time, retrieval is a cosine similarity lookup — fast, approximate, suitable for the full corpus. The bi-encoder is the component that will be **fine-tuned** on the parallel corpus.
+Encodes query and passages independently into a shared embedding space. At search time, retrieval is a cosine similarity lookup over the FAISS index. The bi-encoder is the component that will be **fine-tuned** on the parallel corpus.
+
+**Index contents:** translations and paraphrases only. Each indexed document carries a `tercet_id` pointing back to the original. Multiple documents may share the same `tercet_id` (one per translation), so results are deduplicated by `tercet_id` before reranking — the highest-scoring representation per tercet is kept. The indexed corpus is thus ~14K–19K documents (4,740 tercets × 3–4 representations), still trivially small for FAISS.
 
 **Base model:** `intfloat/multilingual-e5-large` or `BAAI/bge-m3`
 
-Rationale: both are state-of-the-art multilingual dense retrieval models trained on large-scale cross-lingual data. BGE-M3 additionally supports hybrid dense/sparse retrieval natively. Zero-shot performance will be evaluated before fine-tuning to establish a baseline delta.
+Rationale: both are state-of-the-art multilingual dense retrieval models trained on large-scale cross-lingual data. Because the index holds modern-language representations only, the model no longer needs to handle archaic Florentine tokenization — a meaningful simplification of the embedding task. BGE-M3 additionally supports hybrid dense/sparse retrieval natively. Zero-shot performance will be evaluated before fine-tuning to establish a baseline delta.
 
-### 3.2 BM25 (Lexical Retrieval)
+### 3.2 BM25 (Lexical Retrieval — Original Italian track)
 
-Classical term-frequency retrieval. Complementary to the bi-encoder: BM25 excels at rare proper nouns (character names, Florentine place names, hapax legomena) where dense retrieval can fail due to low training frequency. Combined via **Reciprocal Rank Fusion (RRF)**:
+BM25 runs over the **original Italian tercets** and serves a specific, narrow role: handling user queries that contain Italian fragments from memory (e.g., "selva oscura", "mi ritrovai"). The dense FAISS index holds only modern-language representations and would not reliably retrieve these via semantic similarity. BM25 over the original handles lexical match directly, without requiring the model to understand archaic vocabulary.
+
+Combined with the dense track via **Reciprocal Rank Fusion (RRF)**:
 
 ```
 score_rrf(d) = Σ  1 / (k + rank_i(d))
 ```
 
-where `k = 60` (standard) and the sum is over the two ranking lists. No additional parameters to tune.
+where `k = 60` (standard) and the sum is over the two ranking lists. No additional parameters to tune. For English queries or modern Italian queries, the BM25 track contributes little and the dense track dominates — which is the correct behaviour.
 
 ### 3.3 Cross-Encoder (Reranker)
 
-Takes (query, passage) pairs as joint input and produces a scalar relevance score. Slower than the bi-encoder (cannot pre-index) but significantly more accurate. Applied only to the top-K shortlist from stage 1.
+Takes (query, passage) pairs as joint input and produces a scalar relevance score. Slower than the bi-encoder (cannot pre-index) but significantly more accurate. Applied only to the top-K shortlist after deduplication — one (query, best_translation) pair per candidate tercet.
 
 **Base model:** `cross-encoder/mmarco-mMiniLMv2-L12-H384` (multilingual, efficient)
 
@@ -116,39 +129,51 @@ This is the central design decision. The answer differs by phase:
 
 ## 5. Dataset Strategy
 
-The parallel corpus is the training signal. The retrieval and alignment unit is the **tercet** — three lines sharing an ABA rhyme scheme. Verse-level alignment across translations is not reliable: translators shift line boundaries, expand or compress within the tercet, and the semantic closure consistently falls at the three-line unit, not the single line. Its structure:
+The parallel corpus serves two distinct roles that must be kept separate:
+
+| Role | Contents | Used for |
+|------|----------|----------|
+| **Retrieval corpus** | Translations + paraphrases | Indexed in FAISS; what the bi-encoder searches over |
+| **Display corpus** | Original Italian | Returned to the user via lookup after retrieval; never searched directly |
+| **Lexical corpus** | Original Italian | Indexed in BM25 separately for Italian-language queries |
+
+The retrieval and alignment unit is the **tercet** — three lines sharing an ABA rhyme scheme. Verse-level alignment across translations is not reliable: translators shift line boundaries, expand or compress within the tercet, and the semantic closure consistently falls at the three-line unit, not the single line.
 
 ```
 Tercet unit (terzina — 3 verses, ABA rhyme):
-  ├── original_italian
+  ├── tercet_id: "Inf.I.1"
+  │
+  ├── [display / BM25 only] original_italian
   │     "Nel mezzo del cammin di nostra vita
   │      mi ritrovai per una selva oscura
   │      ché la diritta via era smarrita."
-  ├── translation_longfellow
+  │
+  ├── [FAISS index] translation_longfellow
   │     "Midway upon the journey of our life
   │      I came within a forest dark,
   │      For the straightforward pathway had been lost."
-  ├── translation_mandelbaum
+  ├── [FAISS index] translation_mandelbaum
   │     "When I had journeyed half of our life's way,
   │      I found myself within a shadowed forest,
   │      for I had lost the path that does not stray."
-  ├── translation_hollander
+  ├── [FAISS index] translation_hollander
   │     "Midway in the journey of our life
   │      I came to myself in a dark wood,
   │      for the straight way was lost."
-  └── [optional] modern_paraphrase
+  └── [FAISS index] modern_paraphrase
         "I was halfway through my life and found myself lost in darkness."
 ```
 
 ### 5.1 Positive Pairs
 
-Formed from cross-language and cross-translation alignment at tercet level:
+Training pairs have a query on the left and an indexed document (translation or paraphrase) on the right. The original Italian appears only on the query side — as a source of fragment queries — not as a retrieval target.
 
-- `(italian, english_translation_A)` — cross-lingual positives
-- `(english_translation_A, english_translation_B)` — cross-translation paraphrase positives
-- `(italian, modern_paraphrase)` — archaic → modern positives
+- `(italian_fragment, translation_A)` — archaic fragment → indexed translation; trains the model to surface the right tercet from an Italian query
+- `(translation_A, translation_B)` — cross-translation positives; aligns different renderings of the same tercet
+- `(translation_A, modern_paraphrase)` — trains paraphrase robustness for thematic queries
+- `(modern_query, translation_A)` — thematic query → relevant tercet (Phase 2 training data)
 
-With ~4,740 tercets and 3 translations, the parallel corpus yields ~28,000 positive pairs without manual annotation. Adding paraphrases and all cross-translation combinations approaches ~50K.
+With ~4,740 tercets, 3 translations, and paraphrases, the retrieval corpus yields ~28,000 translation↔translation pairs automatically. Paraphrase pairs and Italian-fragment pairs add further signal; total approaches ~50K without manual annotation.
 
 ### 5.2 Hard Negative Mining
 
@@ -156,9 +181,9 @@ Random negatives (any non-matching verse) are easy to distinguish and produce em
 
 **Mining procedure:**
 
-1. Index the corpus with a frozen base model (no fine-tuning yet)
-2. For each tercet, retrieve top-50 nearest neighbors
-3. Remove true positives (same tercet or known translations)
+1. Index the retrieval corpus (translations + paraphrases) with a frozen base model
+2. For each document, retrieve top-50 nearest neighbors from the same index
+3. Remove true positives (documents sharing the same `tercet_id`)
 4. Remaining top-K (K = 5–10) are hard negatives for that anchor
 
 This is standard practice in all strong dense retrieval work (DPR, BGE, E5) and is the single most impactful dataset improvement beyond the basic parallel structure.
@@ -222,7 +247,8 @@ This structure makes it possible to attribute performance gains to specific desi
 
 ### Phase 0 — Corpus and Baseline
 
-- [ ] Assemble and clean corpus: original Italian + 3 English translations, aligned at tercet level
+- [ ] Assemble and clean corpus: original Italian + 3 English translations, aligned at tercet level; assign stable `tercet_id` keys
+- [ ] Build lookup table: `tercet_id → original Italian text`
 - [ ] Build evaluation benchmark (200 paraphrase queries, ground truth)
 - [ ] Implement BM25 retrieval; measure Recall@1, MRR@10
 - [ ] Run zero-shot multilingual-e5-large; compare vs. BM25
@@ -281,7 +307,8 @@ This structure makes it possible to attribute performance gains to specific desi
 |-------|------|-------|
 | Training | `sentence-transformers` | Native support for contrastive losses and bi-encoder training |
 | Experiment tracking | MLflow | Already in use; track loss, retrieval metrics per checkpoint |
-| ANN index | FAISS `IndexFlatIP` | Exact search sufficient at ~4.7K vectors; upgradeable to `IVF` if corpus grows |
+| ANN index | FAISS `IndexFlatIP` | ~14K–19K vectors (translations + paraphrases); exact search still fast at this size |
+| Lookup table | Python dict / JSON | `tercet_id → original Italian`; loaded in memory at startup; trivial overhead |
 | BM25 | `rank_bm25` | Lightweight; no server required |
 | Cross-encoder | `cross-encoder/mmarco-mMiniLMv2-L12-H384` | Multilingual; fits on CPU for reranking |
 | Serving | FastAPI + FAISS in-memory | Deployable as Hugging Face Space |
@@ -303,12 +330,17 @@ Multiple translations capture interpretive variance. Longfellow's literal prose,
 **Why evaluate before training?**
 Defining the evaluation benchmark before any model training eliminates the risk of inadvertently optimizing for the wrong objective. It also forces precision about what "good retrieval" means for this specific task.
 
+**Why index translations instead of the original Italian?**
+The original text is in medieval Florentine — a language with significant lexical and morphological distance from modern Italian. Pre-trained multilingual models tokenize it poorly: rare tokens, fragmented subwords, low-frequency embeddings. Indexing translations in modern English (and optionally modern Italian paraphrases) sidesteps this entirely: the model operates in a semantic space it was trained on. The original Italian is not lost — it is the displayed result, retrieved via a static lookup keyed on `tercet_id`. This separation of concerns (retrieval over modern representations, display of the original) is analogous to the *document expansion* paradigm in information retrieval, where corpora are enriched with generated text to improve retrieval coverage while the original document remains the authoritative output. The BM25 track over the original Italian handles the residual case of users querying with archaic Italian fragments directly.
+
 ---
 
 ## 10. Open Questions
 
 - [x] **Retrieval unit:** Tercet (terzina). Verse-level alignment across translations is unreliable — translators shift line boundaries and semantic closure consistently falls at the three-line unit. Resolved in v0.2.
-- [ ] **Archaic vocabulary handling:** Medieval Florentine has significant lexical drift from modern Italian. Does `multilingual-e5-large` handle this well zero-shot, or is tokenization fragmentation a problem? Needs early empirical check.
+- [x] **Archaic vocabulary handling:** Resolved in v0.3. The FAISS index holds only modern-language representations; the archaic Italian is never embedded for retrieval. Residual Italian-query coverage is handled by BM25 over the original text.
+- [ ] **Modern Italian paraphrases in the index:** Should the index include modern Italian paraphrases (not just English translations) to improve coverage of Italian-language queries? This would add a fourth representation per tercet (~19K total index documents) and improve recall for Italian users without touching the archaic text.
+- [ ] **Deduplication strategy:** Multiple representations of the same tercet may rank differently; currently the highest-scoring representation is kept. Alternative: average pooling of all representation scores before deduplication. Needs empirical comparison.
 - [ ] **Commentary inclusion:** Should translator commentary (Hollander's notes are extensive) be included in the retrieval index as additional signal, or kept separate to avoid conflating primary text with interpretation?
 - [ ] **Cross-encoder training:** Fine-tune the reranker on this corpus, or use the multilingual reranker zero-shot? Training data for reranking is harder to construct (requires graded relevance, not binary positives).
 - [ ] **Thematic query evaluation:** Graded relevance (1–3 scale) for thematic queries requires human judgment. Who judges, and what is the annotation protocol?
