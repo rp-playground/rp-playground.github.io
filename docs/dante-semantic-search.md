@@ -1,6 +1,6 @@
 # Semantic Search in Dante's Divine Comedy — Solution Design
 
-> **Status:** Draft · **Version:** 0.10 · **Last updated:** 2026-06-28
+> **Status:** Draft · **Version:** 0.11 · **Last updated:** 2026-06-28
 
 ---
 
@@ -8,6 +8,7 @@
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 0.11 | 2026-06-28 | Training data redesigned: cross-translation pairs made explicit as hard positives; negative mining restructured into three tiers with adjacent-tercet structural negatives as Tier 1; pair counts updated |
 | 0.10 | 2026-06-28 | Query reformulation evaluation added: logging spec, retrieval delta measurement, per-query-type reporting, and fine-tuning path documented |
 | 0.9 | 2026-06-28 | Fusion strategy updated: static RRF replaced with query-aware weighted RRF; language detection tier and score-based dynamic tier specified; ablation updated |
 | 0.8 | 2026-06-28 | Query distribution model added: assumed prior over query types with component weighting implications; evaluation set composition updated to mirror distribution |
@@ -248,27 +249,85 @@ Tercet unit (terzina — 3 verses, ABA rhyme):
 
 Training pairs have a query on the left and an indexed document (translation or paraphrase) on the right. The original Italian appears only on the query side — as a source of fragment queries — not as a retrieval target.
 
-- `(italian_fragment, translation_EN)` — archaic fragment → English translation; trains the model to surface the right tercet from an Italian-language query
-- `(translation_A, translation_B)` — cross-translation positives; aligns different English renderings of the same tercet
-- `(translation_EN, modern_paraphrase_EN)` — English translation → English paraphrase; paraphrase robustness
-- `(modern_paraphrase_IT, translation_EN)` — modern Italian query → English translation; cross-lingual alignment for domestic Italian traffic
-- `(modern_paraphrase_IT, modern_paraphrase_EN)` — cross-lingual modern paraphrase pairs
-- `(modern_query, translation_EN)` — thematic query → relevant tercet (Phase 2 training data)
+Positive pairs divide into two categories with different roles in training:
 
-With ~4,740 tercets and 5 representations, the retrieval corpus yields ~28K translation↔translation pairs from English alone, and ~40K+ once modern Italian paraphrase pairs are included. Total approaches ~60K without manual annotation.
+#### Standard positives
+
+Query–document pairs where the query is a natural user input and the document is a retrieval target. These anchor the model to the actual retrieval task:
+
+| Pair | Rationale |
+|------|-----------|
+| `(italian_fragment, translation_EN)` | Archaic fragment → English translation; trains cross-lingual alignment for Italian-fragment queries |
+| `(modern_paraphrase_IT, translation_EN)` | Modern Italian query → English translation; cross-lingual alignment for domestic Italian traffic |
+| `(modern_paraphrase_IT, modern_paraphrase_EN)` | Cross-lingual modern paraphrase pairs; ensures Italian queries can surface English paraphrase targets |
+| `(modern_query, translation_EN)` | Thematic query → relevant tercet (Phase 2 training data) |
+
+#### Hard positives (cross-representation pairs)
+
+Any two representations of the **same tercet** form a hard positive pair: they are semantically equivalent (same source text, same meaning) but surface-divergent (different language, register, diction, syntax). Training on these pairs forces the model to learn content-level alignment independent of surface form — the core generalization property needed for thematic search.
+
+This category includes cross-translation pairs (e.g., Longfellow ↔ Mandelbaum ↔ Hollander for the same tercet), translation ↔ paraphrase pairs, and cross-language paraphrase pairs (modern Italian ↔ English paraphrase). These are harder than standard positives because the two representations do not share obvious surface signals — the model cannot rely on lexical overlap, must rely entirely on semantic content.
+
+**Scale with 5 representations per tercet** (3 English translations + 1 English paraphrase + 1 modern Italian paraphrase):
+
+```
+C(5, 2) = 10 cross-representation pairs per tercet
+10 pairs × 4,740 tercets = 47,400 hard positive pairs
+```
+
+This is the largest positive pair category and requires zero manual annotation — all pairs are derived deterministically from the aligned corpus structure.
+
+**Total positive pair budget (approximate):**
+
+| Category | Source | Pairs |
+|----------|--------|-------|
+| Cross-representation hard positives | C(5,2) × 4,740 tercets | ~47,400 |
+| Italian fragment → translation (standard) | 1 fragment × 3 translations × 4,740 | ~14,220 |
+| Modern Italian → translation (standard) | 1 × 3 × 4,740 | ~14,220 |
+| Thematic query → translation (Phase 2) | Manually created | ~1,000–2,000 |
+| **Total** | | **~77K** (without Phase 2 manual) |
+
+Cross-representation hard positives alone account for ~60% of the positive training signal and require no annotation effort.
 
 ### 5.2 Hard Negative Mining
 
-Random negatives (any non-matching verse) are easy to distinguish and produce embeddings with poor boundary precision. Hard negatives — passages that are thematically close but factually wrong — are essential.
+Random negatives (any non-matching tercet) are easy to distinguish and produce embeddings with poor boundary precision. Hard negatives — passages that are close but factually wrong — are essential. Negative mining is structured into three tiers in order of cost: start cheap, add more expensive tiers if the model still fails on boundary cases.
 
-**Mining procedure:**
+#### Tier 1 — Structural negatives (adjacent tercets)
 
-1. Index the retrieval corpus (translations + paraphrases) with a frozen base model
-2. For each document, retrieve top-50 nearest neighbors from the same index
-3. Remove true positives (documents sharing the same `tercet_id`)
-4. Remaining top-K (K = 5–10) are hard negatives for that anchor
+For each anchor tercet, adjacent tercets in the **same Canto** (positions ±1, ±2, ±3 from the anchor) are designated hard negatives without any model inference.
 
-This is standard practice in all strong dense retrieval work (DPR, BGE, E5) and is the single most impactful dataset improvement beyond the basic parallel structure.
+**Why these are hard:** Adjacent tercets share the same scene, characters, poetic register, and often the same lexical field. The narrative does not cut abruptly — Dante is still in the same forest, speaking to the same figures, continuing the same argument. A retriever that hasn't learned fine-grained semantic distinction will conflate adjacent tercets with high confidence.
+
+**Why this tier comes first:** Structural negatives are **deterministic and free**. Given a `tercet_id` (e.g., `Inf.I.4`), the adjacent IDs (`Inf.I.1`, `Inf.I.7`) are computed from the corpus structure with no model inference, no scoring, no index lookup. The entire set of ~4,740 × 6 ≈ 28,000 structural negative pairs can be generated in milliseconds.
+
+**Mining window:** ±1 tercet (immediate neighbors) is the hardest case; ±2 to ±3 adds softer structural negatives as the scene begins to shift. Use ±1 for the primary hard negative set; ±2–3 as supplementary negatives if training loss saturates.
+
+#### Tier 2 — BM25-mined negatives (lexical overlap)
+
+For each anchor document (a translation or paraphrase), run BM25 over the retrieval corpus and retrieve the top-50 results. Remove documents sharing the anchor's `tercet_id` (true positives). The remaining top-K (K = 5–10) are hard negatives.
+
+**Why these are hard:** High BM25 score means high lexical overlap — the negative shares significant vocabulary with the anchor, but is a different tercet. For a model learning semantic similarity, these negatives require distinguishing passages that look similar on the surface but differ in meaning.
+
+**Cost:** Requires a built BM25 index (available from Phase 0 baseline) but no model inference. Index once; mine once.
+
+#### Tier 3 — Dense-mined negatives (semantic similarity)
+
+For each anchor document, run the **frozen base model** over the FAISS index and retrieve the top-50 nearest neighbors by cosine similarity. Remove true positives (same `tercet_id`). The remaining top-K (K = 5–10) are hard negatives.
+
+**Why these are hard:** Dense neighbors are semantically proximate — the model (even before fine-tuning) assigns them high similarity to the anchor. These are the failure cases of the zero-shot model: passages it cannot yet distinguish from the anchor. Training on these directly corrects the model's current worst errors.
+
+**Cost:** Requires running model inference over the full index (~24K documents). Expensive relative to Tiers 1–2 but standard practice in state-of-the-art dense retrieval (DPR, BGE, E5). Run once per training iteration if iterative hard negative refresh is used.
+
+#### Mining order and rationale
+
+| Tier | Source | Inference required | Pairs per anchor | When to apply |
+|------|--------|--------------------|-----------------|---------------|
+| 1 — Structural | Adjacent tercets (±1 to ±3) | None | 2–6 | Always; first |
+| 2 — BM25-mined | BM25 top-K after dedup | BM25 only | 5–10 | After Tier 1; cheap |
+| 3 — Dense-mined | Dense top-K after dedup | Full model inference | 5–10 | After Tier 2; expensive |
+
+Combine tiers: each training example gets Tier 1 negatives by default, supplemented by Tier 2 and Tier 3. If negatives from different tiers coincide (same `tercet_id`), deduplicate. The three-tier structure provides negatives at different levels of difficulty — structural (surface hard), lexical (lexically hard), and semantic (model-hard) — which together prevent the model from gaming any single hardness criterion.
 
 ### 5.3 Training Objective
 
