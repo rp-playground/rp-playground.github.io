@@ -1,6 +1,6 @@
 # Semantic Search in Dante's Divine Comedy — Solution Design
 
-> **Status:** Draft · **Version:** 0.6 · **Last updated:** 2026-06-28
+> **Status:** Draft · **Version:** 0.7 · **Last updated:** 2026-06-28
 
 ---
 
@@ -8,6 +8,7 @@
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 0.7 | 2026-06-28 | Evaluation section restructured: separate protocols for verse recall and thematic search; Recall@5 added; human annotation protocol specified as mandatory for thematic search with relevance scale, annotator requirements, and inter-annotator agreement threshold |
 | 0.6 | 2026-06-28 | Resolved three open questions: modern Italian paraphrases added to FAISS index; max pooling confirmed for deduplication; commentaries kept as metadata only. Index size updated to ~24K documents; dataset structure, positive pairs, Phase 0 milestones, and infrastructure table updated. |
 | 0.5 | 2026-06-28 | Cross-encoder input specified: highest-scoring bi-encoder representation per tercet; asymmetric reranking rationale documented |
 | 0.4 | 2026-06-28 | BM25 tokenization specified: no stemmer; word unigrams + character 5-grams for robustness to archaic spelling variants and user misremembering |
@@ -238,42 +239,89 @@ Implemented directly in `sentence-transformers` via `MultipleNegativesRankingLos
 
 ## 6. Evaluation Framework
 
-**Ground truth must be defined before training.**
+**Ground truth must be defined before training.** The two retrieval tasks have fundamentally different evaluation structures and cannot share a single protocol:
+
+| Property | Verse recall (Phase 1) | Thematic search (Phase 2) |
+|----------|----------------------|--------------------------|
+| Ground truth construction | Automatic (parallel corpus) | Human annotation — mandatory |
+| Relevance type | Binary (one correct tercet per query) | Graded (multiple tercets may be relevant) |
+| Correct answers per query | Exactly one | One or many |
+| Primary metric | Recall@1 | nDCG@10 |
+
+---
 
 ### 6.1 Evaluation Sets
 
-| Set | Size | Construction | Purpose |
-|-----|------|--------------|---------|
-| Translation pairs | ~4,740 | Automatic (parallel corpus, tercet-aligned) | Measures cross-lingual alignment |
-| Paraphrase queries | 200 | Hand-crafted | Measures paraphrase robustness |
-| Thematic queries | 100 | Hand-crafted | Phase 2 evaluation |
-| Hard cases | 50 | Adversarially selected | Boundary analysis |
+| Set | Phase | Size | Construction |
+|-----|-------|------|--------------|
+| Cross-lingual recall | 1 | ~4,740 | Automatic: each translation → its source tercet |
+| Paraphrase recall | 1 | 200 | Hand-crafted: fragments and paraphrases in EN and modern IT |
+| Hard cases | 1 | 50 | Adversarially selected (see below) |
+| Thematic queries | 2 | 100 | Hand-crafted: modern vernacular, emotional, conceptual |
 
-Hard cases include: false cognates between archaic Italian and modern Italian, verses from the same Canto that are thematically adjacent, and queries that match multiple Canticles.
+**Hard cases** for verse recall include: false cognates between archaic and modern Italian that mislead the dense retriever; tercets from the same Canto that are thematically adjacent (test boundary precision); queries that could plausibly match passages across multiple Canticles.
 
-### 6.2 Metrics
+---
 
-| Metric | Definition | Target |
-|--------|------------|--------|
-| Recall@1 | Correct tercet in top-1 result | > 0.85 (verse recall) |
-| Recall@10 | Correct tercet in top-10 | > 0.97 |
-| MRR@10 | Mean Reciprocal Rank at 10 | > 0.88 |
-| NDCG@10 | Normalized Discounted Cumulative Gain | > 0.90 |
+### 6.2 Verse Recall Metrics (Phase 1)
 
-### 6.3 Ablation Structure
+Ground truth is **unique and automatic**: each query has exactly one correct answer, derived from the parallel corpus alignment. Relevance is binary.
 
-Every improvement is measured against a defined baseline chain:
+| Metric | Definition | Target | Notes |
+|--------|------------|--------|-------|
+| **Recall@1** | Correct tercet is the top-1 result | > 0.85 | Primary metric — the system either finds it or it doesn't |
+| **Recall@5** | Correct tercet appears in top 5 | > 0.95 | Secondary — if not in top 5 the system has meaningfully failed |
+| **MRR@10** | Mean Reciprocal Rank at cutoff 10 | > 0.88 | Captures partial credit for near-misses; sensitive to rank position |
+
+Recall@10 is deliberately excluded as a primary metric: for verse recall, a system that requires 10 results to surface the correct tercet is not fit for purpose. Recall@5 is the practical failure threshold.
+
+---
+
+### 6.3 Thematic Search Metrics (Phase 2)
+
+Ground truth is **non-unique and graded**: multiple tercets may be relevant to a thematic query at different degrees. Human annotation is not optional — there is no automatic proxy for thematic relevance.
+
+#### Relevance Scale
+
+| Score | Label | Definition |
+|-------|-------|------------|
+| 0 | Not relevant | Passage has no meaningful connection to the query |
+| 1 | Marginally relevant | Shares surface theme but does not illuminate the query |
+| 2 | Relevant | Passage meaningfully addresses the query's theme |
+| 3 | Highly relevant | Passage is a strong, direct match; a reader would find it valuable |
+
+#### Annotation Protocol
+
+- **Annotators:** minimum 2 per query; disagreements resolved by adjudication (third annotator or majority vote)
+- **Inter-annotator agreement:** Cohen's kappa ≥ 0.60 required before annotations are used for evaluation; queries below threshold are re-annotated or removed
+- **Scope:** annotators assess the original Italian tercet alongside its translations — relevance is judged on meaning, not surface form
+- **Pool size:** each query is judged against a pool of 50 candidate tercets (top-50 from the baseline retriever), not the full corpus
+
+#### Metrics
+
+| Metric | Definition | Target | Notes |
+|--------|------------|--------|-------|
+| **nDCG@10** | Normalised Discounted Cumulative Gain at 10 | > 0.70 | Primary — accounts for graded relevance and rank position |
+| **nDCG@5** | nDCG at cutoff 5 | > 0.65 | Stricter; tests whether top results are the best results |
+
+nDCG is the correct metric here because it rewards surfacing highly relevant passages (score 3) higher in the ranking over marginally relevant ones (score 1), and discounts relevance logarithmically by rank.
+
+---
+
+### 6.4 Ablation Structure (Phase 1)
+
+Every Phase 1 improvement is measured against a defined baseline chain on the verse recall evaluation sets:
 
 ```
-BM25 only
-  → Zero-shot bi-encoder (no fine-tuning)
+BM25 only (word unigrams + character 5-grams, original Italian)
+  → Zero-shot bi-encoder (multilingual-e5-large, no fine-tuning)
     → Fine-tuned bi-encoder (random negatives)
       → Fine-tuned bi-encoder (hard negatives)
         → Hybrid BM25 + dense (RRF)
           → Hybrid + cross-encoder reranker
 ```
 
-This structure makes it possible to attribute performance gains to specific design decisions rather than to the system as a whole.
+Each step is evaluated on Recall@1, Recall@5, and MRR@10. This structure attributes performance gains to specific design decisions rather than to the system as a whole.
 
 ---
 
@@ -395,7 +443,7 @@ The original text is in medieval Florentine — a language with significant lexi
 - [x] **Deduplication strategy:** Max pooling (highest-scoring representation kept). Average pooling is rejected — stylistically specific queries score high against one translation and low against others; averaging penalises correct matches. Resolved in v0.6.
 - [x] **Commentary inclusion:** Kept separate. Commentaries stored as metadata JSON keyed on `tercet_id`, displayed alongside results, never indexed. Indexing commentaries would pollute vectors with outside vocabulary and cause false positives on historically annotated but thematically unrelated tercets. Resolved in v0.6.
 - [ ] **Cross-encoder training:** Fine-tune the reranker on this corpus, or use the multilingual reranker zero-shot? Training data for reranking is harder to construct (requires graded relevance, not binary positives).
-- [ ] **Thematic query evaluation:** Graded relevance (1–3 scale) for thematic queries requires human judgment. Who judges, and what is the annotation protocol?
+- [x] **Thematic query evaluation:** Resolved in v0.7. 0–3 relevance scale; minimum 2 annotators per query; Cohen's kappa ≥ 0.60 required; pool of 50 candidates per query judged against original Italian + translations; primary metric nDCG@10.
 
 ---
 
