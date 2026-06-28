@@ -1,6 +1,6 @@
 # Semantic Search in Dante's Divine Comedy — Solution Design
 
-> **Status:** Draft · **Version:** 0.1 · **Last updated:** 2026-06-28
+> **Status:** Draft · **Version:** 0.2 · **Last updated:** 2026-06-28
 
 ---
 
@@ -8,6 +8,7 @@
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 0.2 | 2026-06-28 | Retrieval unit changed from verse to tercet; corpus size updated; dataset structure, evaluation counts, and open questions updated accordingly |
 | 0.1 | 2026-06-28 | Initial draft — project framing, architecture, dataset strategy, phasing |
 
 ---
@@ -18,7 +19,7 @@ The Divine Comedy (~14,200 lines, composed 1308–1320) is one of the most comme
 
 **The goal:** build a retrieval system that answers two classes of query:
 
-1. **Verse recall** — a user provides a text fragment, in any language or paraphrase, and the system returns the matching verse(s) with high precision. Example: "a metà della vita" → Inferno I:1.
+1. **Verse recall** — a user provides a text fragment, in any language or paraphrase, and the system returns the matching passage with high precision. Example: "a metà della vita" → Inferno I:1–3. The retrieval unit is the **tercet** (terzina): three lines forming the ABA rhyme unit, the natural semantic closure of the poem. A user query may be a fragment of a single verse; the system returns the containing tercet.
 2. **Thematic search** — a user expresses a modern feeling or concept, and the system surfaces semantically relevant passages regardless of surface form. Example: "I was 35 and felt lost" → passages on Dante's midlife journey.
 
 These are distinct retrieval tasks with different evaluation criteria and different model requirements.
@@ -31,7 +32,7 @@ These are distinct retrieval tasks with different evaluation criteria and differ
 |------|----------|
 | Corpus | Divine Comedy only (all three Canticles) |
 | Languages | Italian (original) + English (3–4 canonical translations) |
-| Corpus size | ~14,200 verses; fixed and fully known |
+| Corpus size | ~4,740 tercets (~14,200 lines); fixed and fully known |
 | Inference target | Low-latency interactive search (< 300 ms p95) |
 | Training budget | Consumer GPU (single A100 or equivalent) |
 | Serving | Hugging Face Space (public demo) |
@@ -96,7 +97,7 @@ Takes (query, passage) pairs as joint input and produces a scalar relevance scor
 
 For thematic queries, a small LLM reformulates the user's query into terms closer to what the fine-tuned retriever expects. This is a thin agentic wrapper — not generative RAG — and does not replace the retrieval backbone.
 
-**Design choice rationale:** agentic query expansion handles the semantic gap between modern vernacular ("avevo 35 anni") and the poem's conceptual vocabulary ("viaggio di mezzo cammino", midlife, exile). Fine-tuned embeddings handle verse-level alignment. Neither alone is sufficient for Phase 2.
+**Design choice rationale:** agentic query expansion handles the semantic gap between modern vernacular ("avevo 35 anni") and the poem's conceptual vocabulary ("viaggio di mezzo cammino", midlife, exile). Fine-tuned embeddings handle tercet-level alignment. Neither alone is sufficient for Phase 2.
 
 ---
 
@@ -115,26 +116,39 @@ This is the central design decision. The answer differs by phase:
 
 ## 5. Dataset Strategy
 
-The parallel corpus is the training signal. Its structure:
+The parallel corpus is the training signal. The retrieval and alignment unit is the **tercet** — three lines sharing an ABA rhyme scheme. Verse-level alignment across translations is not reliable: translators shift line boundaries, expand or compress within the tercet, and the semantic closure consistently falls at the three-line unit, not the single line. Its structure:
 
 ```
-Verse unit (one terzina or single verse):
-  ├── original_italian     "Nel mezzo del cammin di nostra vita"
-  ├── translation_longfellow  "Midway upon the journey of our life"
-  ├── translation_mandelbaum  "When I had journeyed half of our life's way"
-  ├── translation_hollander   "Midway in the journey of our life"
-  └── [optional] modern_paraphrase  "I was halfway through my life's journey"
+Tercet unit (terzina — 3 verses, ABA rhyme):
+  ├── original_italian
+  │     "Nel mezzo del cammin di nostra vita
+  │      mi ritrovai per una selva oscura
+  │      ché la diritta via era smarrita."
+  ├── translation_longfellow
+  │     "Midway upon the journey of our life
+  │      I came within a forest dark,
+  │      For the straightforward pathway had been lost."
+  ├── translation_mandelbaum
+  │     "When I had journeyed half of our life's way,
+  │      I found myself within a shadowed forest,
+  │      for I had lost the path that does not stray."
+  ├── translation_hollander
+  │     "Midway in the journey of our life
+  │      I came to myself in a dark wood,
+  │      for the straight way was lost."
+  └── [optional] modern_paraphrase
+        "I was halfway through my life and found myself lost in darkness."
 ```
 
 ### 5.1 Positive Pairs
 
-Formed from cross-language and cross-translation alignment:
+Formed from cross-language and cross-translation alignment at tercet level:
 
 - `(italian, english_translation_A)` — cross-lingual positives
 - `(english_translation_A, english_translation_B)` — cross-translation paraphrase positives
 - `(italian, modern_paraphrase)` — archaic → modern positives
 
-Each verse in the corpus generates multiple positive pairs without manual annotation.
+With ~4,740 tercets and 3 translations, the parallel corpus yields ~28,000 positive pairs without manual annotation. Adding paraphrases and all cross-translation combinations approaches ~50K.
 
 ### 5.2 Hard Negative Mining
 
@@ -143,8 +157,8 @@ Random negatives (any non-matching verse) are easy to distinguish and produce em
 **Mining procedure:**
 
 1. Index the corpus with a frozen base model (no fine-tuning yet)
-2. For each verse, retrieve top-50 nearest neighbors
-3. Remove true positives (same verse or known translations)
+2. For each tercet, retrieve top-50 nearest neighbors
+3. Remove true positives (same tercet or known translations)
 4. Remaining top-K (K = 5–10) are hard negatives for that anchor
 
 This is standard practice in all strong dense retrieval work (DPR, BGE, E5) and is the single most impactful dataset improvement beyond the basic parallel structure.
@@ -171,7 +185,7 @@ Implemented directly in `sentence-transformers` via `MultipleNegativesRankingLos
 
 | Set | Size | Construction | Purpose |
 |-----|------|--------------|---------|
-| Translation pairs | ~14,200 | Automatic (parallel corpus) | Measures cross-lingual alignment |
+| Translation pairs | ~4,740 | Automatic (parallel corpus, tercet-aligned) | Measures cross-lingual alignment |
 | Paraphrase queries | 200 | Hand-crafted | Measures paraphrase robustness |
 | Thematic queries | 100 | Hand-crafted | Phase 2 evaluation |
 | Hard cases | 50 | Adversarially selected | Boundary analysis |
@@ -182,8 +196,8 @@ Hard cases include: false cognates between archaic Italian and modern Italian, v
 
 | Metric | Definition | Target |
 |--------|------------|--------|
-| Recall@1 | Correct verse in top-1 result | > 0.85 (verse recall) |
-| Recall@10 | Correct verse in top-10 | > 0.97 |
+| Recall@1 | Correct tercet in top-1 result | > 0.85 (verse recall) |
+| Recall@10 | Correct tercet in top-10 | > 0.97 |
 | MRR@10 | Mean Reciprocal Rank at 10 | > 0.88 |
 | NDCG@10 | Normalized Discounted Cumulative Gain | > 0.90 |
 
@@ -208,7 +222,7 @@ This structure makes it possible to attribute performance gains to specific desi
 
 ### Phase 0 — Corpus and Baseline
 
-- [ ] Assemble and clean corpus: original Italian + 3 English translations, aligned at verse level
+- [ ] Assemble and clean corpus: original Italian + 3 English translations, aligned at tercet level
 - [ ] Build evaluation benchmark (200 paraphrase queries, ground truth)
 - [ ] Implement BM25 retrieval; measure Recall@1, MRR@10
 - [ ] Run zero-shot multilingual-e5-large; compare vs. BM25
@@ -219,11 +233,11 @@ This structure makes it possible to attribute performance gains to specific desi
 
 ### Phase 1a — Fine-Tuned Bi-Encoder
 
-- [ ] Construct positive pair dataset from parallel corpus (~50K pairs)
+- [ ] Construct positive pair dataset from parallel corpus (~28K pairs from translations alone; ~50K with paraphrases)
 - [ ] Mine hard negatives using frozen base model
 - [ ] Fine-tune `multilingual-e5-large` with `MultipleNegativesRankingLoss`
 - [ ] Evaluate on benchmark; ablate random vs. hard negatives
-- [ ] Cross-lingual alignment audit: plot cosine similarity distribution for IT↔EN pairs, pre/post fine-tuning
+- [ ] Cross-lingual alignment audit: plot cosine similarity distribution for IT↔EN tercet pairs, pre/post fine-tuning
 
 **Deliverable:** fine-tuned bi-encoder checkpoint; alignment audit plot; ablation table
 
@@ -253,7 +267,7 @@ This structure makes it possible to attribute performance gains to specific desi
 
 ### Phase 3 — Visualization and Calibration
 
-- [ ] UMAP of verse embeddings colored by Canticle, then by Canto — do embeddings reflect the poem's structure?
+- [ ] UMAP of tercet embeddings colored by Canticle, then by Canto — do embeddings reflect the poem's structure?
 - [ ] Retrieval score calibration: plot score vs. precision; apply temperature scaling if needed
 - [ ] Interactive Hugging Face Space demo
 
@@ -267,7 +281,7 @@ This structure makes it possible to attribute performance gains to specific desi
 |-------|------|-------|
 | Training | `sentence-transformers` | Native support for contrastive losses and bi-encoder training |
 | Experiment tracking | MLflow | Already in use; track loss, retrieval metrics per checkpoint |
-| ANN index | FAISS `IndexFlatIP` | Exact search sufficient at 14K vectors; upgradeable to `IVF` if corpus grows |
+| ANN index | FAISS `IndexFlatIP` | Exact search sufficient at ~4.7K vectors; upgradeable to `IVF` if corpus grows |
 | BM25 | `rank_bm25` | Lightweight; no server required |
 | Cross-encoder | `cross-encoder/mmarco-mMiniLMv2-L12-H384` | Multilingual; fits on CPU for reranking |
 | Serving | FastAPI + FAISS in-memory | Deployable as Hugging Face Space |
@@ -293,7 +307,7 @@ Defining the evaluation benchmark before any model training eliminates the risk 
 
 ## 10. Open Questions
 
-- [ ] **Canto-level vs. verse-level retrieval:** Should the retrieval unit be a single verse (11 syllables, ~8 words) or a full terzina (3 verses, ABA rhyme scheme)? Terzine are the natural semantic unit but make retrieval granularity coarser.
+- [x] **Retrieval unit:** Tercet (terzina). Verse-level alignment across translations is unreliable — translators shift line boundaries and semantic closure consistently falls at the three-line unit. Resolved in v0.2.
 - [ ] **Archaic vocabulary handling:** Medieval Florentine has significant lexical drift from modern Italian. Does `multilingual-e5-large` handle this well zero-shot, or is tokenization fragmentation a problem? Needs early empirical check.
 - [ ] **Commentary inclusion:** Should translator commentary (Hollander's notes are extensive) be included in the retrieval index as additional signal, or kept separate to avoid conflating primary text with interpretation?
 - [ ] **Cross-encoder training:** Fine-tune the reranker on this corpus, or use the multilingual reranker zero-shot? Training data for reranking is harder to construct (requires graded relevance, not binary positives).
@@ -306,7 +320,7 @@ Defining the evaluation benchmark before any model training eliminates the risk 
 | This project | Prior work on this site |
 |---|---|
 | Embedding calibration: retrieval score vs. precision | MNIST calibration (ECE, calibration curves) |
-| UMAP of verse embeddings | UMAP of penultimate features in bear detector |
+| UMAP of tercet embeddings | UMAP of penultimate features in bear detector |
 | MLflow experiment tracking for training runs | MNIST MLflow project |
 | Ablation-driven evaluation | Structure-vs-recall: logit lens, patching, DLA |
 | Hard negative mining as a form of hard case analysis | OOD detection: near-OOD as hard boundary cases |
