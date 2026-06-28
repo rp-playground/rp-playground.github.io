@@ -1,6 +1,6 @@
 # Semantic Search in Dante's Divine Comedy — Solution Design
 
-> **Status:** Draft · **Version:** 0.11 · **Last updated:** 2026-06-28
+> **Status:** Draft · **Version:** 0.12 · **Last updated:** 2026-06-28
 
 ---
 
@@ -8,6 +8,7 @@
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 0.12 | 2026-06-28 | Known failure modes section added (§10): abstract thematic queries, multi-tercet concepts, irony/rhetorical inversion, character relational queries; index composition risk added (§5.4): paraphrase dominance in embedding space, detection procedure, and mitigations |
 | 0.11 | 2026-06-28 | Training data redesigned: cross-translation pairs made explicit as hard positives; negative mining restructured into three tiers with adjacent-tercet structural negatives as Tier 1; pair counts updated |
 | 0.10 | 2026-06-28 | Query reformulation evaluation added: logging spec, retrieval delta measurement, per-query-type reporting, and fine-tuning path documented |
 | 0.9 | 2026-06-28 | Fusion strategy updated: static RRF replaced with query-aware weighted RRF; language detection tier and score-based dynamic tier specified; ablation updated |
@@ -341,6 +342,31 @@ where `q` is the query, `p+` is the positive passage, and `{pj}` are in-batch ne
 
 Implemented directly in `sentence-transformers` via `MultipleNegativesRankingLoss`.
 
+### 5.4 Index Composition Risk: Paraphrase Dominance
+
+The FAISS index holds 5 representations per tercet: 3 English translations (Longfellow, Mandelbaum, Hollander), 1 English modern paraphrase, and 1 modern Italian paraphrase. These representations are not equivalent in their relationship to the model's pre-trained embedding space.
+
+**The risk:** Modern paraphrases are written in plain, unambiguous contemporary prose. Literary translations — especially Longfellow (1867) — use archaic diction, syntactic inversions, and poetic compression. Pre-trained multilingual models encode plain modern prose more reliably than archaic literary register. As a consequence, paraphrase embeddings may cluster more tightly in the model's embedding space: they are *model-friendly* in a way that canonical translations are not.
+
+Under contrastive training, the model can satisfy the InfoNCE loss primarily by aligning with paraphrase representations, treating literary translations as harder-to-distinguish outliers. At retrieval time this manifests as: modern-language queries surface the correct tercet (paraphrase is the matching representation — correct); translation-fragment queries fail to distinguish between translations from different tercets because those embeddings have been compressed into a region of space the model treats as uniform (incorrect).
+
+**Detection:**
+
+- **Per-representation match rate:** During training, log which representation type resolves the contrastive positive at each step. If paraphrases are the matched positive in ≥ 60% of steps, the model is optimising primarily against paraphrase targets.
+- **Embedding space audit (UMAP):** Plot all index documents colored by representation type. If paraphrases form a tight separate cluster, the embedding space has been distorted in a way that disadvantages literary translations.
+- **Per-type recall (§6.4):** If English-translation-fragment queries score significantly lower Recall@1 than modern-paraphrase queries, the model is paraphrase-biased in retrieval. This is the clearest signal because it is measured on held-out queries, not on training dynamics.
+
+**Mitigations, in order of invasiveness:**
+
+| Level | Mitigation | When to apply |
+|-------|-----------|---------------|
+| 1 | Monitor only — log match rate and per-type recall before acting | Phase 1a baseline |
+| 2 | Subsample cross-paraphrase pairs in training; ensure translation↔translation pairs are not under-represented relative to paraphrase pairs | If match rate signal is visible |
+| 3 | Apply higher contrastive loss weight to pairs where the positive is a literary translation | If per-type recall shows divergence |
+| 4 | Add translation-fragment-specific held-out queries per translation; report recall separately per translation | If Mitigation 3 is insufficient |
+
+The monitoring step (Level 1) is mandatory regardless: representation-type match rate is a diagnostic that costs nothing to log and makes paraphrase dominance detectable before it becomes a hard-to-diagnose retrieval failure.
+
 ---
 
 ## 6. Evaluation Framework
@@ -650,7 +676,43 @@ The original text is in medieval Florentine — a language with significant lexi
 
 ---
 
-## 10. Open Questions
+## 10. Known Failure Modes
+
+Every retrieval system has a failure boundary. Stating it explicitly serves two purposes: it constrains the claimed scope of the design, and it identifies what the evaluation sets must cover to be credible. The following failure modes are **known and architectural** — they cannot be resolved by training better embeddings alone.
+
+### 10.1 Highly abstract thematic queries
+
+Queries like "the nature of divine love" or "the relationship between reason and faith" have no single retrievable tercet as an answer. The meaning is distributed across the poem, emergent from hundreds of passages in aggregate. The bi-encoder maps the query to a single embedding and retrieves single tercets — the retrieval paradigm itself cannot surface distributed concepts.
+
+LLM query expansion (Phase 2) partially mitigates this: decomposing the abstract query into specific sub-themes ("God as light", "Beatrice as grace", "reason failing where faith begins") produces multiple targeted queries whose union covers more of the relevant tercets. But this is workaround, not solution — the user receives a list of passages, not a synthesised answer about the poem's theology.
+
+**Evaluation implication:** the thematic query set (§6.3) should include ≥10 abstract queries of this type, with a lower nDCG@10 target than concrete thematic queries. The target for this subtype should be set after measuring zero-shot performance, not assumed.
+
+### 10.2 Multi-tercet concepts
+
+Dante's narrative develops across sequences of 3–10 consecutive tercets: extended Homeric similes, dialogue exchanges, the progressive stages of Dante's emotional transformation as he enters each realm. A single tercet is frequently not the unit of meaning — it is an incomplete phrase in a longer syntactic or rhetorical structure.
+
+This is a **deliberate scope constraint**, not a solvable failure mode. The system retrieves tercets. A user whose intent spans multiple consecutive tercets will receive the most relevant tercet in the sequence, not the full passage. The display layer can partially compensate by showing the retrieved tercet plus its immediate neighbors (±1), but this is a UX mitigation — the retrieval problem itself is not resolved.
+
+### 10.3 Irony and rhetorical inversion
+
+Dante uses irony systematically — praising what he condemns, expressing admiration that is contempt, putting sincere belief in the mouths of characters who lack it. A query for "passages where Dante admires political power" may retrieve tercets in which Dante is at his most caustic toward corrupt rulers. The bi-encoder matches semantic surface similarity between the query and the text; it cannot distinguish sincere assertion from performative statement.
+
+The cross-encoder reranker is also unlikely to resolve this. Cross-encoders learn joint relevance from training data; without training pairs that explicitly flag ironic tercets as non-relevant to their literal-reading query counterparts, the reranker has no signal to distinguish them.
+
+**Mitigation path:** ironic passages could be flagged in the metadata store (e.g., from Hollander's commentary, which explicitly notes rhetorical inversion) and excluded from — or down-ranked in — retrieval for literal-intent queries. This requires query intent classification (is the user asking about sincere passages or rhetorical ones?) and is a Phase 3+ concern.
+
+### 10.4 Character-based relational queries
+
+Queries like "where Virgil hesitates", "when Beatrice smiles", or "tercets where Dante weeps" require identifying a character and a specific action or state attributed to that character. The bi-encoder embeds the tercet holistically — a tercet that mentions Virgil prominently but in a guiding rather than hesitating role may score high against "Virgil hesitates" because "Virgil" matches strongly and "hesitates" matches weakly.
+
+The cross-encoder improves this: full attention over the (query, passage) pair can attend to the specific predicate. But cross-encoder gains here depend on how frequently such query types appear in the training data for the base cross-encoder model. Without targeted training pairs that stress-test character-predicate distinction, performance on this query type is unpredictable.
+
+**Evaluation implication:** the hard cases set (§6.3, 50 adversarial queries) should include ≥10 character-based relational queries covering all three Canticles and multiple characters. These queries are the sharpest test of boundary precision between adjacent tercets.
+
+---
+
+## 11. Open Questions
 
 - [x] **Retrieval unit:** Tercet (terzina). Verse-level alignment across translations is unreliable — translators shift line boundaries and semantic closure consistently falls at the three-line unit. Resolved in v0.2.
 - [x] **Archaic vocabulary handling:** Resolved in v0.3. The FAISS index holds only modern-language representations; the archaic Italian is never embedded for retrieval. Residual Italian-query coverage is handled by BM25 over the original text.
@@ -662,7 +724,7 @@ The original text is in medieval Florentine — a language with significant lexi
 
 ---
 
-## 11. Connections to Existing Work
+## 12. Connections to Existing Work
 
 | This project | Prior work on this site |
 |---|---|
