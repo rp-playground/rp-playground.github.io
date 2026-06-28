@@ -1,6 +1,6 @@
 # Semantic Search in Dante's Divine Comedy — Solution Design
 
-> **Status:** Draft · **Version:** 0.8 · **Last updated:** 2026-06-28
+> **Status:** Draft · **Version:** 0.9 · **Last updated:** 2026-06-28
 
 ---
 
@@ -8,6 +8,7 @@
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 0.9 | 2026-06-28 | Fusion strategy updated: static RRF replaced with query-aware weighted RRF; language detection tier and score-based dynamic tier specified; ablation updated |
 | 0.8 | 2026-06-28 | Query distribution model added: assumed prior over query types with component weighting implications; evaluation set composition updated to mirror distribution |
 | 0.7 | 2026-06-28 | Evaluation section restructured: separate protocols for verse recall and thematic search; Recall@5 added; human annotation protocol specified as mandatory for thematic search with relevance scale, annotator requirements, and inter-annotator agreement threshold |
 | 0.6 | 2026-06-28 | Resolved three open questions: modern Italian paraphrases added to FAISS index; max pooling confirmed for deduplication; commentaries kept as metadata only. Index size updated to ~24K documents; dataset structure, positive pairs, Phase 0 milestones, and infrastructure table updated. |
@@ -109,13 +110,35 @@ The tokenization strategy is instead:
 
 The two token types are combined in the same BM25 index. Exact word matches score higher (high IDF on rare archaic words); character n-gram matches provide softer signal when exact match fails. For English or modern Italian queries, the BM25 track produces near-zero scores and the dense track dominates — the correct behaviour.
 
-Combined with the dense track via **Reciprocal Rank Fusion (RRF)**:
+Combined with the dense track via **query-aware weighted RRF**:
 
 ```
-score_rrf(d) = Σ  1 / (k + rank_i(d))
+score(d) = 1/(k + rank_dense(d))  +  w_BM25(q) * 1/(k + rank_BM25(d))
 ```
 
-where `k = 60` (standard) and the sum is over the two ranking lists. No additional parameters to tune.
+where `k = 60` (standard) and `w_BM25(q)` is a **query-dependent weight** — not a static constant. Static RRF (`w_BM25 = 1.0` always) assumes both rankers are equally useful for every query. In this system they are not: BM25 over archaic Italian is valuable for Italian-fragment queries and actively harmful for English queries, where it ranks tercets by irrelevant surface noise.
+
+**Tier 1 — language detection (implemented first):**
+
+Use a lightweight language identification model (`fasttext lid.176.ftz`, 917 KB, <1 ms per query) to classify the query. Apply threshold P(Italian) ≥ 0.6:
+
+| Detected language | w_BM25 | Rationale |
+|-------------------|--------|-----------|
+| Italian | 1.0 | BM25 is primary lexical signal; full weight |
+| Non-Italian | 0.1 | Near-zero but not zero — preserves BM25 signal for Italian proper nouns (Francesca, Virgilio) embedded in English queries |
+
+**Tier 2 — score-based dynamic weighting (refinement, no language detection required):**
+
+Use the BM25 top-1 raw score as a proxy for whether BM25 found a meaningful lexical match. If `max_score_BM25(q) < θ`, the BM25 index has no good matches and should be downweighted automatically:
+
+```
+w_BM25(q) = 1.0  if max_score_BM25(q) >= θ
+             0.1  otherwise
+```
+
+`θ` is calibrated on the development set. This eliminates the language detection dependency and generalises to query types not anticipated at design time (e.g. Latin fragments, proper-noun-heavy queries in other languages). Trade-off: requires score normalisation since raw BM25 scores vary by document length and index statistics.
+
+Both tiers are evaluated in the ablation structure (§6.6).
 
 ### 3.3 Cross-Encoder (Reranker)
 
@@ -379,11 +402,13 @@ BM25 only (word unigrams + character 5-grams, original Italian)
   → Zero-shot bi-encoder (multilingual-e5-large, no fine-tuning)
     → Fine-tuned bi-encoder (random negatives)
       → Fine-tuned bi-encoder (hard negatives)
-        → Hybrid BM25 + dense (RRF)
-          → Hybrid + cross-encoder reranker
+        → Hybrid: static RRF (w_BM25 = 1.0)
+          → Hybrid: query-aware RRF, Tier 1 (language detection)
+            → Hybrid: query-aware RRF, Tier 2 (score-based dynamic weighting)
+              → Full pipeline + cross-encoder reranker
 ```
 
-Each step is evaluated on Recall@1, Recall@5, and MRR@10. This structure attributes performance gains to specific design decisions rather than to the system as a whole.
+Each step is evaluated on Recall@1, Recall@5, and MRR@10, reported both in aggregate and per query type. The two query-aware fusion steps are evaluated separately to isolate their contribution — language detection and score-based weighting are not equivalent and may perform differently across query type distributions.
 
 ---
 
@@ -482,6 +507,9 @@ After FAISS retrieval and deduplication, each candidate tercet is represented by
 
 **Why no stemmer for BM25, and why character n-grams?**
 Standard Italian stemmers (Snowball) were designed for modern Italian morphology and produce incorrect stems on medieval Florentine. Not stemming is strictly better. Character 5-grams are added as supplementary tokens to handle the realistic failure modes for this track: archaic spelling variants (*diritta* vs. *dritta*), clitic compounds (*ritrovami*), and fragments a user half-remembers. Word unigrams retain exact-match precision for the common case; character n-grams provide fuzzy robustness for the edge cases. This is the same design used in production search engines (Elasticsearch's edge n-gram filter) for morphologically complex or domain-specific vocabularies.
+
+**Why query-aware fusion instead of static RRF?**
+Static RRF with fixed `k` assumes both rankers are beneficial for every query. In this system the BM25 track runs over archaic Italian text — a representation that is useful only for queries containing Italian fragments (~14% of estimated total traffic). For all other queries, the BM25 track adds noise: it produces rankings based on surface overlap between modern-language queries and medieval text, which is largely accidental. Blending this noise into the final score via static RRF harms precision. Query-aware weighting sets `w_BM25` to near-zero for non-Italian queries, effectively bypassing BM25 without the overhead of running two completely independent pipelines. The two-tier design (language detection → score-based) provides a degradation path: if language detection fails or is unavailable, Tier 2 falls back to a signal that is always available (the BM25 top-1 score itself).
 
 **Why include modern Italian paraphrases in the FAISS index?**
 English translations alone leave a cross-lingual gap for Italian users querying with contemporary vernacular (e.g., "storia di Paolo e Francesca", "paura nella foresta"). The BM25 track over the archaic original does not close this gap — BM25 matches surface tokens, not modern Italian meaning. Modern Italian paraphrases give the bi-encoder an explicit target in the right language and register, routing domestic Italian traffic through the dense track rather than the less precise BM25 track.
