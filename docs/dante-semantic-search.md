@@ -1,6 +1,6 @@
 # Semantic Search in Dante's Divine Comedy — Solution Design
 
-> **Status:** Draft · **Version:** 0.5 · **Last updated:** 2026-06-28
+> **Status:** Draft · **Version:** 0.6 · **Last updated:** 2026-06-28
 
 ---
 
@@ -8,6 +8,7 @@
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 0.6 | 2026-06-28 | Resolved three open questions: modern Italian paraphrases added to FAISS index; max pooling confirmed for deduplication; commentaries kept as metadata only. Index size updated to ~24K documents; dataset structure, positive pairs, Phase 0 milestones, and infrastructure table updated. |
 | 0.5 | 2026-06-28 | Cross-encoder input specified: highest-scoring bi-encoder representation per tercet; asymmetric reranking rationale documented |
 | 0.4 | 2026-06-28 | BM25 tokenization specified: no stemmer; word unigrams + character 5-grams for robustness to archaic spelling variants and user misremembering |
 | 0.3 | 2026-06-28 | Retrieval architecture changed: original Italian is a display target (lookup), not a retrieval corpus; FAISS index holds translations and paraphrases only; BM25 repurposed as Italian-language lexical track; dataset, infrastructure, and design decisions updated |
@@ -78,13 +79,14 @@ FAISS index                                                   │
                                │
                                ▼
               Display: original Italian + all translations side by side
+                       + commentaries (from metadata store, keyed on tercet_id)
 ```
 
 ### 3.1 Bi-Encoder (Dense Retrieval)
 
 Encodes query and passages independently into a shared embedding space. At search time, retrieval is a cosine similarity lookup over the FAISS index. The bi-encoder is the component that will be **fine-tuned** on the parallel corpus.
 
-**Index contents:** translations and paraphrases only. Each indexed document carries a `tercet_id` pointing back to the original. Multiple documents may share the same `tercet_id` (one per translation), so results are deduplicated by `tercet_id` before reranking — the highest-scoring representation per tercet is kept. The indexed corpus is thus ~14K–19K documents (4,740 tercets × 3–4 representations), still trivially small for FAISS.
+**Index contents:** English translations (×3), English modern paraphrases, and modern Italian paraphrases. Each document carries a `tercet_id` pointing back to the original. Multiple documents share the same `tercet_id`, so results are deduplicated by `tercet_id` before reranking — the **highest-scoring representation per tercet is kept (max pooling)**. Average pooling is explicitly rejected: a query quoting a Longfellow fragment will score high against Longfellow but low against Mandelbaum's poetic rendering; averaging would penalise a correct match. The indexed corpus is ~24K documents (4,740 tercets × 5 representations), still trivially small for FAISS. Commentaries are **not** indexed — they are stored as a separate metadata file keyed on `tercet_id` and surfaced at display time only.
 
 **Base model:** `intfloat/multilingual-e5-large` or `BAAI/bge-m3`
 
@@ -156,9 +158,10 @@ The parallel corpus serves two distinct roles that must be kept separate:
 
 | Role | Contents | Used for |
 |------|----------|----------|
-| **Retrieval corpus** | Translations + paraphrases | Indexed in FAISS; what the bi-encoder searches over |
+| **Retrieval corpus** | English translations (×3) + English paraphrases + modern Italian paraphrases | Indexed in FAISS; what the bi-encoder searches over |
 | **Display corpus** | Original Italian | Returned to the user via lookup after retrieval; never searched directly |
-| **Lexical corpus** | Original Italian | Indexed in BM25 separately for Italian-language queries |
+| **Lexical corpus** | Original Italian | Indexed in BM25 separately for archaic Italian-fragment queries |
+| **Metadata store** | Commentaries (e.g. Hollander's notes) | Stored as JSON keyed on `tercet_id`; displayed alongside results; never indexed |
 
 The retrieval and alignment unit is the **tercet** — three lines sharing an ABA rhyme scheme. Verse-level alignment across translations is not reliable: translators shift line boundaries, expand or compress within the tercet, and the semantic closure consistently falls at the three-line unit, not the single line.
 
@@ -183,20 +186,28 @@ Tercet unit (terzina — 3 verses, ABA rhyme):
   │     "Midway in the journey of our life
   │      I came to myself in a dark wood,
   │      for the straight way was lost."
-  └── [FAISS index] modern_paraphrase
-        "I was halfway through my life and found myself lost in darkness."
+  ├── [FAISS index] modern_paraphrase_english
+  │     "I was halfway through my life and found myself lost in darkness."
+  ├── [FAISS index] modern_paraphrase_italian
+  │     "Ero a metà della mia vita e mi ritrovai perso in una foresta oscura."
+  └── [metadata only] commentary
+        "Nel mezzo: Dante places himself at age 35, midway through the biblical
+         lifespan of 70 years (Psalms 89:10). The dark wood is the traditional
+         symbol of sin and spiritual confusion. [Hollander, 2000]"
 ```
 
 ### 5.1 Positive Pairs
 
 Training pairs have a query on the left and an indexed document (translation or paraphrase) on the right. The original Italian appears only on the query side — as a source of fragment queries — not as a retrieval target.
 
-- `(italian_fragment, translation_A)` — archaic fragment → indexed translation; trains the model to surface the right tercet from an Italian query
-- `(translation_A, translation_B)` — cross-translation positives; aligns different renderings of the same tercet
-- `(translation_A, modern_paraphrase)` — trains paraphrase robustness for thematic queries
-- `(modern_query, translation_A)` — thematic query → relevant tercet (Phase 2 training data)
+- `(italian_fragment, translation_EN)` — archaic fragment → English translation; trains the model to surface the right tercet from an Italian-language query
+- `(translation_A, translation_B)` — cross-translation positives; aligns different English renderings of the same tercet
+- `(translation_EN, modern_paraphrase_EN)` — English translation → English paraphrase; paraphrase robustness
+- `(modern_paraphrase_IT, translation_EN)` — modern Italian query → English translation; cross-lingual alignment for domestic Italian traffic
+- `(modern_paraphrase_IT, modern_paraphrase_EN)` — cross-lingual modern paraphrase pairs
+- `(modern_query, translation_EN)` — thematic query → relevant tercet (Phase 2 training data)
 
-With ~4,740 tercets, 3 translations, and paraphrases, the retrieval corpus yields ~28,000 translation↔translation pairs automatically. Paraphrase pairs and Italian-fragment pairs add further signal; total approaches ~50K without manual annotation.
+With ~4,740 tercets and 5 representations, the retrieval corpus yields ~28K translation↔translation pairs from English alone, and ~40K+ once modern Italian paraphrase pairs are included. Total approaches ~60K without manual annotation.
 
 ### 5.2 Hard Negative Mining
 
@@ -272,6 +283,8 @@ This structure makes it possible to attribute performance gains to specific desi
 
 - [ ] Assemble and clean corpus: original Italian + 3 English translations, aligned at tercet level; assign stable `tercet_id` keys
 - [ ] Build lookup table: `tercet_id → original Italian text`
+- [ ] Generate modern Italian paraphrases for all ~4,740 tercets (LLM-assisted, manually spot-checked)
+- [ ] Extract and store Hollander commentaries as metadata JSON keyed on `tercet_id`
 - [ ] Build evaluation benchmark (200 paraphrase queries, ground truth)
 - [ ] Implement BM25 retrieval; measure Recall@1, MRR@10
 - [ ] Run zero-shot multilingual-e5-large; compare vs. BM25
@@ -330,8 +343,9 @@ This structure makes it possible to attribute performance gains to specific desi
 |-------|------|-------|
 | Training | `sentence-transformers` | Native support for contrastive losses and bi-encoder training |
 | Experiment tracking | MLflow | Already in use; track loss, retrieval metrics per checkpoint |
-| ANN index | FAISS `IndexFlatIP` | ~14K–19K vectors (translations + paraphrases); exact search still fast at this size |
+| ANN index | FAISS `IndexFlatIP` | ~24K vectors (4,740 tercets × 5 representations); exact search still fast at this size |
 | Lookup table | Python dict / JSON | `tercet_id → original Italian`; loaded in memory at startup; trivial overhead |
+| Metadata store | JSON file | `tercet_id → commentary text`; loaded at startup; displayed alongside results; never queried |
 | BM25 | `rank_bm25` | Lightweight; no server required |
 | Cross-encoder | `cross-encoder/mmarco-mMiniLMv2-L12-H384` | Multilingual; fits on CPU for reranking |
 | Serving | FastAPI + FAISS in-memory | Deployable as Hugging Face Space |
@@ -359,6 +373,15 @@ After FAISS retrieval and deduplication, each candidate tercet is represented by
 **Why no stemmer for BM25, and why character n-grams?**
 Standard Italian stemmers (Snowball) were designed for modern Italian morphology and produce incorrect stems on medieval Florentine. Not stemming is strictly better. Character 5-grams are added as supplementary tokens to handle the realistic failure modes for this track: archaic spelling variants (*diritta* vs. *dritta*), clitic compounds (*ritrovami*), and fragments a user half-remembers. Word unigrams retain exact-match precision for the common case; character n-grams provide fuzzy robustness for the edge cases. This is the same design used in production search engines (Elasticsearch's edge n-gram filter) for morphologically complex or domain-specific vocabularies.
 
+**Why include modern Italian paraphrases in the FAISS index?**
+English translations alone leave a cross-lingual gap for Italian users querying with contemporary vernacular (e.g., "storia di Paolo e Francesca", "paura nella foresta"). The BM25 track over the archaic original does not close this gap — BM25 matches surface tokens, not modern Italian meaning. Modern Italian paraphrases give the bi-encoder an explicit target in the right language and register, routing domestic Italian traffic through the dense track rather than the less precise BM25 track.
+
+**Why max pooling (highest-scoring representation) for deduplication, not average?**
+Queries are stylistically specific. A user quoting a Longfellow fragment will score very high against Longfellow and potentially low against Mandelbaum's poetic rendering of the same tercet. Averaging those scores penalises a correct match by diluting it with irrelevant representations. Max pooling preserves the strongest signal: if any representation matches the query well, the tercet is correctly retrieved.
+
+**Why keep commentaries out of the retrieval index?**
+Commentaries (e.g. Hollander's extensive theological and historical notes) introduce vocabulary, concepts, and proper names that are not present in the primary text. Indexing them would pollute the dense vectors with outside semantic signal and cause high false-positive rates: a query about Florentine political history might surface tercets that merely happen to be annotated with historical commentary, not tercets that thematically match. Commentaries are stored as a separate metadata file keyed on `tercet_id` and displayed alongside results — useful as context, not as retrieval signal.
+
 **Why index translations instead of the original Italian?**
 The original text is in medieval Florentine — a language with significant lexical and morphological distance from modern Italian. Pre-trained multilingual models tokenize it poorly: rare tokens, fragmented subwords, low-frequency embeddings. Indexing translations in modern English (and optionally modern Italian paraphrases) sidesteps this entirely: the model operates in a semantic space it was trained on. The original Italian is not lost — it is the displayed result, retrieved via a static lookup keyed on `tercet_id`. This separation of concerns (retrieval over modern representations, display of the original) is analogous to the *document expansion* paradigm in information retrieval, where corpora are enriched with generated text to improve retrieval coverage while the original document remains the authoritative output. The BM25 track over the original Italian handles the residual case of users querying with archaic Italian fragments directly.
 
@@ -368,9 +391,9 @@ The original text is in medieval Florentine — a language with significant lexi
 
 - [x] **Retrieval unit:** Tercet (terzina). Verse-level alignment across translations is unreliable — translators shift line boundaries and semantic closure consistently falls at the three-line unit. Resolved in v0.2.
 - [x] **Archaic vocabulary handling:** Resolved in v0.3. The FAISS index holds only modern-language representations; the archaic Italian is never embedded for retrieval. Residual Italian-query coverage is handled by BM25 over the original text.
-- [ ] **Modern Italian paraphrases in the index:** Should the index include modern Italian paraphrases (not just English translations) to improve coverage of Italian-language queries? This would add a fourth representation per tercet (~19K total index documents) and improve recall for Italian users without touching the archaic text.
-- [ ] **Deduplication strategy:** Multiple representations of the same tercet may rank differently; currently the highest-scoring representation is kept. Alternative: average pooling of all representation scores before deduplication. Needs empirical comparison.
-- [ ] **Commentary inclusion:** Should translator commentary (Hollander's notes are extensive) be included in the retrieval index as additional signal, or kept separate to avoid conflating primary text with interpretation?
+- [x] **Modern Italian paraphrases in the index:** Yes — included. Closes the cross-lingual gap for Italian users querying in contemporary vernacular. Fifth representation per tercet; ~24K total index documents. Resolved in v0.6.
+- [x] **Deduplication strategy:** Max pooling (highest-scoring representation kept). Average pooling is rejected — stylistically specific queries score high against one translation and low against others; averaging penalises correct matches. Resolved in v0.6.
+- [x] **Commentary inclusion:** Kept separate. Commentaries stored as metadata JSON keyed on `tercet_id`, displayed alongside results, never indexed. Indexing commentaries would pollute vectors with outside vocabulary and cause false positives on historically annotated but thematically unrelated tercets. Resolved in v0.6.
 - [ ] **Cross-encoder training:** Fine-tune the reranker on this corpus, or use the multilingual reranker zero-shot? Training data for reranking is harder to construct (requires graded relevance, not binary positives).
 - [ ] **Thematic query evaluation:** Graded relevance (1–3 scale) for thematic queries requires human judgment. Who judges, and what is the annotation protocol?
 
