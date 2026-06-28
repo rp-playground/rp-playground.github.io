@@ -1,6 +1,6 @@
 # Semantic Search in Dante's Divine Comedy — Solution Design
 
-> **Status:** Draft · **Version:** 0.15 · **Last updated:** 2026-06-28
+> **Status:** Draft · **Version:** 0.16 · **Last updated:** 2026-06-28
 
 ---
 
@@ -8,6 +8,7 @@
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 0.16 | 2026-06-28 | Executive summary: key design decisions added to make it self-contained as a standalone one-pager; §3.4: concrete example prompt (system/user format + JSON output schema) added to make Phase 2 immediately executable; Risk Register: annotation-effort row rewritten to lead with explicit pilot recommendation sentence |
 | 0.15 | 2026-06-28 | Executive summary added; §2 licensing note added for canonical translations; §3.1 second-highest representation score surfaced in metadata; §3.4 LLM implementation details added (model, temperature, few-shot, structured output, cost/latency); §6.5 staged annotation pilot (30–40 queries) added before full 100-query annotation; LoRA/QLoFA added to §8 infrastructure and Phase 1a; §12 Risk Register added; §12 Connections → §13; §13 Future Work relabeled and renumbered to §14 |
 | 0.14 | 2026-06-28 | Four targeted improvements: modern Italian paraphrase generation spec tightened (Phase 0: stronger LLM + few-shot from Hollander, stratified spot-check); CoT prompting strategy added to §3.4 query expansion; UMAP moved from Phase 3 to Phase 1a as a diagnostic checkpoint; neighboring tercet display added to Phase 1b milestones |
 | 0.13 | 2026-06-28 | Research-level extensions section added (§13): translation variance as confidence signal, ColBERT-style multi-vector retrieval, interpretability layer; §3 Architecture intro tightened to remove repeated Italian-exclusion rationale; simplified pipeline flow added; §7 phasing intro added; §11 Open Questions restructured to separate open from closed items |
@@ -53,6 +54,14 @@ Query → [Dense (FAISS) + BM25] → Fusion (RRF) → Dedup (max pool) → Cross
 | 1b — Hybrid + Reranker | Full retrieval pipeline, latency report |
 | 2 — Thematic Search | Thematic evaluation set, LLM expansion pipeline, delta distribution report |
 | 3 — Visualization & Demo | UMAP extended analysis, calibration plots, public HF Space |
+
+**Key design decisions (rationale in §9):**
+
+- Index translations and modern paraphrases — not original medieval Italian — so retrieval operates in a semantic space the model was trained on. Original Italian is the display target, recovered via lookup.
+- Retrieval unit: **tercet** (3 lines). Verse-level alignment across translations is unreliable; semantic closure falls at the terzina unit.
+- Query-aware BM25 weighting: BM25 over archaic Italian is useful for ~14% of queries (Italian fragments); query-aware `w_BM25` suppresses it for all others rather than blending noise.
+- Hard positives from cross-translation pairs: C(5,2) = 10 pairs × 4,740 tercets = 47,400 positive training pairs, zero annotation cost.
+- LoRA/QLoRA first: 100× fewer trainable parameters, 3–5× faster iteration; switch to full fine-tuning only if LoRA plateaus.
 
 ---
 
@@ -228,6 +237,45 @@ Do not ask the LLM to produce the reformulation string directly. Instead, prompt
 4. Given the above — produce a reformulated query in that vocabulary.
 
 CoT intermediate reasoning catches hallucination and overspecification before they propagate to the retrieval step: an LLM that has to commit to a Dantesque concept in step 1 is less likely to invent one in step 4. Log both the CoT trace and the final reformulation string. This prompting approach must be fully evaluated (via retrieval delta, §6.5) before considering the mT5 fine-tune path.
+
+**Example prompt (zero-shot CoT, structured output):**
+
+```
+System:
+You are a Dante scholar assisting a semantic retrieval system. Given a user query,
+reason step by step about which Dantesque themes and vocabulary are relevant, then
+produce a reformulated query suitable for retrieval over modern English translations
+and Italian paraphrases of the Divine Comedy.
+
+User:
+Query: "avevo 35 anni e mi sentivo perso nella vita"
+
+Reason through the following steps before producing output:
+1. Dantesque themes/concepts: What does this query map to in Dante's world?
+2. Characters/canticles/episodes: Which parts of the poem are most relevant?
+3. Retriever vocabulary: What terms appear in the translations and modern paraphrases?
+4. Reformulation: A concise query string in retriever vocabulary.
+
+Respond in JSON:
+{
+  "step1_themes": "...",
+  "step2_location": "...",
+  "step3_vocabulary": "...",
+  "reformulated_query": "..."
+}
+```
+
+Expected output for the example query:
+```json
+{
+  "step1_themes": "Midlife disorientation, spiritual crisis, loss of direction, Dante's journey at age 35",
+  "step2_location": "Inferno I (Nel mezzo del cammin), the dark forest — Dante entering at midlife",
+  "step3_vocabulary": "midway through life, lost path, dark wood, journey, age 35, selva oscura, smarrita",
+  "reformulated_query": "midlife disorientation, lost in a dark forest, spiritual crisis, journey at age 35"
+}
+```
+
+Start zero-shot; add few-shot examples once 20+ high-delta log entries are available (positive-delta pairs are the natural training signal). Enforce JSON schema via function calling / tool use — do not rely on free-form text parsing.
 
 **Logging specification:**
 
@@ -814,7 +862,7 @@ Known risks and dependencies that could materially affect the project. Tracked h
 | **LLM paraphrase quality** — GPT-4o generates modern Italian paraphrases that are fluent but semantically incorrect for specific tercets | Medium | High (corrupts 5th representation; hurts Italian user retrieval) | Stratified QC sample + back-translation round-trip check + embedding similarity to original; budget regeneration for ~5% of tercets |
 | **Language detection brittleness** — fasttext `lid.176.ftz` misclassifies short or mixed-language queries; `w_BM25` is set incorrectly | Medium | Low–Medium (BM25 noise bleeds into non-Italian results) | Tier 2 score-based fallback is designed for exactly this; evaluate language detection accuracy on the verse recall query set separately |
 | **A100 availability** — single GPU access is intermittent on Colab Pro; full fine-tune is preempted mid-run | Medium | Medium (delays Phase 1a) | Use LoRA for initial experiments (fits on smaller GPU, faster to checkpoint); reserve full fine-tuning for final run |
-| **Annotation effort underestimate** — 100 thematic queries × 50 candidates × 2 annotators exceeds available bandwidth | Medium | High (blocks Phase 2 evaluation) | 30–40 query pilot first (§6.5); time-box annotation; hard cases set (50 queries) is higher priority than thematic set if effort is constrained |
+| **Annotation effort underestimate** — 100 thematic queries × 50 candidates × 2 annotators exceeds available bandwidth | Medium | High (blocks Phase 2 evaluation) | **Run a 30–40 query pilot annotation first** to validate the rubric and estimate per-query effort before committing to the full set (see §6.5 for staged protocol). If effort is constrained, prioritise the hard-cases set (50 adversarial queries) over the thematic set — it yields more diagnostic signal per annotation hour. |
 | **Translation copyright** — Mandelbaum (1980) and Hollander (2000) are under copyright; public demo may infringe | High | High (demo must be taken down or rebuilt) | Resolve before Phase 3; substitute Norton (1892) / Cary (1814) for demo if licensing cannot be obtained |
 | **Cross-encoder zero-shot insufficient** — mmarco reranker doesn't generalise to medieval-literary content well enough | Low–Medium | Medium (thematic search quality below target) | Ablation in Phase 1b will quantify; graded relevance annotation for reranker fine-tuning is expensive — only pursue if zero-shot nDCG lift is < 0.05 |
 | **BM25 character n-gram index size** — 5-gram indexing of ~14K original Italian lines may produce a large index | Low | Low (still fits in memory; `rank_bm25` is pure Python) | Profile index size at Phase 0; if problematic, reduce to character 4-grams or limit n-gram coverage to token-internal substrings only |
