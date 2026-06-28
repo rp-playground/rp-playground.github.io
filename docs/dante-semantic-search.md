@@ -1,6 +1,6 @@
 # Semantic Search in Dante's Divine Comedy — Solution Design
 
-> **Status:** Draft · **Version:** 0.12 · **Last updated:** 2026-06-28
+> **Status:** Draft · **Version:** 0.13 · **Last updated:** 2026-06-28
 
 ---
 
@@ -8,6 +8,7 @@
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 0.13 | 2026-06-28 | Research-level extensions section added (§13): translation variance as confidence signal, ColBERT-style multi-vector retrieval, interpretability layer; §3 Architecture intro tightened to remove repeated Italian-exclusion rationale; simplified pipeline flow added; §7 phasing intro added; §11 Open Questions restructured to separate open from closed items |
 | 0.12 | 2026-06-28 | Known failure modes section added (§10): abstract thematic queries, multi-tercet concepts, irony/rhetorical inversion, character relational queries; index composition risk added (§5.4): paraphrase dominance in embedding space, detection procedure, and mitigations |
 | 0.11 | 2026-06-28 | Training data redesigned: cross-translation pairs made explicit as hard positives; negative mining restructured into three tiers with adjacent-tercet structural negatives as Tier 1; pair counts updated |
 | 0.10 | 2026-06-28 | Query reformulation evaluation added: logging spec, retrieval delta measurement, per-query-type reporting, and fine-tuning path documented |
@@ -53,8 +54,14 @@ The bounded, exhaustive nature of the corpus is a design asset: ground truth can
 
 ## 3. Architecture Overview
 
-The system uses a **two-stage retrieval pipeline** — the current best practice for dense retrieval. A key architectural decision (v0.3) is that the **original Italian is not part of the retrieval index**. It is a display target, recovered via a static lookup after retrieval. The dense index and BM25 index operate entirely over modern-language representations (translations and paraphrases), which are semantically accessible to pre-trained multilingual models without the archaic vocabulary problem.
+The system uses a **two-stage retrieval pipeline** — the current best practice for dense retrieval. The original Italian is not indexed; it is the displayed result, recovered via lookup after retrieval. Full rationale for this design choice is in §9.
 
+**Pipeline (simplified):**
+```
+Query → [Dense (FAISS) + BM25] → Fusion (RRF) → Dedup (max pool) → Cross-encoder → Lookup → Display
+```
+
+**Full flow (with Phase 2 branch):**
 ```
 User query
     │
@@ -562,6 +569,8 @@ Each step is evaluated on Recall@1, Recall@5, and MRR@10, reported both in aggre
 
 ## 7. Phasing and Milestones
 
+The implementation follows four sequential phases. Each phase has a concrete deliverable that gates the next phase. Phase 0 is prerequisite to all subsequent phases; Phases 1a and 1b are sequential; Phase 2 depends on Phase 1b; Phase 3 requires Phase 2 outputs.
+
 ### Phase 0 — Corpus and Baseline
 
 - [ ] Assemble and clean corpus: original Italian + 3 English translations, aligned at tercet level; assign stable `tercet_id` keys
@@ -714,13 +723,11 @@ The cross-encoder improves this: full attention over the (query, passage) pair c
 
 ## 11. Open Questions
 
-- [x] **Retrieval unit:** Tercet (terzina). Verse-level alignment across translations is unreliable — translators shift line boundaries and semantic closure consistently falls at the three-line unit. Resolved in v0.2.
-- [x] **Archaic vocabulary handling:** Resolved in v0.3. The FAISS index holds only modern-language representations; the archaic Italian is never embedded for retrieval. Residual Italian-query coverage is handled by BM25 over the original text.
-- [x] **Modern Italian paraphrases in the index:** Yes — included. Closes the cross-lingual gap for Italian users querying in contemporary vernacular. Fifth representation per tercet; ~24K total index documents. Resolved in v0.6.
-- [x] **Deduplication strategy:** Max pooling (highest-scoring representation kept). Average pooling is rejected — stylistically specific queries score high against one translation and low against others; averaging penalises correct matches. Resolved in v0.6.
-- [x] **Commentary inclusion:** Kept separate. Commentaries stored as metadata JSON keyed on `tercet_id`, displayed alongside results, never indexed. Indexing commentaries would pollute vectors with outside vocabulary and cause false positives on historically annotated but thematically unrelated tercets. Resolved in v0.6.
-- [ ] **Cross-encoder training:** Fine-tune the reranker on this corpus, or use the multilingual reranker zero-shot? Training data for reranking is harder to construct (requires graded relevance, not binary positives).
-- [x] **Thematic query evaluation:** Resolved in v0.7. 0–3 relevance scale; minimum 2 annotators per query; Cohen's kappa ≥ 0.60 required; pool of 50 candidates per query judged against original Italian + translations; primary metric nDCG@10.
+All design questions identified in the initial draft have been resolved except one. Resolved items are captured in the relevant version's changelog entry.
+
+**Open:**
+
+- [ ] **Cross-encoder training:** Fine-tune the reranker on this corpus, or use the multilingual reranker zero-shot? Reranker training data requires graded relevance judgments — not binary positives — which adds annotation cost. Decision deferred to Phase 1b after measuring zero-shot cross-encoder performance.
 
 ---
 
@@ -733,6 +740,60 @@ The cross-encoder improves this: full attention over the (query, passage) pair c
 | MLflow experiment tracking for training runs | MNIST MLflow project |
 | Ablation-driven evaluation | Structure-vs-recall: logit lens, patching, DLA |
 | Hard negative mining as a form of hard case analysis | OOD detection: near-OOD as hard boundary cases |
+
+---
+
+---
+
+## 13. Research-Level Extensions
+
+The following extensions exceed the scope of the current design but represent genuine research opportunities — empirical questions that this corpus and pipeline are unusually well-positioned to answer.
+
+### 13.1 Translation Variance as Confidence Signal
+
+In the current architecture, the *spread* of bi-encoder scores across a tercet's 5 representations is discarded after max pooling. That spread is information.
+
+High score variance across translations of the same tercet means the query's alignment is sensitive to one translation's specific word choices — the match is brittle. Low variance across high-scoring representations means the tercet aligns with the query regardless of surface form — the match is robust. For scholarly users this distinction is material: a retrieved passage driven by a modern paraphrase is a weaker textual claim than one driven by two independent canonical translations.
+
+**Operationalization:**
+
+```
+conf(tercet, query) = μ(scores) / (1 + σ(scores))
+```
+
+where `μ` and `σ` are mean and standard deviation of bi-encoder similarities across all 5 representations. High mean, low variance → confident match; same mean, high variance → flagged as ambiguous.
+
+**Research contribution:** measure the correlation between `σ(scores)` and human relevance judgments from the thematic annotation set (§6.5). Test whether routing high-variance candidates through an additional cross-encoder pass improves precision. This is a novel calibration question — parallel-corpus retrieval provides the signal; standard single-representation benchmarks cannot. Direct connection to the calibration work in §12.
+
+### 13.2 Multi-Vector Retrieval (ColBERT-style)
+
+The current bi-encoder compresses each passage into a single vector. A tercet about "light as divine metaphor" and a tercet about "light in a forest clearing" may map to nearby points because both compress to the same topical neighbourhood without preserving the distinction.
+
+**ColBERT** (Khattab & Zaharia, 2020) replaces single-vector compression with *token-level late interaction*: each query token computes a maximum similarity (MaxSim) against all passage tokens; the final score is the sum of per-token MaxSims. Fine-grained lexical signal is preserved without the compression bottleneck.
+
+Relevance to this system's known failure modes (§10):
+
+- **Partial recall queries:** a user who remembers one specific word benefits from token-level matching — the query token finds its counterpart without needing the full query to compress into the right neighbourhood.
+- **Mixed-language input:** a query mixing Italian and English ("the selva, dark and overwhelming") has Italian tokens that match via BM25 and English tokens that interact at the token level with translation embeddings. Code-switching that confuses a single-vector encoder is naturally handled at the token level.
+- **Character relational queries (§10.4):** "Virgil hesitates" requires both the character name and the predicate to match — token-level interaction explicitly scores both.
+
+**Implementation:** `pylate` (a `sentence-transformers` extension) provides ColBERT. At ~24K index documents, full token-level storage is tractable without PLAID compression.
+
+**Research framing:** a head-to-head comparison of bi-encoder vs. ColBERT on the verse recall evaluation sets (§6.3), at Recall@1 and MRR@10 per query type, is a well-scoped empirical contribution. The hypothesis — ColBERT gains most on partial-recall and mixed-language queries, loses nothing on full-paraphrase queries — is directly testable with the existing evaluation infrastructure.
+
+### 13.3 Interpretability Layer
+
+The current output is a ranked list of tercets with relevance scores. For scholarly use, "the system returned this passage" is insufficient. A researcher needs to know *which representation* drove the retrieval and *which tokens* in the query and passage were responsible for the match.
+
+Three levels of attribution, in order of implementation cost:
+
+**Level 1 — Which representation matched (free):** The max-pooling deduplication step already knows which of the 5 representations scored highest for each candidate. Surface this alongside results. "Matched via Longfellow 1867" vs. "matched via modern English paraphrase" is material: a match driven by a paraphrase is a weaker textual claim than one driven by a 19th-century verse translation that independently made the same lexical choices.
+
+**Level 2 — Key token attribution:** Apply **Integrated Gradients** to the bi-encoder to identify which query tokens and which passage tokens contributed most to the cosine similarity. For "midway through life's journey", attribution should surface "midway" ↔ "mezzo" ↔ "del cammin" — a legible cross-lingual chain grounded in the text, not a black-box score.
+
+**Level 3 — Cross-encoder attention visualization:** The cross-encoder's final-layer attention weights show which query tokens attended to which passage tokens when computing the relevance score. Visualizing this for the top-ranked result produces a scholar-legible trace of why the reranker placed this tercet first.
+
+**Scholarly upside:** this layer transforms the system from a retrieval engine into a scholarship tool. A Dante scholar can discover which translation's lexical choices made a passage retrievable for a given query — a meta-insight about the translations themselves, not only about the poem. That use case is unavailable from any existing Dante concordance or search tool.
 
 ---
 
