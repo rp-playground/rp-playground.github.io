@@ -1,6 +1,6 @@
 # Semantic Search in Dante's Divine Comedy — Solution Design
 
-> **Status:** Draft · **Version:** 0.6 · **Last updated:** 2026-06-28
+> **Status:** Draft · **Version:** 0.13 · **Last updated:** 2026-06-28
 
 ---
 
@@ -8,6 +8,13 @@
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 0.13 | 2026-06-28 | Research-level extensions section added (§13): translation variance as confidence signal, ColBERT-style multi-vector retrieval, interpretability layer; §3 Architecture intro tightened to remove repeated Italian-exclusion rationale; simplified pipeline flow added; §7 phasing intro added; §11 Open Questions restructured to separate open from closed items |
+| 0.12 | 2026-06-28 | Known failure modes section added (§10): abstract thematic queries, multi-tercet concepts, irony/rhetorical inversion, character relational queries; index composition risk added (§5.4): paraphrase dominance in embedding space, detection procedure, and mitigations |
+| 0.11 | 2026-06-28 | Training data redesigned: cross-translation pairs made explicit as hard positives; negative mining restructured into three tiers with adjacent-tercet structural negatives as Tier 1; pair counts updated |
+| 0.10 | 2026-06-28 | Query reformulation evaluation added: logging spec, retrieval delta measurement, per-query-type reporting, and fine-tuning path documented |
+| 0.9 | 2026-06-28 | Fusion strategy updated: static RRF replaced with query-aware weighted RRF; language detection tier and score-based dynamic tier specified; ablation updated |
+| 0.8 | 2026-06-28 | Query distribution model added: assumed prior over query types with component weighting implications; evaluation set composition updated to mirror distribution |
+| 0.7 | 2026-06-28 | Evaluation section restructured: separate protocols for verse recall and thematic search; Recall@5 added; human annotation protocol specified as mandatory for thematic search with relevance scale, annotator requirements, and inter-annotator agreement threshold |
 | 0.6 | 2026-06-28 | Resolved three open questions: modern Italian paraphrases added to FAISS index; max pooling confirmed for deduplication; commentaries kept as metadata only. Index size updated to ~24K documents; dataset structure, positive pairs, Phase 0 milestones, and infrastructure table updated. |
 | 0.5 | 2026-06-28 | Cross-encoder input specified: highest-scoring bi-encoder representation per tercet; asymmetric reranking rationale documented |
 | 0.4 | 2026-06-28 | BM25 tokenization specified: no stemmer; word unigrams + character 5-grams for robustness to archaic spelling variants and user misremembering |
@@ -47,8 +54,14 @@ The bounded, exhaustive nature of the corpus is a design asset: ground truth can
 
 ## 3. Architecture Overview
 
-The system uses a **two-stage retrieval pipeline** — the current best practice for dense retrieval. A key architectural decision (v0.3) is that the **original Italian is not part of the retrieval index**. It is a display target, recovered via a static lookup after retrieval. The dense index and BM25 index operate entirely over modern-language representations (translations and paraphrases), which are semantically accessible to pre-trained multilingual models without the archaic vocabulary problem.
+The system uses a **two-stage retrieval pipeline** — the current best practice for dense retrieval. The original Italian is not indexed; it is the displayed result, recovered via lookup after retrieval. Full rationale for this design choice is in §9.
 
+**Pipeline (simplified):**
+```
+Query → [Dense (FAISS) + BM25] → Fusion (RRF) → Dedup (max pool) → Cross-encoder → Lookup → Display
+```
+
+**Full flow (with Phase 2 branch):**
 ```
 User query
     │
@@ -107,13 +120,35 @@ The tokenization strategy is instead:
 
 The two token types are combined in the same BM25 index. Exact word matches score higher (high IDF on rare archaic words); character n-gram matches provide softer signal when exact match fails. For English or modern Italian queries, the BM25 track produces near-zero scores and the dense track dominates — the correct behaviour.
 
-Combined with the dense track via **Reciprocal Rank Fusion (RRF)**:
+Combined with the dense track via **query-aware weighted RRF**:
 
 ```
-score_rrf(d) = Σ  1 / (k + rank_i(d))
+score(d) = 1/(k + rank_dense(d))  +  w_BM25(q) * 1/(k + rank_BM25(d))
 ```
 
-where `k = 60` (standard) and the sum is over the two ranking lists. No additional parameters to tune.
+where `k = 60` (standard) and `w_BM25(q)` is a **query-dependent weight** — not a static constant. Static RRF (`w_BM25 = 1.0` always) assumes both rankers are equally useful for every query. In this system they are not: BM25 over archaic Italian is valuable for Italian-fragment queries and actively harmful for English queries, where it ranks tercets by irrelevant surface noise.
+
+**Tier 1 — language detection (implemented first):**
+
+Use a lightweight language identification model (`fasttext lid.176.ftz`, 917 KB, <1 ms per query) to classify the query. Apply threshold P(Italian) ≥ 0.6:
+
+| Detected language | w_BM25 | Rationale |
+|-------------------|--------|-----------|
+| Italian | 1.0 | BM25 is primary lexical signal; full weight |
+| Non-Italian | 0.1 | Near-zero but not zero — preserves BM25 signal for Italian proper nouns (Francesca, Virgilio) embedded in English queries |
+
+**Tier 2 — score-based dynamic weighting (refinement, no language detection required):**
+
+Use the BM25 top-1 raw score as a proxy for whether BM25 found a meaningful lexical match. If `max_score_BM25(q) < θ`, the BM25 index has no good matches and should be downweighted automatically:
+
+```
+w_BM25(q) = 1.0  if max_score_BM25(q) >= θ
+             0.1  otherwise
+```
+
+`θ` is calibrated on the development set. This eliminates the language detection dependency and generalises to query types not anticipated at design time (e.g. Latin fragments, proper-noun-heavy queries in other languages). Trade-off: requires score normalisation since raw BM25 scores vary by document length and index statistics.
+
+Both tiers are evaluated in the ablation structure (§6.6).
 
 ### 3.3 Cross-Encoder (Reranker)
 
@@ -136,6 +171,28 @@ The setup is inherently asymmetric: the query is short, user-generated, in moder
 For thematic queries, a small LLM reformulates the user's query into terms closer to what the fine-tuned retriever expects. This is a thin agentic wrapper — not generative RAG — and does not replace the retrieval backbone.
 
 **Design choice rationale:** agentic query expansion handles the semantic gap between modern vernacular ("avevo 35 anni") and the poem's conceptual vocabulary ("viaggio di mezzo cammino", midlife, exile). Fine-tuned embeddings handle tercet-level alignment. Neither alone is sufficient for Phase 2.
+
+**Logging specification:**
+
+Every expansion call must be logged. The reformulation step is otherwise a black box: end-to-end nDCG@10 tells you whether the full pipeline worked, but not whether the LLM helped or hurt. Without logs, failure modes are invisible.
+
+Minimum log record per query:
+
+```json
+{
+  "query_id": "...",
+  "original_query": "avevo 35 anni e mi sentivo perso",
+  "reformulated_query": "midlife disorientation, spiritual crisis, journey, age 35, dark forest",
+  "nDCG10_without_expansion": 0.41,
+  "nDCG10_with_expansion": 0.78,
+  "retrieval_delta": +0.37,
+  "top3_tercets_without": ["Inf.I.1", "Purg.XXX.1", "Par.I.1"],
+  "top3_tercets_with":    ["Inf.I.1", "Inf.I.4", "Purg.XXX.1"],
+  "query_type": "emotional"
+}
+```
+
+`retrieval_delta = nDCG10_with - nDCG10_without` is the primary instrument for evaluating reformulation quality. It is computed query-by-query on the annotated thematic evaluation set, not just as a population mean. See §6.5 for the full measurement protocol.
 
 ---
 
@@ -200,27 +257,85 @@ Tercet unit (terzina — 3 verses, ABA rhyme):
 
 Training pairs have a query on the left and an indexed document (translation or paraphrase) on the right. The original Italian appears only on the query side — as a source of fragment queries — not as a retrieval target.
 
-- `(italian_fragment, translation_EN)` — archaic fragment → English translation; trains the model to surface the right tercet from an Italian-language query
-- `(translation_A, translation_B)` — cross-translation positives; aligns different English renderings of the same tercet
-- `(translation_EN, modern_paraphrase_EN)` — English translation → English paraphrase; paraphrase robustness
-- `(modern_paraphrase_IT, translation_EN)` — modern Italian query → English translation; cross-lingual alignment for domestic Italian traffic
-- `(modern_paraphrase_IT, modern_paraphrase_EN)` — cross-lingual modern paraphrase pairs
-- `(modern_query, translation_EN)` — thematic query → relevant tercet (Phase 2 training data)
+Positive pairs divide into two categories with different roles in training:
 
-With ~4,740 tercets and 5 representations, the retrieval corpus yields ~28K translation↔translation pairs from English alone, and ~40K+ once modern Italian paraphrase pairs are included. Total approaches ~60K without manual annotation.
+#### Standard positives
+
+Query–document pairs where the query is a natural user input and the document is a retrieval target. These anchor the model to the actual retrieval task:
+
+| Pair | Rationale |
+|------|-----------|
+| `(italian_fragment, translation_EN)` | Archaic fragment → English translation; trains cross-lingual alignment for Italian-fragment queries |
+| `(modern_paraphrase_IT, translation_EN)` | Modern Italian query → English translation; cross-lingual alignment for domestic Italian traffic |
+| `(modern_paraphrase_IT, modern_paraphrase_EN)` | Cross-lingual modern paraphrase pairs; ensures Italian queries can surface English paraphrase targets |
+| `(modern_query, translation_EN)` | Thematic query → relevant tercet (Phase 2 training data) |
+
+#### Hard positives (cross-representation pairs)
+
+Any two representations of the **same tercet** form a hard positive pair: they are semantically equivalent (same source text, same meaning) but surface-divergent (different language, register, diction, syntax). Training on these pairs forces the model to learn content-level alignment independent of surface form — the core generalization property needed for thematic search.
+
+This category includes cross-translation pairs (e.g., Longfellow ↔ Mandelbaum ↔ Hollander for the same tercet), translation ↔ paraphrase pairs, and cross-language paraphrase pairs (modern Italian ↔ English paraphrase). These are harder than standard positives because the two representations do not share obvious surface signals — the model cannot rely on lexical overlap, must rely entirely on semantic content.
+
+**Scale with 5 representations per tercet** (3 English translations + 1 English paraphrase + 1 modern Italian paraphrase):
+
+```
+C(5, 2) = 10 cross-representation pairs per tercet
+10 pairs × 4,740 tercets = 47,400 hard positive pairs
+```
+
+This is the largest positive pair category and requires zero manual annotation — all pairs are derived deterministically from the aligned corpus structure.
+
+**Total positive pair budget (approximate):**
+
+| Category | Source | Pairs |
+|----------|--------|-------|
+| Cross-representation hard positives | C(5,2) × 4,740 tercets | ~47,400 |
+| Italian fragment → translation (standard) | 1 fragment × 3 translations × 4,740 | ~14,220 |
+| Modern Italian → translation (standard) | 1 × 3 × 4,740 | ~14,220 |
+| Thematic query → translation (Phase 2) | Manually created | ~1,000–2,000 |
+| **Total** | | **~77K** (without Phase 2 manual) |
+
+Cross-representation hard positives alone account for ~60% of the positive training signal and require no annotation effort.
 
 ### 5.2 Hard Negative Mining
 
-Random negatives (any non-matching verse) are easy to distinguish and produce embeddings with poor boundary precision. Hard negatives — passages that are thematically close but factually wrong — are essential.
+Random negatives (any non-matching tercet) are easy to distinguish and produce embeddings with poor boundary precision. Hard negatives — passages that are close but factually wrong — are essential. Negative mining is structured into three tiers in order of cost: start cheap, add more expensive tiers if the model still fails on boundary cases.
 
-**Mining procedure:**
+#### Tier 1 — Structural negatives (adjacent tercets)
 
-1. Index the retrieval corpus (translations + paraphrases) with a frozen base model
-2. For each document, retrieve top-50 nearest neighbors from the same index
-3. Remove true positives (documents sharing the same `tercet_id`)
-4. Remaining top-K (K = 5–10) are hard negatives for that anchor
+For each anchor tercet, adjacent tercets in the **same Canto** (positions ±1, ±2, ±3 from the anchor) are designated hard negatives without any model inference.
 
-This is standard practice in all strong dense retrieval work (DPR, BGE, E5) and is the single most impactful dataset improvement beyond the basic parallel structure.
+**Why these are hard:** Adjacent tercets share the same scene, characters, poetic register, and often the same lexical field. The narrative does not cut abruptly — Dante is still in the same forest, speaking to the same figures, continuing the same argument. A retriever that hasn't learned fine-grained semantic distinction will conflate adjacent tercets with high confidence.
+
+**Why this tier comes first:** Structural negatives are **deterministic and free**. Given a `tercet_id` (e.g., `Inf.I.4`), the adjacent IDs (`Inf.I.1`, `Inf.I.7`) are computed from the corpus structure with no model inference, no scoring, no index lookup. The entire set of ~4,740 × 6 ≈ 28,000 structural negative pairs can be generated in milliseconds.
+
+**Mining window:** ±1 tercet (immediate neighbors) is the hardest case; ±2 to ±3 adds softer structural negatives as the scene begins to shift. Use ±1 for the primary hard negative set; ±2–3 as supplementary negatives if training loss saturates.
+
+#### Tier 2 — BM25-mined negatives (lexical overlap)
+
+For each anchor document (a translation or paraphrase), run BM25 over the retrieval corpus and retrieve the top-50 results. Remove documents sharing the anchor's `tercet_id` (true positives). The remaining top-K (K = 5–10) are hard negatives.
+
+**Why these are hard:** High BM25 score means high lexical overlap — the negative shares significant vocabulary with the anchor, but is a different tercet. For a model learning semantic similarity, these negatives require distinguishing passages that look similar on the surface but differ in meaning.
+
+**Cost:** Requires a built BM25 index (available from Phase 0 baseline) but no model inference. Index once; mine once.
+
+#### Tier 3 — Dense-mined negatives (semantic similarity)
+
+For each anchor document, run the **frozen base model** over the FAISS index and retrieve the top-50 nearest neighbors by cosine similarity. Remove true positives (same `tercet_id`). The remaining top-K (K = 5–10) are hard negatives.
+
+**Why these are hard:** Dense neighbors are semantically proximate — the model (even before fine-tuning) assigns them high similarity to the anchor. These are the failure cases of the zero-shot model: passages it cannot yet distinguish from the anchor. Training on these directly corrects the model's current worst errors.
+
+**Cost:** Requires running model inference over the full index (~24K documents). Expensive relative to Tiers 1–2 but standard practice in state-of-the-art dense retrieval (DPR, BGE, E5). Run once per training iteration if iterative hard negative refresh is used.
+
+#### Mining order and rationale
+
+| Tier | Source | Inference required | Pairs per anchor | When to apply |
+|------|--------|--------------------|-----------------|---------------|
+| 1 — Structural | Adjacent tercets (±1 to ±3) | None | 2–6 | Always; first |
+| 2 — BM25-mined | BM25 top-K after dedup | BM25 only | 5–10 | After Tier 1; cheap |
+| 3 — Dense-mined | Dense top-K after dedup | Full model inference | 5–10 | After Tier 2; expensive |
+
+Combine tiers: each training example gets Tier 1 negatives by default, supplemented by Tier 2 and Tier 3. If negatives from different tiers coincide (same `tercet_id`), deduplicate. The three-tier structure provides negatives at different levels of difficulty — structural (surface hard), lexical (lexically hard), and semantic (model-hard) — which together prevent the model from gaming any single hardness criterion.
 
 ### 5.3 Training Objective
 
@@ -234,50 +349,227 @@ where `q` is the query, `p+` is the positive passage, and `{pj}` are in-batch ne
 
 Implemented directly in `sentence-transformers` via `MultipleNegativesRankingLoss`.
 
+### 5.4 Index Composition Risk: Paraphrase Dominance
+
+The FAISS index holds 5 representations per tercet: 3 English translations (Longfellow, Mandelbaum, Hollander), 1 English modern paraphrase, and 1 modern Italian paraphrase. These representations are not equivalent in their relationship to the model's pre-trained embedding space.
+
+**The risk:** Modern paraphrases are written in plain, unambiguous contemporary prose. Literary translations — especially Longfellow (1867) — use archaic diction, syntactic inversions, and poetic compression. Pre-trained multilingual models encode plain modern prose more reliably than archaic literary register. As a consequence, paraphrase embeddings may cluster more tightly in the model's embedding space: they are *model-friendly* in a way that canonical translations are not.
+
+Under contrastive training, the model can satisfy the InfoNCE loss primarily by aligning with paraphrase representations, treating literary translations as harder-to-distinguish outliers. At retrieval time this manifests as: modern-language queries surface the correct tercet (paraphrase is the matching representation — correct); translation-fragment queries fail to distinguish between translations from different tercets because those embeddings have been compressed into a region of space the model treats as uniform (incorrect).
+
+**Detection:**
+
+- **Per-representation match rate:** During training, log which representation type resolves the contrastive positive at each step. If paraphrases are the matched positive in ≥ 60% of steps, the model is optimising primarily against paraphrase targets.
+- **Embedding space audit (UMAP):** Plot all index documents colored by representation type. If paraphrases form a tight separate cluster, the embedding space has been distorted in a way that disadvantages literary translations.
+- **Per-type recall (§6.4):** If English-translation-fragment queries score significantly lower Recall@1 than modern-paraphrase queries, the model is paraphrase-biased in retrieval. This is the clearest signal because it is measured on held-out queries, not on training dynamics.
+
+**Mitigations, in order of invasiveness:**
+
+| Level | Mitigation | When to apply |
+|-------|-----------|---------------|
+| 1 | Monitor only — log match rate and per-type recall before acting | Phase 1a baseline |
+| 2 | Subsample cross-paraphrase pairs in training; ensure translation↔translation pairs are not under-represented relative to paraphrase pairs | If match rate signal is visible |
+| 3 | Apply higher contrastive loss weight to pairs where the positive is a literary translation | If per-type recall shows divergence |
+| 4 | Add translation-fragment-specific held-out queries per translation; report recall separately per translation | If Mitigation 3 is insufficient |
+
+The monitoring step (Level 1) is mandatory regardless: representation-type match rate is a diagnostic that costs nothing to log and makes paraphrase dominance detectable before it becomes a hard-to-diagnose retrieval failure.
+
 ---
 
 ## 6. Evaluation Framework
 
-**Ground truth must be defined before training.**
+**Ground truth must be defined before training.** The two retrieval tasks have fundamentally different evaluation structures and cannot share a single protocol:
 
-### 6.1 Evaluation Sets
+| Property | Verse recall (Phase 1) | Thematic search (Phase 2) |
+|----------|----------------------|--------------------------|
+| Ground truth construction | Automatic (parallel corpus) | Human annotation — mandatory |
+| Relevance type | Binary (one correct tercet per query) | Graded (multiple tercets may be relevant) |
+| Correct answers per query | Exactly one | One or many |
+| Primary metric | Recall@1 | nDCG@10 |
 
-| Set | Size | Construction | Purpose |
-|-----|------|--------------|---------|
-| Translation pairs | ~4,740 | Automatic (parallel corpus, tercet-aligned) | Measures cross-lingual alignment |
-| Paraphrase queries | 200 | Hand-crafted | Measures paraphrase robustness |
-| Thematic queries | 100 | Hand-crafted | Phase 2 evaluation |
-| Hard cases | 50 | Adversarially selected | Boundary analysis |
+---
 
-Hard cases include: false cognates between archaic Italian and modern Italian, verses from the same Canto that are thematically adjacent, and queries that match multiple Canticles.
+### 6.1 Query Distribution Model
 
-### 6.2 Metrics
+The expected distribution of query types determines: (a) the relative importance of BM25 vs. dense retrieval in RRF weighting, (b) the training data allocation across pair types, and (c) the composition of the evaluation sets. Without an explicit distribution, these choices are arbitrary.
 
-| Metric | Definition | Target |
-|--------|------------|--------|
-| Recall@1 | Correct tercet in top-1 result | > 0.85 (verse recall) |
-| Recall@10 | Correct tercet in top-10 | > 0.97 |
-| MRR@10 | Mean Reciprocal Rank at 10 | > 0.88 |
-| NDCG@10 | Normalized Discounted Cumulative Gain | > 0.90 |
+The following is an **assumed prior** based on the likely user population (Italian literary users, English translation readers, general public). It must be validated and updated post-launch via query logging.
 
-### 6.3 Ablation Structure
+**Phase-level split (estimated):**
 
-Every improvement is measured against a defined baseline chain:
+| Phase | Traffic share |
+|-------|--------------|
+| Verse recall (Phase 1) | ~70% |
+| Thematic search (Phase 2) | ~30% |
+
+**Verse recall — query type breakdown (% of Phase 1 traffic):**
+
+| Type | Example | Est. % | Primary retrieval track |
+|------|---------|--------|------------------------|
+| Exact / near-exact Italian fragment | "nel mezzo del cammin" | 20% | BM25 (archaic Italian) |
+| Modern Italian paraphrase | "a metà della mia vita" | 25% | Dense (modern IT reps) |
+| English translation fragment | "midway upon the journey" | 20% | Dense (EN translations) |
+| English semantic paraphrase | "halfway through life's journey" | 35% | Dense (EN paraphrases) |
+
+**Thematic search — query type breakdown (% of Phase 2 traffic):**
+
+| Type | Example | Est. % |
+|------|---------|--------|
+| Emotional / experiential | "I was lost and afraid at 35" | 50% |
+| Conceptual / character reference | "storia di Paolo e Francesca" | 30% |
+| Cross-domain metaphor | "standing at a crossroads" | 20% |
+
+**Implications for component weighting:**
+
+- BM25 is the primary track for ~14% of total queries (20% of 70% Phase 1 traffic). For all other queries, BM25 contributes noise; the dense track should dominate.
+- This sets a prior for the RRF `α` parameter: start with BM25 weight ≈ 0.2, dense weight ≈ 0.8, tune on the development set.
+- LLM query expansion is relevant for 100% of Phase 2 (thematic) traffic — ~30% of total. Its latency cost is therefore significant at scale and must be measured in Phase 2 profiling.
+
+**Implication for evaluation set composition:**
+
+The Phase 1 evaluation set of 200 paraphrase recall queries should be composed to mirror the distribution:
+
+| Query type | Target count |
+|------------|-------------|
+| Exact / near-exact Italian fragment | 40 |
+| Modern Italian paraphrase | 50 |
+| English translation fragment | 40 |
+| English semantic paraphrase | 70 |
+
+The Phase 2 evaluation set of 100 thematic queries:
+
+| Query type | Target count |
+|------------|-------------|
+| Emotional / experiential | 50 |
+| Conceptual / character reference | 30 |
+| Cross-domain metaphor | 20 |
+
+Metrics must also be reported **per query type**, not only in aggregate — a system that achieves 0.90 Recall@1 overall but 0.40 on Italian fragments has a specific, actionable failure mode that the aggregate number hides.
+
+---
+
+### 6.3 Evaluation Sets
+
+| Set | Phase | Size | Construction |
+|-----|-------|------|--------------|
+| Cross-lingual recall | 1 | ~4,740 | Automatic: each translation → its source tercet |
+| Paraphrase recall | 1 | 200 | Hand-crafted: distributed per §6.1 query type targets |
+| Hard cases | 1 | 50 | Adversarially selected (see below) |
+| Thematic queries | 2 | 100 | Hand-crafted: distributed per §6.1 query type targets |
+
+**Hard cases** for verse recall include: false cognates between archaic and modern Italian that mislead the dense retriever; tercets from the same Canto that are thematically adjacent (test boundary precision); queries that could plausibly match passages across multiple Canticles.
+
+---
+
+### 6.4 Verse Recall Metrics (Phase 1)
+
+Ground truth is **unique and automatic**: each query has exactly one correct answer, derived from the parallel corpus alignment. Relevance is binary.
+
+| Metric | Definition | Target | Notes |
+|--------|------------|--------|-------|
+| **Recall@1** | Correct tercet is the top-1 result | > 0.85 | Primary metric — the system either finds it or it doesn't |
+| **Recall@5** | Correct tercet appears in top 5 | > 0.95 | Secondary — if not in top 5 the system has meaningfully failed |
+| **MRR@10** | Mean Reciprocal Rank at cutoff 10 | > 0.88 | Captures partial credit for near-misses; sensitive to rank position |
+
+Recall@10 is deliberately excluded as a primary metric: for verse recall, a system that requires 10 results to surface the correct tercet is not fit for purpose. Recall@5 is the practical failure threshold.
+
+All metrics must be reported **per query type** (Italian fragment / modern Italian / EN fragment / EN paraphrase) in addition to aggregate — a system scoring 0.90 Recall@1 overall but 0.40 on Italian fragments has a specific, actionable failure mode that the aggregate hides.
+
+---
+
+### 6.5 Thematic Search Metrics (Phase 2)
+
+Ground truth is **non-unique and graded**: multiple tercets may be relevant to a thematic query at different degrees. Human annotation is not optional — there is no automatic proxy for thematic relevance.
+
+#### Relevance Scale
+
+| Score | Label | Definition |
+|-------|-------|------------|
+| 0 | Not relevant | Passage has no meaningful connection to the query |
+| 1 | Marginally relevant | Shares surface theme but does not illuminate the query |
+| 2 | Relevant | Passage meaningfully addresses the query's theme |
+| 3 | Highly relevant | Passage is a strong, direct match; a reader would find it valuable |
+
+#### Annotation Protocol
+
+- **Annotators:** minimum 2 per query; disagreements resolved by adjudication (third annotator or majority vote)
+- **Inter-annotator agreement:** Cohen's kappa ≥ 0.60 required before annotations are used for evaluation; queries below threshold are re-annotated or removed
+- **Scope:** annotators assess the original Italian tercet alongside its translations — relevance is judged on meaning, not surface form
+- **Pool size:** each query is judged against a pool of 50 candidate tercets (top-50 from the baseline retriever), not the full corpus
+
+#### Metrics
+
+| Metric | Definition | Target | Notes |
+|--------|------------|--------|-------|
+| **nDCG@10** | Normalised Discounted Cumulative Gain at 10 | > 0.70 | Primary — accounts for graded relevance and rank position |
+| **nDCG@5** | nDCG at cutoff 5 | > 0.65 | Stricter; tests whether top results are the best results |
+
+nDCG is the correct metric here because it rewards surfacing highly relevant passages (score 3) higher in the ranking over marginally relevant ones (score 1), and discounts relevance logarithmically by rank.
+
+#### Reformulation Quality Evaluation
+
+The LLM expansion step must be evaluated independently, not only as part of the end-to-end pipeline. The instrument is **retrieval delta** — the change in nDCG@10 attributable to reformulation alone, measured on the annotated thematic evaluation set.
+
+**Measurement procedure:**
+1. Run all 100 thematic queries through the pipeline **without** expansion (raw query → retriever)
+2. Run the same queries **with** LLM expansion (reformulated query → retriever)
+3. For each query: `delta_i = nDCG10_with(i) - nDCG10_without(i)`
+
+**Reporting — do not report the mean alone:**
+
+| Statistic | What it reveals |
+|-----------|----------------|
+| Mean delta | Overall tendency; can be positive even when many queries are harmed |
+| % queries with delta > 0 | Fraction where expansion helped |
+| % queries with delta < 0 | Fraction where expansion actively hurt — the critical failure signal |
+| % queries with \|delta\| < 0.05 | Fraction where expansion had no meaningful effect |
+| Delta by query type | Whether expansion helps emotional queries more than conceptual ones |
+
+A mean delta of +0.12 with 35% of queries having delta < 0 is a system with a significant failure mode hiding behind a positive average. Per-query distribution exposes this.
+
+**Qualitative inspection:**
+
+Sample 20–30 (original, reformulated) pairs from queries with the largest negative delta and inspect manually. Common failure modes:
+- **Overspecification:** LLM adds concepts not implied by the query, retrieving thematically adjacent but wrong tercets
+- **Hallucination:** LLM introduces characters or events not actually in the poem, biasing the retriever toward false matches
+- **Register mismatch:** reformulation in archaic or scholarly register that does not match the fine-tuned retriever's training distribution
+
+#### Fine-Tuning Path
+
+If the delta distribution reveals systematic failure modes in specific query types, the reformulator can be improved without changing the retrieval backbone:
+
+1. Collect (original_query, reformulated_query, delta) triples from the evaluation set
+2. Positive examples: reformulations with delta > 0 (expansion helped)
+3. Negative examples: reformulations with delta < 0 (expansion hurt)
+4. Fine-tune a small sequence-to-sequence model (e.g. mT5-base) on positive examples using standard supervised fine-tuning
+5. Use retrieval delta as the reward signal — this is equivalent to offline RLHF for query reformulation, with nDCG@10 delta as the proxy for human preference
+
+This path is only warranted if prompt engineering fails to close the gap, and only after the annotated evaluation set is large enough to provide reliable signal (≥ 200 thematic queries with human judgments).
+
+---
+
+### 6.6 Ablation Structure (Phase 1)
+
+Every Phase 1 improvement is measured against a defined baseline chain on the verse recall evaluation sets:
 
 ```
-BM25 only
-  → Zero-shot bi-encoder (no fine-tuning)
+BM25 only (word unigrams + character 5-grams, original Italian)
+  → Zero-shot bi-encoder (multilingual-e5-large, no fine-tuning)
     → Fine-tuned bi-encoder (random negatives)
       → Fine-tuned bi-encoder (hard negatives)
-        → Hybrid BM25 + dense (RRF)
-          → Hybrid + cross-encoder reranker
+        → Hybrid: static RRF (w_BM25 = 1.0)
+          → Hybrid: query-aware RRF, Tier 1 (language detection)
+            → Hybrid: query-aware RRF, Tier 2 (score-based dynamic weighting)
+              → Full pipeline + cross-encoder reranker
 ```
 
-This structure makes it possible to attribute performance gains to specific design decisions rather than to the system as a whole.
+Each step is evaluated on Recall@1, Recall@5, and MRR@10, reported both in aggregate and per query type. The two query-aware fusion steps are evaluated separately to isolate their contribution — language detection and score-based weighting are not equivalent and may perform differently across query type distributions.
 
 ---
 
 ## 7. Phasing and Milestones
+
+The implementation follows four sequential phases. Each phase has a concrete deliverable that gates the next phase. Phase 0 is prerequisite to all subsequent phases; Phases 1a and 1b are sequential; Phase 2 depends on Phase 1b; Phase 3 requires Phase 2 outputs.
 
 ### Phase 0 — Corpus and Baseline
 
@@ -318,10 +610,12 @@ This structure makes it possible to attribute performance gains to specific desi
 
 ### Phase 2 — Thematic Search
 
-- [ ] Define thematic query evaluation set (100 queries, graded relevance)
-- [ ] Implement LLM query expansion (prompt: modern expression → poem-space concepts)
-- [ ] Evaluate thematic search: expansion alone / dense alone / expansion + dense
-- [ ] Failure mode analysis: where does thematic search break?
+- [ ] Define thematic query evaluation set (100 queries, graded relevance, distributed per §6.1 targets)
+- [ ] Implement LLM query expansion with structured logging (original query, reformulated query, retrieval delta per §3.4 spec)
+- [ ] Measure retrieval delta distribution: mean, % helped, % hurt, % neutral, by query type
+- [ ] Qualitative inspection of 20–30 highest-negative-delta (original, reformulated) pairs — identify failure mode taxonomy
+- [ ] Evaluate thematic search end-to-end: expansion alone / dense alone / expansion + dense; report nDCG@10 and nDCG@5
+- [ ] Failure mode analysis: where does thematic search break and does it break at the expansion step or the retrieval step?
 
 **Deliverable:** thematic search pipeline; evaluation results; failure taxonomy
 
@@ -331,6 +625,7 @@ This structure makes it possible to attribute performance gains to specific desi
 
 - [ ] UMAP of tercet embeddings colored by Canticle, then by Canto — do embeddings reflect the poem's structure?
 - [ ] Retrieval score calibration: plot score vs. precision; apply temperature scaling if needed
+- [ ] If reformulation delta analysis (Phase 2) reveals systematic failure modes: fine-tune a small reformulator (mT5-base) on positive delta examples — only if prompt engineering has failed to close the gap and ≥ 200 annotated thematic queries are available
 - [ ] Interactive Hugging Face Space demo
 
 **Deliverable:** UMAP plots; calibration analysis; public demo
@@ -373,6 +668,9 @@ After FAISS retrieval and deduplication, each candidate tercet is represented by
 **Why no stemmer for BM25, and why character n-grams?**
 Standard Italian stemmers (Snowball) were designed for modern Italian morphology and produce incorrect stems on medieval Florentine. Not stemming is strictly better. Character 5-grams are added as supplementary tokens to handle the realistic failure modes for this track: archaic spelling variants (*diritta* vs. *dritta*), clitic compounds (*ritrovami*), and fragments a user half-remembers. Word unigrams retain exact-match precision for the common case; character n-grams provide fuzzy robustness for the edge cases. This is the same design used in production search engines (Elasticsearch's edge n-gram filter) for morphologically complex or domain-specific vocabularies.
 
+**Why query-aware fusion instead of static RRF?**
+Static RRF with fixed `k` assumes both rankers are beneficial for every query. In this system the BM25 track runs over archaic Italian text — a representation that is useful only for queries containing Italian fragments (~14% of estimated total traffic). For all other queries, the BM25 track adds noise: it produces rankings based on surface overlap between modern-language queries and medieval text, which is largely accidental. Blending this noise into the final score via static RRF harms precision. Query-aware weighting sets `w_BM25` to near-zero for non-Italian queries, effectively bypassing BM25 without the overhead of running two completely independent pipelines. The two-tier design (language detection → score-based) provides a degradation path: if language detection fails or is unavailable, Tier 2 falls back to a signal that is always available (the BM25 top-1 score itself).
+
 **Why include modern Italian paraphrases in the FAISS index?**
 English translations alone leave a cross-lingual gap for Italian users querying with contemporary vernacular (e.g., "storia di Paolo e Francesca", "paura nella foresta"). The BM25 track over the archaic original does not close this gap — BM25 matches surface tokens, not modern Italian meaning. Modern Italian paraphrases give the bi-encoder an explicit target in the right language and register, routing domestic Italian traffic through the dense track rather than the less precise BM25 track.
 
@@ -387,19 +685,53 @@ The original text is in medieval Florentine — a language with significant lexi
 
 ---
 
-## 10. Open Questions
+## 10. Known Failure Modes
 
-- [x] **Retrieval unit:** Tercet (terzina). Verse-level alignment across translations is unreliable — translators shift line boundaries and semantic closure consistently falls at the three-line unit. Resolved in v0.2.
-- [x] **Archaic vocabulary handling:** Resolved in v0.3. The FAISS index holds only modern-language representations; the archaic Italian is never embedded for retrieval. Residual Italian-query coverage is handled by BM25 over the original text.
-- [x] **Modern Italian paraphrases in the index:** Yes — included. Closes the cross-lingual gap for Italian users querying in contemporary vernacular. Fifth representation per tercet; ~24K total index documents. Resolved in v0.6.
-- [x] **Deduplication strategy:** Max pooling (highest-scoring representation kept). Average pooling is rejected — stylistically specific queries score high against one translation and low against others; averaging penalises correct matches. Resolved in v0.6.
-- [x] **Commentary inclusion:** Kept separate. Commentaries stored as metadata JSON keyed on `tercet_id`, displayed alongside results, never indexed. Indexing commentaries would pollute vectors with outside vocabulary and cause false positives on historically annotated but thematically unrelated tercets. Resolved in v0.6.
-- [ ] **Cross-encoder training:** Fine-tune the reranker on this corpus, or use the multilingual reranker zero-shot? Training data for reranking is harder to construct (requires graded relevance, not binary positives).
-- [ ] **Thematic query evaluation:** Graded relevance (1–3 scale) for thematic queries requires human judgment. Who judges, and what is the annotation protocol?
+Every retrieval system has a failure boundary. Stating it explicitly serves two purposes: it constrains the claimed scope of the design, and it identifies what the evaluation sets must cover to be credible. The following failure modes are **known and architectural** — they cannot be resolved by training better embeddings alone.
+
+### 10.1 Highly abstract thematic queries
+
+Queries like "the nature of divine love" or "the relationship between reason and faith" have no single retrievable tercet as an answer. The meaning is distributed across the poem, emergent from hundreds of passages in aggregate. The bi-encoder maps the query to a single embedding and retrieves single tercets — the retrieval paradigm itself cannot surface distributed concepts.
+
+LLM query expansion (Phase 2) partially mitigates this: decomposing the abstract query into specific sub-themes ("God as light", "Beatrice as grace", "reason failing where faith begins") produces multiple targeted queries whose union covers more of the relevant tercets. But this is workaround, not solution — the user receives a list of passages, not a synthesised answer about the poem's theology.
+
+**Evaluation implication:** the thematic query set (§6.3) should include ≥10 abstract queries of this type, with a lower nDCG@10 target than concrete thematic queries. The target for this subtype should be set after measuring zero-shot performance, not assumed.
+
+### 10.2 Multi-tercet concepts
+
+Dante's narrative develops across sequences of 3–10 consecutive tercets: extended Homeric similes, dialogue exchanges, the progressive stages of Dante's emotional transformation as he enters each realm. A single tercet is frequently not the unit of meaning — it is an incomplete phrase in a longer syntactic or rhetorical structure.
+
+This is a **deliberate scope constraint**, not a solvable failure mode. The system retrieves tercets. A user whose intent spans multiple consecutive tercets will receive the most relevant tercet in the sequence, not the full passage. The display layer can partially compensate by showing the retrieved tercet plus its immediate neighbors (±1), but this is a UX mitigation — the retrieval problem itself is not resolved.
+
+### 10.3 Irony and rhetorical inversion
+
+Dante uses irony systematically — praising what he condemns, expressing admiration that is contempt, putting sincere belief in the mouths of characters who lack it. A query for "passages where Dante admires political power" may retrieve tercets in which Dante is at his most caustic toward corrupt rulers. The bi-encoder matches semantic surface similarity between the query and the text; it cannot distinguish sincere assertion from performative statement.
+
+The cross-encoder reranker is also unlikely to resolve this. Cross-encoders learn joint relevance from training data; without training pairs that explicitly flag ironic tercets as non-relevant to their literal-reading query counterparts, the reranker has no signal to distinguish them.
+
+**Mitigation path:** ironic passages could be flagged in the metadata store (e.g., from Hollander's commentary, which explicitly notes rhetorical inversion) and excluded from — or down-ranked in — retrieval for literal-intent queries. This requires query intent classification (is the user asking about sincere passages or rhetorical ones?) and is a Phase 3+ concern.
+
+### 10.4 Character-based relational queries
+
+Queries like "where Virgil hesitates", "when Beatrice smiles", or "tercets where Dante weeps" require identifying a character and a specific action or state attributed to that character. The bi-encoder embeds the tercet holistically — a tercet that mentions Virgil prominently but in a guiding rather than hesitating role may score high against "Virgil hesitates" because "Virgil" matches strongly and "hesitates" matches weakly.
+
+The cross-encoder improves this: full attention over the (query, passage) pair can attend to the specific predicate. But cross-encoder gains here depend on how frequently such query types appear in the training data for the base cross-encoder model. Without targeted training pairs that stress-test character-predicate distinction, performance on this query type is unpredictable.
+
+**Evaluation implication:** the hard cases set (§6.3, 50 adversarial queries) should include ≥10 character-based relational queries covering all three Canticles and multiple characters. These queries are the sharpest test of boundary precision between adjacent tercets.
 
 ---
 
-## 11. Connections to Existing Work
+## 11. Open Questions
+
+All design questions identified in the initial draft have been resolved except one. Resolved items are captured in the relevant version's changelog entry.
+
+**Open:**
+
+- [ ] **Cross-encoder training:** Fine-tune the reranker on this corpus, or use the multilingual reranker zero-shot? Reranker training data requires graded relevance judgments — not binary positives — which adds annotation cost. Decision deferred to Phase 1b after measuring zero-shot cross-encoder performance.
+
+---
+
+## 12. Connections to Existing Work
 
 | This project | Prior work on this site |
 |---|---|
@@ -408,6 +740,60 @@ The original text is in medieval Florentine — a language with significant lexi
 | MLflow experiment tracking for training runs | MNIST MLflow project |
 | Ablation-driven evaluation | Structure-vs-recall: logit lens, patching, DLA |
 | Hard negative mining as a form of hard case analysis | OOD detection: near-OOD as hard boundary cases |
+
+---
+
+---
+
+## 13. Research-Level Extensions
+
+The following extensions exceed the scope of the current design but represent genuine research opportunities — empirical questions that this corpus and pipeline are unusually well-positioned to answer.
+
+### 13.1 Translation Variance as Confidence Signal
+
+In the current architecture, the *spread* of bi-encoder scores across a tercet's 5 representations is discarded after max pooling. That spread is information.
+
+High score variance across translations of the same tercet means the query's alignment is sensitive to one translation's specific word choices — the match is brittle. Low variance across high-scoring representations means the tercet aligns with the query regardless of surface form — the match is robust. For scholarly users this distinction is material: a retrieved passage driven by a modern paraphrase is a weaker textual claim than one driven by two independent canonical translations.
+
+**Operationalization:**
+
+```
+conf(tercet, query) = μ(scores) / (1 + σ(scores))
+```
+
+where `μ` and `σ` are mean and standard deviation of bi-encoder similarities across all 5 representations. High mean, low variance → confident match; same mean, high variance → flagged as ambiguous.
+
+**Research contribution:** measure the correlation between `σ(scores)` and human relevance judgments from the thematic annotation set (§6.5). Test whether routing high-variance candidates through an additional cross-encoder pass improves precision. This is a novel calibration question — parallel-corpus retrieval provides the signal; standard single-representation benchmarks cannot. Direct connection to the calibration work in §12.
+
+### 13.2 Multi-Vector Retrieval (ColBERT-style)
+
+The current bi-encoder compresses each passage into a single vector. A tercet about "light as divine metaphor" and a tercet about "light in a forest clearing" may map to nearby points because both compress to the same topical neighbourhood without preserving the distinction.
+
+**ColBERT** (Khattab & Zaharia, 2020) replaces single-vector compression with *token-level late interaction*: each query token computes a maximum similarity (MaxSim) against all passage tokens; the final score is the sum of per-token MaxSims. Fine-grained lexical signal is preserved without the compression bottleneck.
+
+Relevance to this system's known failure modes (§10):
+
+- **Partial recall queries:** a user who remembers one specific word benefits from token-level matching — the query token finds its counterpart without needing the full query to compress into the right neighbourhood.
+- **Mixed-language input:** a query mixing Italian and English ("the selva, dark and overwhelming") has Italian tokens that match via BM25 and English tokens that interact at the token level with translation embeddings. Code-switching that confuses a single-vector encoder is naturally handled at the token level.
+- **Character relational queries (§10.4):** "Virgil hesitates" requires both the character name and the predicate to match — token-level interaction explicitly scores both.
+
+**Implementation:** `pylate` (a `sentence-transformers` extension) provides ColBERT. At ~24K index documents, full token-level storage is tractable without PLAID compression.
+
+**Research framing:** a head-to-head comparison of bi-encoder vs. ColBERT on the verse recall evaluation sets (§6.3), at Recall@1 and MRR@10 per query type, is a well-scoped empirical contribution. The hypothesis — ColBERT gains most on partial-recall and mixed-language queries, loses nothing on full-paraphrase queries — is directly testable with the existing evaluation infrastructure.
+
+### 13.3 Interpretability Layer
+
+The current output is a ranked list of tercets with relevance scores. For scholarly use, "the system returned this passage" is insufficient. A researcher needs to know *which representation* drove the retrieval and *which tokens* in the query and passage were responsible for the match.
+
+Three levels of attribution, in order of implementation cost:
+
+**Level 1 — Which representation matched (free):** The max-pooling deduplication step already knows which of the 5 representations scored highest for each candidate. Surface this alongside results. "Matched via Longfellow 1867" vs. "matched via modern English paraphrase" is material: a match driven by a paraphrase is a weaker textual claim than one driven by a 19th-century verse translation that independently made the same lexical choices.
+
+**Level 2 — Key token attribution:** Apply **Integrated Gradients** to the bi-encoder to identify which query tokens and which passage tokens contributed most to the cosine similarity. For "midway through life's journey", attribution should surface "midway" ↔ "mezzo" ↔ "del cammin" — a legible cross-lingual chain grounded in the text, not a black-box score.
+
+**Level 3 — Cross-encoder attention visualization:** The cross-encoder's final-layer attention weights show which query tokens attended to which passage tokens when computing the relevance score. Visualizing this for the top-ranked result produces a scholar-legible trace of why the reranker placed this tercet first.
+
+**Scholarly upside:** this layer transforms the system from a retrieval engine into a scholarship tool. A Dante scholar can discover which translation's lexical choices made a passage retrievable for a given query — a meta-insight about the translations themselves, not only about the poem. That use case is unavailable from any existing Dante concordance or search tool.
 
 ---
 
