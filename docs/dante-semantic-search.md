@@ -1,6 +1,6 @@
 # Semantic Search in Dante's Divine Comedy — Solution Design
 
-> **Status:** Draft · **Version:** 0.3 · **Last updated:** 2026-06-28
+> **Status:** Draft · **Version:** 0.4 · **Last updated:** 2026-06-28
 
 ---
 
@@ -8,6 +8,7 @@
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 0.4 | 2026-06-28 | BM25 tokenization specified: no stemmer; word unigrams + character 5-grams for robustness to archaic spelling variants and user misremembering |
 | 0.3 | 2026-06-28 | Retrieval architecture changed: original Italian is a display target (lookup), not a retrieval corpus; FAISS index holds translations and paraphrases only; BM25 repurposed as Italian-language lexical track; dataset, infrastructure, and design decisions updated |
 | 0.2 | 2026-06-28 | Retrieval unit changed from verse to tercet; corpus size updated; dataset structure, evaluation counts, and open questions updated accordingly |
 | 0.1 | 2026-06-28 | Initial draft — project framing, architecture, dataset strategy, phasing |
@@ -92,13 +93,24 @@ Rationale: both are state-of-the-art multilingual dense retrieval models trained
 
 BM25 runs over the **original Italian tercets** and serves a specific, narrow role: handling user queries that contain Italian fragments from memory (e.g., "selva oscura", "mi ritrovai"). The dense FAISS index holds only modern-language representations and would not reliably retrieve these via semantic similarity. BM25 over the original handles lexical match directly, without requiring the model to understand archaic vocabulary.
 
+**Tokenization — no stemmer; word unigrams + character 5-grams:**
+
+Standard Italian stemmers (Snowball and equivalents) assume modern grammatical rules. Medieval Florentine has different conjugation patterns, heavy clitic attachment, and orthographic variants (e.g., *diritta* vs. *dritta*, pronoun-clitic compounds like *ritrovami*) that a modern stemmer handles incorrectly or fails to normalise. Applying Snowball here is worse than not stemming at all.
+
+The tokenization strategy is instead:
+
+- **Word unigrams** (lowercase, alphanumeric only): provide exact-match signal for the majority of queries where the user remembers the word correctly. Rare archaic words like *selva*, *oscura*, *ritrovai* have high IDF and dominate the score when they match exactly.
+- **Character 5-grams**: index each word's character substrings of length 5 as supplementary tokens. This makes the index robust to suffix variation, spelling variants, and partial recall — "ritro" bridges *ritrovai* and any misremembered form that shares a root; "diritt" bridges *diritta* and *dritta*. Size 5 is the right tradeoff: long enough to avoid false positives on common substrings ("della", "della"), short enough to catch most archaic variants.
+
+The two token types are combined in the same BM25 index. Exact word matches score higher (high IDF on rare archaic words); character n-gram matches provide softer signal when exact match fails. For English or modern Italian queries, the BM25 track produces near-zero scores and the dense track dominates — the correct behaviour.
+
 Combined with the dense track via **Reciprocal Rank Fusion (RRF)**:
 
 ```
 score_rrf(d) = Σ  1 / (k + rank_i(d))
 ```
 
-where `k = 60` (standard) and the sum is over the two ranking lists. No additional parameters to tune. For English queries or modern Italian queries, the BM25 track contributes little and the dense track dominates — which is the correct behaviour.
+where `k = 60` (standard) and the sum is over the two ranking lists. No additional parameters to tune.
 
 ### 3.3 Cross-Encoder (Reranker)
 
@@ -329,6 +341,9 @@ Multiple translations capture interpretive variance. Longfellow's literal prose,
 
 **Why evaluate before training?**
 Defining the evaluation benchmark before any model training eliminates the risk of inadvertently optimizing for the wrong objective. It also forces precision about what "good retrieval" means for this specific task.
+
+**Why no stemmer for BM25, and why character n-grams?**
+Standard Italian stemmers (Snowball) were designed for modern Italian morphology and produce incorrect stems on medieval Florentine. Not stemming is strictly better. Character 5-grams are added as supplementary tokens to handle the realistic failure modes for this track: archaic spelling variants (*diritta* vs. *dritta*), clitic compounds (*ritrovami*), and fragments a user half-remembers. Word unigrams retain exact-match precision for the common case; character n-grams provide fuzzy robustness for the edge cases. This is the same design used in production search engines (Elasticsearch's edge n-gram filter) for morphologically complex or domain-specific vocabularies.
 
 **Why index translations instead of the original Italian?**
 The original text is in medieval Florentine — a language with significant lexical and morphological distance from modern Italian. Pre-trained multilingual models tokenize it poorly: rare tokens, fragmented subwords, low-frequency embeddings. Indexing translations in modern English (and optionally modern Italian paraphrases) sidesteps this entirely: the model operates in a semantic space it was trained on. The original Italian is not lost — it is the displayed result, retrieved via a static lookup keyed on `tercet_id`. This separation of concerns (retrieval over modern representations, display of the original) is analogous to the *document expansion* paradigm in information retrieval, where corpora are enriched with generated text to improve retrieval coverage while the original document remains the authoritative output. The BM25 track over the original Italian handles the residual case of users querying with archaic Italian fragments directly.
