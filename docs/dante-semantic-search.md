@@ -1,6 +1,6 @@
 # Semantic Search in Dante's Divine Comedy — Solution Design
 
-> **Status:** Draft · **Version:** 0.9 · **Last updated:** 2026-06-28
+> **Status:** Draft · **Version:** 0.10 · **Last updated:** 2026-06-28
 
 ---
 
@@ -8,6 +8,7 @@
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 0.10 | 2026-06-28 | Query reformulation evaluation added: logging spec, retrieval delta measurement, per-query-type reporting, and fine-tuning path documented |
 | 0.9 | 2026-06-28 | Fusion strategy updated: static RRF replaced with query-aware weighted RRF; language detection tier and score-based dynamic tier specified; ablation updated |
 | 0.8 | 2026-06-28 | Query distribution model added: assumed prior over query types with component weighting implications; evaluation set composition updated to mirror distribution |
 | 0.7 | 2026-06-28 | Evaluation section restructured: separate protocols for verse recall and thematic search; Recall@5 added; human annotation protocol specified as mandatory for thematic search with relevance scale, annotator requirements, and inter-annotator agreement threshold |
@@ -161,6 +162,28 @@ The setup is inherently asymmetric: the query is short, user-generated, in moder
 For thematic queries, a small LLM reformulates the user's query into terms closer to what the fine-tuned retriever expects. This is a thin agentic wrapper — not generative RAG — and does not replace the retrieval backbone.
 
 **Design choice rationale:** agentic query expansion handles the semantic gap between modern vernacular ("avevo 35 anni") and the poem's conceptual vocabulary ("viaggio di mezzo cammino", midlife, exile). Fine-tuned embeddings handle tercet-level alignment. Neither alone is sufficient for Phase 2.
+
+**Logging specification:**
+
+Every expansion call must be logged. The reformulation step is otherwise a black box: end-to-end nDCG@10 tells you whether the full pipeline worked, but not whether the LLM helped or hurt. Without logs, failure modes are invisible.
+
+Minimum log record per query:
+
+```json
+{
+  "query_id": "...",
+  "original_query": "avevo 35 anni e mi sentivo perso",
+  "reformulated_query": "midlife disorientation, spiritual crisis, journey, age 35, dark forest",
+  "nDCG10_without_expansion": 0.41,
+  "nDCG10_with_expansion": 0.78,
+  "retrieval_delta": +0.37,
+  "top3_tercets_without": ["Inf.I.1", "Purg.XXX.1", "Par.I.1"],
+  "top3_tercets_with":    ["Inf.I.1", "Inf.I.4", "Purg.XXX.1"],
+  "query_type": "emotional"
+}
+```
+
+`retrieval_delta = nDCG10_with - nDCG10_without` is the primary instrument for evaluating reformulation quality. It is computed query-by-query on the annotated thematic evaluation set, not just as a population mean. See §6.5 for the full measurement protocol.
 
 ---
 
@@ -391,6 +414,46 @@ Ground truth is **non-unique and graded**: multiple tercets may be relevant to a
 
 nDCG is the correct metric here because it rewards surfacing highly relevant passages (score 3) higher in the ranking over marginally relevant ones (score 1), and discounts relevance logarithmically by rank.
 
+#### Reformulation Quality Evaluation
+
+The LLM expansion step must be evaluated independently, not only as part of the end-to-end pipeline. The instrument is **retrieval delta** — the change in nDCG@10 attributable to reformulation alone, measured on the annotated thematic evaluation set.
+
+**Measurement procedure:**
+1. Run all 100 thematic queries through the pipeline **without** expansion (raw query → retriever)
+2. Run the same queries **with** LLM expansion (reformulated query → retriever)
+3. For each query: `delta_i = nDCG10_with(i) - nDCG10_without(i)`
+
+**Reporting — do not report the mean alone:**
+
+| Statistic | What it reveals |
+|-----------|----------------|
+| Mean delta | Overall tendency; can be positive even when many queries are harmed |
+| % queries with delta > 0 | Fraction where expansion helped |
+| % queries with delta < 0 | Fraction where expansion actively hurt — the critical failure signal |
+| % queries with \|delta\| < 0.05 | Fraction where expansion had no meaningful effect |
+| Delta by query type | Whether expansion helps emotional queries more than conceptual ones |
+
+A mean delta of +0.12 with 35% of queries having delta < 0 is a system with a significant failure mode hiding behind a positive average. Per-query distribution exposes this.
+
+**Qualitative inspection:**
+
+Sample 20–30 (original, reformulated) pairs from queries with the largest negative delta and inspect manually. Common failure modes:
+- **Overspecification:** LLM adds concepts not implied by the query, retrieving thematically adjacent but wrong tercets
+- **Hallucination:** LLM introduces characters or events not actually in the poem, biasing the retriever toward false matches
+- **Register mismatch:** reformulation in archaic or scholarly register that does not match the fine-tuned retriever's training distribution
+
+#### Fine-Tuning Path
+
+If the delta distribution reveals systematic failure modes in specific query types, the reformulator can be improved without changing the retrieval backbone:
+
+1. Collect (original_query, reformulated_query, delta) triples from the evaluation set
+2. Positive examples: reformulations with delta > 0 (expansion helped)
+3. Negative examples: reformulations with delta < 0 (expansion hurt)
+4. Fine-tune a small sequence-to-sequence model (e.g. mT5-base) on positive examples using standard supervised fine-tuning
+5. Use retrieval delta as the reward signal — this is equivalent to offline RLHF for query reformulation, with nDCG@10 delta as the proxy for human preference
+
+This path is only warranted if prompt engineering fails to close the gap, and only after the annotated evaluation set is large enough to provide reliable signal (≥ 200 thematic queries with human judgments).
+
 ---
 
 ### 6.6 Ablation Structure (Phase 1)
@@ -453,10 +516,12 @@ Each step is evaluated on Recall@1, Recall@5, and MRR@10, reported both in aggre
 
 ### Phase 2 — Thematic Search
 
-- [ ] Define thematic query evaluation set (100 queries, graded relevance)
-- [ ] Implement LLM query expansion (prompt: modern expression → poem-space concepts)
-- [ ] Evaluate thematic search: expansion alone / dense alone / expansion + dense
-- [ ] Failure mode analysis: where does thematic search break?
+- [ ] Define thematic query evaluation set (100 queries, graded relevance, distributed per §6.1 targets)
+- [ ] Implement LLM query expansion with structured logging (original query, reformulated query, retrieval delta per §3.4 spec)
+- [ ] Measure retrieval delta distribution: mean, % helped, % hurt, % neutral, by query type
+- [ ] Qualitative inspection of 20–30 highest-negative-delta (original, reformulated) pairs — identify failure mode taxonomy
+- [ ] Evaluate thematic search end-to-end: expansion alone / dense alone / expansion + dense; report nDCG@10 and nDCG@5
+- [ ] Failure mode analysis: where does thematic search break and does it break at the expansion step or the retrieval step?
 
 **Deliverable:** thematic search pipeline; evaluation results; failure taxonomy
 
@@ -466,6 +531,7 @@ Each step is evaluated on Recall@1, Recall@5, and MRR@10, reported both in aggre
 
 - [ ] UMAP of tercet embeddings colored by Canticle, then by Canto — do embeddings reflect the poem's structure?
 - [ ] Retrieval score calibration: plot score vs. precision; apply temperature scaling if needed
+- [ ] If reformulation delta analysis (Phase 2) reveals systematic failure modes: fine-tune a small reformulator (mT5-base) on positive delta examples — only if prompt engineering has failed to close the gap and ≥ 200 annotated thematic queries are available
 - [ ] Interactive Hugging Face Space demo
 
 **Deliverable:** UMAP plots; calibration analysis; public demo
