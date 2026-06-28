@@ -1,6 +1,6 @@
 # Semantic Search in Dante's Divine Comedy — Solution Design
 
-> **Status:** Draft · **Version:** 0.4 · **Last updated:** 2026-06-28
+> **Status:** Draft · **Version:** 0.5 · **Last updated:** 2026-06-28
 
 ---
 
@@ -8,6 +8,7 @@
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 0.5 | 2026-06-28 | Cross-encoder input specified: highest-scoring bi-encoder representation per tercet; asymmetric reranking rationale documented |
 | 0.4 | 2026-06-28 | BM25 tokenization specified: no stemmer; word unigrams + character 5-grams for robustness to archaic spelling variants and user misremembering |
 | 0.3 | 2026-06-28 | Retrieval architecture changed: original Italian is a display target (lookup), not a retrieval corpus; FAISS index holds translations and paraphrases only; BM25 repurposed as Italian-language lexical track; dataset, infrastructure, and design decisions updated |
 | 0.2 | 2026-06-28 | Retrieval unit changed from verse to tercet; corpus size updated; dataset structure, evaluation counts, and open questions updated accordingly |
@@ -114,7 +115,17 @@ where `k = 60` (standard) and the sum is over the two ranking lists. No addition
 
 ### 3.3 Cross-Encoder (Reranker)
 
-Takes (query, passage) pairs as joint input and produces a scalar relevance score. Slower than the bi-encoder (cannot pre-index) but significantly more accurate. Applied only to the top-K shortlist after deduplication — one (query, best_translation) pair per candidate tercet.
+Takes (query, passage) pairs as joint input and produces a scalar relevance score. Slower than the bi-encoder (cannot pre-index) but significantly more accurate. Applied only to the top-K shortlist after deduplication.
+
+**Input specification — asymmetric reranking:**
+
+The cross-encoder receives one `(query, passage)` pair per candidate tercet. The passage is the **highest-scoring translation** that the bi-encoder retrieved for that tercet — i.e., the representation that survived deduplication. This is the correct choice for two reasons:
+
+1. **Computational efficiency.** Each cross-encoder call is expensive (full attention over the concatenated pair). Passing all 3–4 translations per tercet would multiply calls by the number of representations with no guaranteed gain, since the highest-scoring bi-encoder result is already the best semantic match to the query.
+
+2. **Semantic consistency.** The bi-encoder already selected the translation that is closest to the query in embedding space. Feeding the same representation to the cross-encoder maintains coherence between the two stages — the cross-encoder refines a ranking signal on the same evidence that drove retrieval, not on a different translation that may not align with the query's language or register.
+
+The setup is inherently asymmetric: the query is short, user-generated, in modern language; the passage is a fixed canonical translation in literary English (or a modern paraphrase). The cross-encoder handles this asymmetry natively — it was pre-trained on (query, passage) pairs with the same structure.
 
 **Base model:** `cross-encoder/mmarco-mMiniLMv2-L12-H384` (multilingual, efficient)
 
@@ -341,6 +352,9 @@ Multiple translations capture interpretive variance. Longfellow's literal prose,
 
 **Why evaluate before training?**
 Defining the evaluation benchmark before any model training eliminates the risk of inadvertently optimizing for the wrong objective. It also forces precision about what "good retrieval" means for this specific task.
+
+**Why pass the highest-scoring bi-encoder translation to the cross-encoder?**
+After FAISS retrieval and deduplication, each candidate tercet is represented by its best-matching translation. Passing all translations to the cross-encoder instead would multiply inference time by 3–4× per candidate with no guaranteed improvement — the bi-encoder already selected the translation most aligned to the query. The alternative of concatenating all translations risks exceeding context limits and introduces noise from translations that do not match the query's register. Keeping one passage per tercet through the full pipeline is consistent, efficient, and maintains the semantic signal established at the retrieval stage.
 
 **Why no stemmer for BM25, and why character n-grams?**
 Standard Italian stemmers (Snowball) were designed for modern Italian morphology and produce incorrect stems on medieval Florentine. Not stemming is strictly better. Character 5-grams are added as supplementary tokens to handle the realistic failure modes for this track: archaic spelling variants (*diritta* vs. *dritta*), clitic compounds (*ritrovami*), and fragments a user half-remembers. Word unigrams retain exact-match precision for the common case; character n-grams provide fuzzy robustness for the edge cases. This is the same design used in production search engines (Elasticsearch's edge n-gram filter) for morphologically complex or domain-specific vocabularies.
