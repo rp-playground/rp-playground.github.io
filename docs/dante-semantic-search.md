@@ -1,6 +1,6 @@
 # Semantic Search in Dante's Divine Comedy — Solution Design
 
-> **Status:** Draft · **Version:** 0.14 · **Last updated:** 2026-06-28
+> **Status:** Draft · **Version:** 0.15 · **Last updated:** 2026-06-28
 
 ---
 
@@ -8,6 +8,7 @@
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 0.15 | 2026-06-28 | Executive summary added; §2 licensing note added for canonical translations; §3.1 second-highest representation score surfaced in metadata; §3.4 LLM implementation details added (model, temperature, few-shot, structured output, cost/latency); §6.5 staged annotation pilot (30–40 queries) added before full 100-query annotation; LoRA/QLoFA added to §8 infrastructure and Phase 1a; §12 Risk Register added; §12 Connections → §13; §13 Future Work relabeled and renumbered to §14 |
 | 0.14 | 2026-06-28 | Four targeted improvements: modern Italian paraphrase generation spec tightened (Phase 0: stronger LLM + few-shot from Hollander, stratified spot-check); CoT prompting strategy added to §3.4 query expansion; UMAP moved from Phase 3 to Phase 1a as a diagnostic checkpoint; neighboring tercet display added to Phase 1b milestones |
 | 0.13 | 2026-06-28 | Research-level extensions section added (§13): translation variance as confidence signal, ColBERT-style multi-vector retrieval, interpretability layer; §3 Architecture intro tightened to remove repeated Italian-exclusion rationale; simplified pipeline flow added; §7 phasing intro added; §11 Open Questions restructured to separate open from closed items |
 | 0.12 | 2026-06-28 | Known failure modes section added (§10): abstract thematic queries, multi-tercet concepts, irony/rhetorical inversion, character relational queries; index composition risk added (§5.4): paraphrase dominance in embedding space, detection procedure, and mitigations |
@@ -22,6 +23,36 @@
 | 0.3 | 2026-06-28 | Retrieval architecture changed: original Italian is a display target (lookup), not a retrieval corpus; FAISS index holds translations and paraphrases only; BM25 repurposed as Italian-language lexical track; dataset, infrastructure, and design decisions updated |
 | 0.2 | 2026-06-28 | Retrieval unit changed from verse to tercet; corpus size updated; dataset structure, evaluation counts, and open questions updated accordingly |
 | 0.1 | 2026-06-28 | Initial draft — project framing, architecture, dataset strategy, phasing |
+
+---
+
+## Executive Summary
+
+**Problem:** The Divine Comedy has no usable semantic search tool. Keyword search fails across languages and across the centuries of paraphrase that separate a modern reader from the text. This project builds a retrieval system answering two distinct query classes: *verse recall* (return the matching tercet for a text fragment) and *thematic search* (surface semantically relevant passages for a modern concept or feeling).
+
+**Architecture:** Two-stage pipeline — bi-encoder (FAISS dense retrieval over modern-language translations and paraphrases) + BM25 (original Italian, lexical track) fused via query-aware weighted RRF, reranked by a multilingual cross-encoder. The original Italian is a display target, not a retrieval corpus. Phase 2 adds LLM query expansion with chain-of-thought prompting for thematic queries.
+
+```
+Query → [Dense (FAISS) + BM25] → Fusion (RRF) → Dedup (max pool) → Cross-encoder → Lookup → Display
+```
+
+**Key metric targets:**
+
+| Task | Primary metric | Target |
+|------|---------------|--------|
+| Verse recall (Phase 1) | Recall@1 | > 0.85 |
+| Verse recall (Phase 1) | MRR@10 | > 0.88 |
+| Thematic search (Phase 2) | nDCG@10 | > 0.70 |
+
+**Phase deliverables:**
+
+| Phase | Deliverable |
+|-------|-------------|
+| 0 — Corpus & Baseline | Aligned tercet corpus, BM25 + zero-shot bi-encoder baseline, evaluation harness |
+| 1a — Fine-Tuned Bi-Encoder | Fine-tuned checkpoint, UMAP diagnostic, ablation table |
+| 1b — Hybrid + Reranker | Full retrieval pipeline, latency report |
+| 2 — Thematic Search | Thematic evaluation set, LLM expansion pipeline, delta distribution report |
+| 3 — Visualization & Demo | UMAP extended analysis, calibration plots, public HF Space |
 
 ---
 
@@ -48,6 +79,7 @@ These are distinct retrieval tasks with different evaluation criteria and differ
 | Inference target | Low-latency interactive search (< 300 ms p95) |
 | Training budget | Consumer GPU (single A100 or equivalent) |
 | Serving | Hugging Face Space (public demo) |
+| **Translation licensing** | Longfellow (1867) — public domain. Mandelbaum (1980) and Hollander (2000) are under copyright; their use in a public demo requires explicit permission or a fair-use assessment. Training on these texts for research purposes may qualify as fair use, but serving them publicly does not. **Action item before Phase 3:** confirm licensing or substitute with public-domain translations (e.g. Norton 1892, Cary 1814) for the demo corpus. |
 
 The bounded, exhaustive nature of the corpus is a design asset: ground truth can be constructed completely, and the index fits comfortably in memory.
 
@@ -101,6 +133,8 @@ FAISS index                                                   │
 Encodes query and passages independently into a shared embedding space. At search time, retrieval is a cosine similarity lookup over the FAISS index. The bi-encoder is the component that will be **fine-tuned** on the parallel corpus.
 
 **Index contents:** English translations (×3), English modern paraphrases, and modern Italian paraphrases. Each document carries a `tercet_id` pointing back to the original. Multiple documents share the same `tercet_id`, so results are deduplicated by `tercet_id` before reranking — the **highest-scoring representation per tercet is kept (max pooling)**. Average pooling is explicitly rejected: a query quoting a Longfellow fragment will score high against Longfellow but low against Mandelbaum's poetic rendering; averaging would penalise a correct match. The indexed corpus is ~24K documents (4,740 tercets × 5 representations), still trivially small for FAISS. Commentaries are **not** indexed — they are stored as a separate metadata file keyed on `tercet_id` and surfaced at display time only.
+
+**Representation metadata for scholarly users:** alongside the max-pooled score, store the **second-highest representation score and its representation type** in the result metadata. The gap between the top-1 and top-2 scores is a proxy for match confidence: a large gap means the query aligned strongly with one specific translation; a small gap means the content is consistent across representations (a more robust match). This feeds directly into §14.1 (Translation Variance as Confidence Signal, §14) and is available at zero extra inference cost from the deduplication step.
 
 **Base model:** `intfloat/multilingual-e5-large` or `BAAI/bge-m3`
 
@@ -172,6 +206,17 @@ The setup is inherently asymmetric: the query is short, user-generated, in moder
 For thematic queries, a small LLM reformulates the user's query into terms closer to what the fine-tuned retriever expects. This is a thin agentic wrapper — not generative RAG — and does not replace the retrieval backbone.
 
 **Design choice rationale:** agentic query expansion handles the semantic gap between modern vernacular ("avevo 35 anni") and the poem's conceptual vocabulary ("viaggio di mezzo cammino", midlife, exile). Fine-tuned embeddings handle tercet-level alignment. Neither alone is sufficient for Phase 2.
+
+**Implementation details:**
+
+| Parameter | Recommendation | Rationale |
+|-----------|---------------|-----------|
+| Model | GPT-4o or `claude-sonnet-4-6` (evaluation); GPT-4o-mini or equivalent (production) | Start with the strongest available model to establish ceiling; downgrade once prompting approach is validated |
+| Temperature | 0.0 for evaluation runs; 0.3 for production | Deterministic output needed for repeatable delta measurement; slight diversity helps production |
+| Prompting | Few-shot after zero-shot baseline | Start zero-shot to measure baseline quality; add few-shot examples from high-delta log entries once 20+ are available |
+| Structured output | JSON schema enforcement (function calling / tool use) | Prevents hallucination of output format; ensures `reformulated_query` field is always a string |
+| Cost estimate | ~$0.02–0.05 per query (GPT-4o) | At 30% of traffic being thematic queries, budget accordingly; cache reformulations for identical queries |
+| Latency | 800ms–2s additional p95 | Exceeds the 300ms target — run expansion asynchronously or as a pre-fetch; Phase 2 profiling must measure end-to-end with expansion included |
 
 **Prompting strategy — chain-of-thought before reformulation:**
 
@@ -504,6 +549,20 @@ Ground truth is **non-unique and graded**: multiple tercets may be relevant to a
 
 #### Annotation Protocol
 
+**Staged approach — pilot before full annotation:**
+
+Before committing to all 100 queries, run a **30–40 query pilot**:
+1. Select a stratified subset (covering all three query types and all three Canticles)
+2. Annotate with 2 annotators using the 0–3 scale
+3. Compute kappa on the pilot set
+4. If kappa < 0.50: the rubric is ambiguous — refine definitions, add examples to the annotation guide, and re-annotate the pilot before proceeding
+5. If 0.50 ≤ kappa < 0.60: borderline — hold a calibration session, resolve disagreements collectively, then expand
+6. If kappa ≥ 0.60: proceed to full annotation
+
+The pilot also provides a time estimate per query: annotation of 50-candidate pools for thematic queries typically takes 10–20 minutes per annotator per query. With 100 queries and 2 annotators, budget 35–70 hours of annotation effort before starting.
+
+**Full annotation protocol:**
+
 - **Annotators:** minimum 2 per query; disagreements resolved by adjudication (third annotator or majority vote)
 - **Inter-annotator agreement:** Cohen's kappa ≥ 0.60 required before annotations are used for evaluation; queries below threshold are re-annotated or removed
 - **Scope:** annotators assess the original Italian tercet alongside its translations — relevance is judged on meaning, not surface form
@@ -601,7 +660,7 @@ The implementation follows four sequential phases. Each phase has a concrete del
 
 - [ ] Construct positive pair dataset from parallel corpus (~28K pairs from translations alone; ~50K with paraphrases)
 - [ ] Mine hard negatives using frozen base model
-- [ ] Fine-tune `multilingual-e5-large` with `MultipleNegativesRankingLoss`
+- [ ] Fine-tune `multilingual-e5-large` with `MultipleNegativesRankingLoss`; consider **LoRA/QLoRA** for the first iteration — fine-tuning all ~560M params on a single A100 is feasible but slow to iterate (full fine-tuning: ~4–8h per run). LoRA (rank 16–32 on attention layers) reduces trainable parameters by 100×, enabling 3–5× faster iteration with comparable retrieval gains on small corpora; switch to full fine-tuning only if LoRA reaches a ceiling
 - [ ] Evaluate on benchmark; ablate random vs. hard negatives
 - [ ] Cross-lingual alignment audit: plot cosine similarity distribution for IT↔EN tercet pairs, pre/post fine-tuning
 - [ ] **UMAP diagnostic** (pre- and post-fine-tuning): embed all ~24K index documents; plot colored by Canticle, then by Canto. If Canticle boundaries are not visible post-training, the model is not learning the poem's semantic structure — a signal to revisit training data or loss formulation before proceeding to Phase 1b. This is a diagnostic checkpoint, not a presentation artifact.
@@ -659,6 +718,7 @@ The implementation follows four sequential phases. Each phase has a concrete del
 | Cross-encoder | `cross-encoder/mmarco-mMiniLMv2-L12-H384` | Multilingual; fits on CPU for reranking |
 | Serving | FastAPI + FAISS in-memory | Deployable as Hugging Face Space |
 | Hardware | Single A100 (or Colab Pro) | Fine-tuning `multilingual-e5-large` (~560M params) |
+| Fine-tuning efficiency | LoRA/QLoRA via `peft` | Rank 16–32 on attention layers; ~100× fewer trainable params; 3–5× faster iteration; use for initial experiments before committing to full fine-tuning |
 
 ---
 
@@ -745,7 +805,23 @@ All design questions identified in the initial draft have been resolved except o
 
 ---
 
-## 12. Connections to Existing Work
+## 12. Risk Register
+
+Known risks and dependencies that could materially affect the project. Tracked here so they are visible at design time, not discovered at implementation time.
+
+| Risk | Likelihood | Impact | Mitigation |
+|------|-----------|--------|-----------|
+| **LLM paraphrase quality** — GPT-4o generates modern Italian paraphrases that are fluent but semantically incorrect for specific tercets | Medium | High (corrupts 5th representation; hurts Italian user retrieval) | Stratified QC sample + back-translation round-trip check + embedding similarity to original; budget regeneration for ~5% of tercets |
+| **Language detection brittleness** — fasttext `lid.176.ftz` misclassifies short or mixed-language queries; `w_BM25` is set incorrectly | Medium | Low–Medium (BM25 noise bleeds into non-Italian results) | Tier 2 score-based fallback is designed for exactly this; evaluate language detection accuracy on the verse recall query set separately |
+| **A100 availability** — single GPU access is intermittent on Colab Pro; full fine-tune is preempted mid-run | Medium | Medium (delays Phase 1a) | Use LoRA for initial experiments (fits on smaller GPU, faster to checkpoint); reserve full fine-tuning for final run |
+| **Annotation effort underestimate** — 100 thematic queries × 50 candidates × 2 annotators exceeds available bandwidth | Medium | High (blocks Phase 2 evaluation) | 30–40 query pilot first (§6.5); time-box annotation; hard cases set (50 queries) is higher priority than thematic set if effort is constrained |
+| **Translation copyright** — Mandelbaum (1980) and Hollander (2000) are under copyright; public demo may infringe | High | High (demo must be taken down or rebuilt) | Resolve before Phase 3; substitute Norton (1892) / Cary (1814) for demo if licensing cannot be obtained |
+| **Cross-encoder zero-shot insufficient** — mmarco reranker doesn't generalise to medieval-literary content well enough | Low–Medium | Medium (thematic search quality below target) | Ablation in Phase 1b will quantify; graded relevance annotation for reranker fine-tuning is expensive — only pursue if zero-shot nDCG lift is < 0.05 |
+| **BM25 character n-gram index size** — 5-gram indexing of ~14K original Italian lines may produce a large index | Low | Low (still fits in memory; `rank_bm25` is pure Python) | Profile index size at Phase 0; if problematic, reduce to character 4-grams or limit n-gram coverage to token-internal substrings only |
+
+---
+
+## 13. Connections to Existing Work
 
 | This project | Prior work on this site |
 |---|---|
@@ -759,7 +835,7 @@ All design questions identified in the initial draft have been resolved except o
 
 ---
 
-## 13. Research-Level Extensions
+## 14. Future Work / Research Opportunities
 
 The following extensions exceed the scope of the current design but represent genuine research opportunities — empirical questions that this corpus and pipeline are unusually well-positioned to answer.
 
@@ -777,7 +853,7 @@ conf(tercet, query) = μ(scores) / (1 + σ(scores))
 
 where `μ` and `σ` are mean and standard deviation of bi-encoder similarities across all 5 representations. High mean, low variance → confident match; same mean, high variance → flagged as ambiguous.
 
-**Research contribution:** measure the correlation between `σ(scores)` and human relevance judgments from the thematic annotation set (§6.5). Test whether routing high-variance candidates through an additional cross-encoder pass improves precision. This is a novel calibration question — parallel-corpus retrieval provides the signal; standard single-representation benchmarks cannot. Direct connection to the calibration work in §12.
+**Research contribution:** measure the correlation between `σ(scores)` and human relevance judgments from the thematic annotation set (§6.5). Test whether routing high-variance candidates through an additional cross-encoder pass improves precision. This is a novel calibration question — parallel-corpus retrieval provides the signal; standard single-representation benchmarks cannot. Direct connection to the calibration work in §13.
 
 ### 13.2 Multi-Vector Retrieval (ColBERT-style)
 
