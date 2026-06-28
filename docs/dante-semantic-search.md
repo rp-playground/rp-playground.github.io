@@ -1,6 +1,6 @@
 # Semantic Search in Dante's Divine Comedy — Solution Design
 
-> **Status:** Draft · **Version:** 0.7 · **Last updated:** 2026-06-28
+> **Status:** Draft · **Version:** 0.8 · **Last updated:** 2026-06-28
 
 ---
 
@@ -8,6 +8,7 @@
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 0.8 | 2026-06-28 | Query distribution model added: assumed prior over query types with component weighting implications; evaluation set composition updated to mirror distribution |
 | 0.7 | 2026-06-28 | Evaluation section restructured: separate protocols for verse recall and thematic search; Recall@5 added; human annotation protocol specified as mandatory for thematic search with relevance scale, annotator requirements, and inter-annotator agreement threshold |
 | 0.6 | 2026-06-28 | Resolved three open questions: modern Italian paraphrases added to FAISS index; max pooling confirmed for deduplication; commentaries kept as metadata only. Index size updated to ~24K documents; dataset structure, positive pairs, Phase 0 milestones, and infrastructure table updated. |
 | 0.5 | 2026-06-28 | Cross-encoder input specified: highest-scoring bi-encoder representation per tercet; asymmetric reranking rationale documented |
@@ -250,20 +251,79 @@ Implemented directly in `sentence-transformers` via `MultipleNegativesRankingLos
 
 ---
 
-### 6.1 Evaluation Sets
+### 6.1 Query Distribution Model
+
+The expected distribution of query types determines: (a) the relative importance of BM25 vs. dense retrieval in RRF weighting, (b) the training data allocation across pair types, and (c) the composition of the evaluation sets. Without an explicit distribution, these choices are arbitrary.
+
+The following is an **assumed prior** based on the likely user population (Italian literary users, English translation readers, general public). It must be validated and updated post-launch via query logging.
+
+**Phase-level split (estimated):**
+
+| Phase | Traffic share |
+|-------|--------------|
+| Verse recall (Phase 1) | ~70% |
+| Thematic search (Phase 2) | ~30% |
+
+**Verse recall — query type breakdown (% of Phase 1 traffic):**
+
+| Type | Example | Est. % | Primary retrieval track |
+|------|---------|--------|------------------------|
+| Exact / near-exact Italian fragment | "nel mezzo del cammin" | 20% | BM25 (archaic Italian) |
+| Modern Italian paraphrase | "a metà della mia vita" | 25% | Dense (modern IT reps) |
+| English translation fragment | "midway upon the journey" | 20% | Dense (EN translations) |
+| English semantic paraphrase | "halfway through life's journey" | 35% | Dense (EN paraphrases) |
+
+**Thematic search — query type breakdown (% of Phase 2 traffic):**
+
+| Type | Example | Est. % |
+|------|---------|--------|
+| Emotional / experiential | "I was lost and afraid at 35" | 50% |
+| Conceptual / character reference | "storia di Paolo e Francesca" | 30% |
+| Cross-domain metaphor | "standing at a crossroads" | 20% |
+
+**Implications for component weighting:**
+
+- BM25 is the primary track for ~14% of total queries (20% of 70% Phase 1 traffic). For all other queries, BM25 contributes noise; the dense track should dominate.
+- This sets a prior for the RRF `α` parameter: start with BM25 weight ≈ 0.2, dense weight ≈ 0.8, tune on the development set.
+- LLM query expansion is relevant for 100% of Phase 2 (thematic) traffic — ~30% of total. Its latency cost is therefore significant at scale and must be measured in Phase 2 profiling.
+
+**Implication for evaluation set composition:**
+
+The Phase 1 evaluation set of 200 paraphrase recall queries should be composed to mirror the distribution:
+
+| Query type | Target count |
+|------------|-------------|
+| Exact / near-exact Italian fragment | 40 |
+| Modern Italian paraphrase | 50 |
+| English translation fragment | 40 |
+| English semantic paraphrase | 70 |
+
+The Phase 2 evaluation set of 100 thematic queries:
+
+| Query type | Target count |
+|------------|-------------|
+| Emotional / experiential | 50 |
+| Conceptual / character reference | 30 |
+| Cross-domain metaphor | 20 |
+
+Metrics must also be reported **per query type**, not only in aggregate — a system that achieves 0.90 Recall@1 overall but 0.40 on Italian fragments has a specific, actionable failure mode that the aggregate number hides.
+
+---
+
+### 6.3 Evaluation Sets
 
 | Set | Phase | Size | Construction |
 |-----|-------|------|--------------|
 | Cross-lingual recall | 1 | ~4,740 | Automatic: each translation → its source tercet |
-| Paraphrase recall | 1 | 200 | Hand-crafted: fragments and paraphrases in EN and modern IT |
+| Paraphrase recall | 1 | 200 | Hand-crafted: distributed per §6.1 query type targets |
 | Hard cases | 1 | 50 | Adversarially selected (see below) |
-| Thematic queries | 2 | 100 | Hand-crafted: modern vernacular, emotional, conceptual |
+| Thematic queries | 2 | 100 | Hand-crafted: distributed per §6.1 query type targets |
 
 **Hard cases** for verse recall include: false cognates between archaic and modern Italian that mislead the dense retriever; tercets from the same Canto that are thematically adjacent (test boundary precision); queries that could plausibly match passages across multiple Canticles.
 
 ---
 
-### 6.2 Verse Recall Metrics (Phase 1)
+### 6.4 Verse Recall Metrics (Phase 1)
 
 Ground truth is **unique and automatic**: each query has exactly one correct answer, derived from the parallel corpus alignment. Relevance is binary.
 
@@ -275,9 +335,11 @@ Ground truth is **unique and automatic**: each query has exactly one correct ans
 
 Recall@10 is deliberately excluded as a primary metric: for verse recall, a system that requires 10 results to surface the correct tercet is not fit for purpose. Recall@5 is the practical failure threshold.
 
+All metrics must be reported **per query type** (Italian fragment / modern Italian / EN fragment / EN paraphrase) in addition to aggregate — a system scoring 0.90 Recall@1 overall but 0.40 on Italian fragments has a specific, actionable failure mode that the aggregate hides.
+
 ---
 
-### 6.3 Thematic Search Metrics (Phase 2)
+### 6.5 Thematic Search Metrics (Phase 2)
 
 Ground truth is **non-unique and graded**: multiple tercets may be relevant to a thematic query at different degrees. Human annotation is not optional — there is no automatic proxy for thematic relevance.
 
@@ -308,7 +370,7 @@ nDCG is the correct metric here because it rewards surfacing highly relevant pas
 
 ---
 
-### 6.4 Ablation Structure (Phase 1)
+### 6.6 Ablation Structure (Phase 1)
 
 Every Phase 1 improvement is measured against a defined baseline chain on the verse recall evaluation sets:
 
