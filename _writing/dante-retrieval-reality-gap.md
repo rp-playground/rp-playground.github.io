@@ -15,6 +15,23 @@ published: false
 permalink: /writing/dante-retrieval-reality-gap/
 ---
 
+This article is the first part of a larger project to build *DanteGPT*, a semantic 
+search system for Dante’s *Divine Comedy*. The system will address two classes of query:
+
+* Verse recall — a user provides a text fragment, perhaps obtained reaching back 
+into distant school memories, perhaps misspelled or only half-remembered,
+in any language or loose paraphrase, and wants to know exactly 
+which canto and which tercet it belongs to. The system takes the text 
+and returns the precise matching tercet with high precision. Example: "a metà della vita" → Inferno I:1–3. 
+
+* Thematic search — a user expresses a modern feeling or concept, and the system surfaces 
+semantically relevant passages regardless of surface form. Example: "I was 35 and felt lost" → Inferno I:1–3.
+
+The architecture uses a two-stage pipeline — BM25 over the original Italian combined
+with dense retrieval over translations and paraphrases, fused with query-aware weighting and followed 
+by cross-encoder reranking. The work described here belongs to the verse-recall component and documents
+the evaluation and diagnostic process that shaped its development.
+
 **Background**
 
 I wanted a system that finds the right *tercet* of Dante's *Divine Comedy* from a fuzzy query — a half-remembered
@@ -27,14 +44,16 @@ MRR@10.
 
 **The investigation**
 
-The first number looked strong: on Inferno Canto 1, the dense retriever hit **Recall@1 0.92**. I could have stopped
-there. But the score covered one canto, and the most famous one in Western literature, so I went looking for what it
-actually measured.
+On Inferno Canto 1 the dense retriever hit **Recall@1 0.92**. 
+The score is not representative of other cantos: the canto contains 
+some of the most famous lines in Western literature, and a multilingual model trained on web data 
+has almost certainly memorized large parts of it.
 
-What follows is mostly about the benchmark rather than the model. Each step toward a more realistic evaluation lowered
-the score, and that drop is what eventually pointed at the right thing to fix. The negative results did most of the work:
-a stronger encoder didn't help, naive fusion hurt, a bigger reranker didn't help. Each one removed a wrong path and
-sharpened the next question.
+What follows is mostly about how much a realistic evaluation dataset 
+drops the score, and about the attempts — stronger encoder, fusion, bigger reranker — that 
+were made to recover from that drop. They reached a plateau. 
+Beyond it, the only move left is targeted fine-tuning.
+
 
 {:.no_toc}
 
@@ -56,17 +75,14 @@ No single retriever is good at both for free, so I run two and measure where eac
 - **Dense** e5-large, zero-shot, cosine over normalized embeddings, max-pooled per tercet. Strong on semantics, weak on
   rare archaic Italian.
 
-This dual-track baseline isn't the product. It's the instrument that tells me which axis is broken before I spend effort
-on it.
+By running both I can tell whether the problem is lexical or semantic before I spend effort on the wrong fix.
 
-## 2. Teaching the dense retriever Italian
+## 2. Indexing the original Italian
 
-The first real failure mode was sharp. A query that *is* the original verse —
+A concrete failure appeared immediately: a query that *is* the original verse —
 `"Poi ch'èi posato un poco il corpo lasso"` — was a complete miss for the dense retriever (the gold tercet wasn't even in
-the top-10), while BM25 returned it at rank 1.
-
-The reason: the dense index held English translations and English paraphrases, but never the original Italian text. An
-Italian query had nothing Italian to match against, so it matched cross-lingually against English and lost.
+the top-10), while BM25 returned it at rank 1. 
+This happened because the dense index held only English translations and paraphrases.
 
 Two representation fixes followed, each touching only the dense side (BM25 already indexes the original):
 
@@ -75,62 +91,56 @@ Two representation fixes followed, each touching only the dense side (BM25 alrea
 
 <figure>
   <img src="/assets/dante-retrieval-reality-gap/fig_improvements_canto1.png" alt="Bar chart titled 'Representations that improve dense — Inferno canto 1 (R@1)'. Three dense bars rising left to right: baseline 0.79, +IT paraphrases 0.87, +original Dante 0.92. A flat grey BM25 reference around 0.73.">
-  <figcaption>Each representation the dense retriever can match against lifts Recall@1; BM25 is the flat lexical reference.</figcaption>
+  <figcaption>The dense retriever’s Recall@1 improves as we add more text it can match against (Italian paraphrases, then the original verses). BM25 (grey line) stays flat as a lexical baseline.</figcaption>
 </figure>
 
-One detail that matters: these representations go only into the curated full-index evaluation flow, never into the
-synthetic-with-holdout flow. Otherwise queries generated *from* the original verse would trivially match the indexed
-original. Leakage controls like this recur throughout the project.
-
-That gets dense to 0.92 on Canto 1. It's also where the story stops being useful, for a reason that has nothing to do
-with the model.
 
 ## 3. The reality check
 
 Canto 1 is the most quoted canto in the poem. A multilingual model trained on the web has seen "Nel mezzo del cammin"
-thousands of times. So 0.92 might be the system, or it might be the fame of the text.
+thousands of times. 
 
-I built curated sets for other cantos to test generalization. The dense number on the famous-but-less-canonical cantos
-(5, 26, 30) clustered around **~0.72**, with Canto 1 sitting well above as an outlier.
+To check whether 0. 92 was specific to this famous canto, I created additional curated sets for cantos 5,
+26 and 30. These were generated via agent prompt + gating as generalization and validation probes, mainly to test the
+system on less famous material and see what typical performance looked like once the canto-1 outlier was removed. On
+those, dense Recall@1 clustered around **~0.72**.
 
 <figure>
   <img src="/assets/dante-retrieval-reality-gap/fig_generalization.png" alt="Bar chart 'Generalization: dense R@1 per canto (curated sets)'. Canto 1 dense 0.92 (outlier above a dashed mean line at ~0.73), cantos 4/5/26/30 between 0.69 and 0.77.">
-  <figcaption>Canto 1 is a fame/memorization outlier; the curated number across other cantos is ~0.72.</figcaption>
+  <figcaption>Canto 1 is a fame/memorization outlier; the number on the other curated sets is ~0.72.</figcaption>
 </figure>
 
-Even ~0.72 was optimistic, because all of these sets share a shortcut: they are single-canto. The evaluator knows the
-canto, and the gold resolves among about 46 candidate tercets. Real users don't know the canto. They type a keyword
-("lupa", "the gate of hell"), recall an episode ("the count who ate his children"), or misremember a line, across the
-whole Inferno.
+Those sets were still single-canto: the evaluator benefits from knowing which canto the passage is in, so the gold
+only has to be distinguished among ~46 candidates.
 
-The last benchmark drops that shortcut. It has 210 queries built to match real use — keyword, episodic, cross-canto,
-ambiguous — and it is scored over the entire Inferno (1,596 tercets, about 42k index documents). It was generated by a
-Grok Build model and gated for de-contamination (the descriptor queries are checked not to be substrings of any indexed
-text).
+The noisy cross-canto set removes that limitation. It was built from the start around actual user behavior (short
+keywords, episode recall, misremembered or blended details, cross-canto references) and is scored over the entire
+Inferno (1,596 tercets, ~42k index documents). It was generated by a Grok Build model and passed the decontamination
+gates (the audit verifies that every gold is resolvable over the full Inferno and that no query is an exact match or
+substring of its indexed target).
 
 <figure>
   <img src="/assets/dante-retrieval-reality-gap/fig_noisy_cross_canto_profile.png" alt="Profile of the cross-canto set: top panel shows gold tercets spread across 24 of 34 Inferno cantos; a query-mix stacked bar shows keyword 38%, semantic/episodic 30%, entity 21%, noisy fragment 6%, ambiguous 5%; difficulty 94 hard / 87 medium / 29 easy.">
-  <figcaption>The cross-canto set: gold tercets across 24 of 34 cantos, and a query mix closer to what people actually type.</figcaption>
+  <figcaption>The cross-canto set: gold tercets across 24 of 34 cantos, and a query mix built around real user search behavior.</figcaption>
 </figure>
 
 On this set, dense Recall@1 is **0.42**.
 
 <figure>
   <img src="/assets/dante-retrieval-reality-gap/fig_realworld_progression.png" alt="Three color-coded bars labelled with their purpose: canto 1 (single canto, development) 0.92, cantos 5/26/30 (single canto, generalization probes) 0.71, noisy cross-canto (whole Inferno, real-world) 0.42. Title: 'The reality gap'.">
-  <figcaption>Same retriever, three benchmarks built for different purposes; the more realistic the benchmark, the lower the number.</figcaption>
+  <figcaption>Same retriever, three benchmarks built for different purposes.</figcaption>
 </figure>
 
-The progression is 0.92 → 0.72 → 0.42. The earlier sets weren't wrong; each had a job — developing the representations,
-probing for overfitting. But the headline 0.92 didn't predict performance on the queries I actually care about.
+The earlier sets served their purposes: canto 1 as the high-fidelity development and productive within-canto reference, and the sets for 5/26/30 as generalization probes to test the system and de-risk the fame effect. The noisy cross-canto set is the one whose design priority was real-world conditions — how the retriever behaves when a user does not know the canto and is searching from partial, noisy memory. That is the number that dropped to 0.42.
 
 ## 4. What actually moved the real number
 
-With a realistic benchmark, I could tell improvements apart from artifacts.
+The realistic benchmark showed what actually worked.
 
-**Entity grounding.** The cross-canto set has many character queries. Indexing a short descriptive `context` per
-character helps, but only after fixing a data bug: the contexts were attached to tercets where the character is
-*involved*, not where it is *named* (Homer's bio sat on four peripheral tercets and missed the one that says "quelli è
-Omero"). Attaching each entity to its canonical tercet — the one where its name appears — roughly doubled the gain.
+**Entity grounding.** Adding a short descriptive context for each character helped on the cross-canto set’s many
+name queries. The gain was much larger, however, after fixing a data bug: the contexts were attached to tercets where
+the character merely appeared, not where its name is mentioned. (Homer’s bio sat on four peripheral tercets instead of
+the line that says 'quelli è Omero'.) Moving each to its canonical tercet roughly doubled the improvement.
 
 **Fusion, the right way.** BM25 and dense are complementary per query type: BM25 wins Italian fragments and names, dense
 wins English and semantics. Fusing them with Reciprocal Rank Fusion at equal weights made things worse, because dense is
@@ -143,10 +153,10 @@ win.
 </figure>
 
 The fix is query-aware fusion: detect the query language and set BM25's weight to zero on English queries, where its
-Italian-only index is just noise, and high on Italian ones. On the cross-canto set this finally pays off, with fusion
-beating dense on R@5 and MRR.
+Italian-only index is just noise, and high on Italian ones. On the cross-canto set fusion
+beats dense on R@5 and MRR.
 
-**Reranking** was the biggest single lever. A cross-encoder reads `(query, passage)` jointly and reorders the top-50
+**Reranking**. A cross-encoder reads `(query, passage)` jointly and reorders the top-50
 candidates. On the real set, Recall@1 went **0.42 → 0.51**; on Canto 1, 0.92 → 0.96. It is the first component to improve
 over dense/RRF on both the easy and the hard benchmark.
 
@@ -155,55 +165,77 @@ over dense/RRF on both the easy and the hard benchmark.
   <figcaption>The stack on real-world queries: lexical and semantic retrieval, then query-aware fusion, then cross-encoder reranking.</figcaption>
 </figure>
 
-## 5. Where the system is stuck, and where it isn't
+## 5. Reranking is the bottleneck
 
-0.51 is low. The obvious move is to blame the embeddings and get a stronger retriever, or fine-tune it. I checked, and the
-data said otherwise.
-
-A stronger zero-shot dense model (BGE-M3) gave the same final Recall@1 after reranking as e5-large. The embedding model
+0.51 is low. The obvious move is to blame the embeddings and get a stronger retriever, or fine-tune it. I checked: 
+a stronger zero-shot dense model (BGE-M3) gave the same final Recall@1 after reranking as e5-large. The embedding model
 is not the limiter.
 
-Then I measured the reranker's actual ceiling. The reranker reorders the top-50, so its ceiling is recall@50, which I had
-been reading off the wrong number (R@5). On the cross-canto set, recall@50 is **0.74**. The gold is already in the
+Then I measured the reranker's actual ceiling. The reranker reorders the top-50, so its ceiling is recall@50. 
+On the cross-canto set, recall@50 is **0.74**. The gold is already in the
 candidate pool for 74% of queries; the reranker ranks it #1 for only 51%.
 
 <figure>
-  <img src="/assets/dante-retrieval-reality-gap/fig_reranking_headroom.png" alt="Bar chart of candidate-set recall@k on the cross-canto set: @1 0.42, @5 0.60, @10 0.63, @20 0.69, @50 0.74. A dashed red line marks the best reranked R@1 at 0.51, well below the 0.74 ceiling.">
+  <img src="/assets/dante-retrieval-reality-gap/fig_reranking_headroom.png" alt="Bar chart of candidate-set recall @k on the noisy cross-canto set. Red dashed line at 0.51 shows final reranked R@1, vs. 0.74 at @50.">
   <figcaption>The gold is in the top-50 for 74% of queries, but the best off-the-shelf reranker ranks it #1 only 51% of the time. The gap is reranking, not recall.</figcaption>
 </figure>
 
-So the limiter is the reranker, not recall. And a bigger generic reranker doesn't fix it: across three off-the-shelf
+Recall@50 is 0.74, but the reranker only surfaces the gold at rank 1 for 51% of queries. 
+And a bigger generic reranker doesn't fix it: across three off-the-shelf
 cross-encoders (120M to 568M), none beat the small `mmarco-mMiniLM`; all plateau around 0.47–0.51. Telling the gold tercet
 apart from 49 thematically similar Dante tercets needs domain knowledge, not more parameters.
 
 ## Conclusion
 
 The number for "find a Dante verse from a real, noisy, cross-canto query" is around **Recall@1 0.51**, not the 0.92 the
-first benchmark reported. Most of that distance is the benchmark, not the model. Single-canto, famous-text, clean-query
-evaluation flatters a system; realistic evaluation lowers the number and is far more useful.
+first benchmark reported. The drop comes mainly from using a more realistic test set. 
+Single-canto tests on well-known passages give more flattering results than queries over the full poem.
 
-The chain of measurements did more than any single result:
+Looking at the sequence of results:
 
-- More realistic benchmarks → 0.92 → 0.72 → 0.42.
+- Generalization probes on other cantos + the real-world cross-canto set → 0.92 → 0.72 → 0.42.
 - Representations, query-aware fusion, and reranking → 0.42 → 0.51.
-- A stronger encoder → no change, so it isn't the encoder.
+- A stronger encoder produced no improvement.
 - recall@50 = 0.74 with reranked R@1 = 0.51 → the gold is there, and the reranker can't pick it.
-- A bigger reranker → no change, so it isn't the size.
+- Larger rerankers (up to 568M parameters) did not beat the smaller one.
 
-Each negative result narrowed the search. The error mode is now specific: picking the right tercet among thematically
-similar candidates that are already retrieved.
+The remaining problem is now sharply defined: the initial retrieval usually brings the correct tercet into the top-50 candidates, but the reranker still cannot reliably select it among the many thematically similar alternatives.
+
+## The main lesson
+
+A realistic benchmark should be built early. It will usually give lower numbers, but those numbers better indicate what is actually worth changing.
 
 ## What's next
 
-The lever with empirical support is domain-adaptive fine-tuning of the reranker — a small cross-encoder trained on Dante
-`(query, tercet)` pairs, with hard negatives drawn from the actual retriever's confusions (the tercets it currently mixes
-up), and strict leakage controls (the curated and cross-canto eval sets stay held out, with an overlap audit). Before
-that, there is cheap lift to harvest: aligning the passage the reranker reads, and a late fusion of reranker and retrieval
-scores instead of pure reordering.
+The results point most clearly to domain-adaptive fine-tuning of the reranker:
 
-The broader point is about method, not the next model. The benchmark decides what you're measuring, so build the
-realistic one early, let it lower your numbers, and follow the measurements rather than the intuitions to the thing worth
-fixing.
+- A small cross-encoder trained on Dante `(query, tercet)` pairs
+- Hard negatives drawn from the actual retriever’s confusions
+- Strict leakage controls (curated and cross-canto eval sets held out, with an overlap audit)
+
+Before that, two inexpensive improvements are still available:
+
+- Align the text passed to the reranker with the representation that actually matched in the first stage (or add entity context for character queries)
+- Late fusion: combine the reranker score with the original retrieval scores instead of pure reordering
+
+
+## Methodological Weaknesses
+
+Before closing, several methodological weaknesses and inconsistencies in the current evaluation framework should be acknowledged, as they will need to be addressed in subsequent work:
+
+- **Small Evaluation Dataset**: The "ecological" real-world dataset (noisy cross-canto) relies on a very small sample size of only 210 queries (n=210). While curated, this is a remarkably small number of queries to validate a production-level retrieval system.
+
+- **Language Detection Assumption**: The "query-aware fusion" relies on detecting the query language to set BM25's weight to zero for English queries. However, the system does not address how language detection performs accurately on short, heavily misspelled, or noisy queries (e.g., a blended Anglo-Italian keyword search).
+
+- **Reliance on Synthetic Data**: The evaluation sets were generated using LLMs ("agent prompt + gating" and a "Grok Build model"). While a decontamination audit is mentioned, relying on synthetic queries risks introducing LLM biases that may not perfectly reflect true human idiosyncrasies.
+
+- **Handling of Thematic Ambiguity**: The system categorizes only 10 out of 210 queries as "ambiguous (multi-gold)". Given the nature of thematic searches (e.g., "I felt lost"), there are likely many more valid matching tercets across the poem than a single designated gold standard, potentially making the Recall@1 metric an overly harsh penalty for semantic searches.
+
+- **Unproven Memorization Claim**: The 0.92 score on Canto 1 is attributed to the multilingual-e5-large model having memorized the famous text. While highly probable, this is presented without an ablation study (e.g., testing the model on obscured or fake text of similar structure) to confirm it.
+
+**Inconsistencies**
+
+- **Contradictory Architecture Descriptions**: The introduction defines the dense retrieval index as running specifically "over translations and paraphrases". However, Section 2 notes that one of the representation fixes was "Indexing the original `t.dante` as a dense passage". The introductory summary does not accurately reflect the updated architecture used for the final benchmarks.
 
 *This is a working draft from an ongoing project; numbers and figures are reproducible from the project's versioned ML
 journal.*
