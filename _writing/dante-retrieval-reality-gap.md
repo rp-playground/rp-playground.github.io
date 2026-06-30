@@ -154,11 +154,11 @@ substring of its indexed target).
 On this set, dense Recall@1 is **0.42**.
 
 <figure>
-  <img src="/assets/dante-retrieval-reality-gap/fig_realworld_progression.png" alt="Three color-coded bars labelled with their purpose: canto 1 (single canto, development) 0.92, cantos 5/26/30 (single canto, generalization probes) 0.71, noisy cross-canto (whole Inferno, real-world) 0.42. Title: 'The reality gap'.">
+  <img src="/assets/dante-retrieval-reality-gap/fig_realworld_progression.png" alt="Three color-coded bars labelled with their purpose: canto 1 (single canto, development) 0.92, cantos 4/5/26/30 (single canto, generalization probes) 0.71, noisy cross-canto (whole Inferno, real-world) 0.42. Title: 'The reality gap'.">
   <figcaption>Same retriever, three benchmarks built for different purposes.</figcaption>
 </figure>
 
-The earlier sets served their purposes: canto 1 as the high-fidelity development and productive within-canto reference, and the sets for 5/26/30 as generalization probes to test the system and de-risk the fame effect. The noisy cross-canto set is the one whose design priority was real-world conditions — how the retriever behaves when a user does not know the canto and is searching from partial, noisy memory. That is the number that dropped to 0.42.
+The earlier sets served their purposes: canto 1 as the high-fidelity development and productive within-canto reference, and the sets for 4/5/26/30 as generalization probes to test the system and de-risk the fame effect. The noisy cross-canto set is the one whose design priority was real-world conditions — how the retriever behaves when a user does not know the canto and is searching from partial, noisy memory. That is the number that dropped to 0.42.
 
 ## 4. What actually moved the real number
 
@@ -256,7 +256,7 @@ Before closing, several methodological weaknesses and inconsistencies in the cur
 
 - **Language Detection Assumption**: The query-aware fusion sets BM25's weight to zero on English queries based on a deliberately lightweight heuristic (`fusion.py:detect_language`) — a count of Italian vs English function words plus an Italian-accent signal, with an `und` (undetermined) fallback when the two are tied. This is brittle exactly where the real-world set is hardest: on short, heavily misspelled, or blended Anglo-Italian queries the function-word signal is thin, so the detector lands in `und` or picks the wrong branch and BM25 is weighted wrongly. Crucially, the detector's accuracy on the actual eval queries is never measured, so the reported query-aware fusion gains on R@5/MRR rest on an unverified assumption and may be overstated. A more robust language/script detector is on the to-do list (see *What's next*).
 
-- **Heavy reliance on synthetic queries, with limited ecological validity**: Every eval query is machine-generated — agent prompt + gating, and the cross-canto set by a "Grok Build" model — then passed through a decontamination audit (no query is an exact match or substring of its indexed target). The audit rules out trivial leakage, but it does not guarantee the queries *look like real ones*. LLM-written queries tend to be cleaner and more grammatical than how people actually half-remember verses: severe misspellings, distant memories blended across episodes, non-native paraphrases, translation and cultural artifacts. So performance on this set may be optimistic. No human-curated validation set, and no comparison against real query logs, is available to check that the synthetic distribution matches real users.
+- **Heavy reliance on synthetic queries, with limited ecological validity**: Every eval query is machine-generated — agent prompt + gating, and the cross-canto set by Grok (model "Grok Build") — then passed through a decontamination audit (no query is an exact match or substring of its indexed target). The audit rules out trivial leakage, but it does not guarantee the queries *look like real ones*. LLM-written queries tend to be cleaner and more grammatical than how people actually half-remember verses: severe misspellings, distant memories blended across episodes, non-native paraphrases, translation and cultural artifacts. So performance on this set may be optimistic. No human-curated validation set, and no comparison against real query logs, is available to check that the synthetic distribution matches real users.
 
 - **Handling of Thematic Ambiguity**: The system categorizes only 10 out of 210 queries as "ambiguous (multi-gold)". Given the nature of thematic searches (e.g., "I felt lost"), there are likely many more valid matching tercets across the poem than a single designated gold standard, potentially making the Recall@1 metric an overly harsh penalty for semantic searches.
 
@@ -277,8 +277,6 @@ Before closing, several methodological weaknesses and inconsistencies in the cur
 **Inconsistencies**
 
 - **Contradictory Architecture Descriptions**: The introduction defines the dense retrieval index as running specifically "over translations and paraphrases". However, Section 2 notes that one of the representation fixes was "Indexing the original `t.dante` as a dense passage". The introductory summary does not accurately reflect the updated architecture used for the final benchmarks.
-
-- **Canto 4 dropped from the summary chart**: §3 runs the generalization probes on cantos 4, 5, 26 and 30 — and the per-canto figure shows all four — but the "reality gap" summary chart labels its middle bar only "cantos 5/26/30" and averages just those three. Canto 4 is silently excluded from that one figure.
 
 **Note — entity contexts.** The per-character descriptive contexts were not hand-written. They were extracted by parsing
 the English Wikipedia [List of cultural references in the Divine Comedy](https://en.wikipedia.org/wiki/List_of_cultural_references_in_the_Divine_Comedy),
