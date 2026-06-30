@@ -81,9 +81,9 @@ By running both I can tell whether the problem is lexical or semantic before I s
 
 ## 2. Indexing the original Italian
 
-A concrete failure appeared immediately: a query that *is* the original verse —
-`"Poi ch'èi posato un poco il corpo lasso"` — was a complete miss for the dense retriever (the gold tercet 
-Inferno 1:28 wasn't even in
+The first failure appeared immediately: a query that *is* the original verse —
+`"Poi ch'èi posato un poco il corpo lasso"` — was a complete miss for the dense 
+retriever (the gold tercet, Inferno 1:28, wasn't even in
 the top-10), while BM25 returned it at rank 1. 
 This happened because the dense index held only English translations and paraphrases.
 
