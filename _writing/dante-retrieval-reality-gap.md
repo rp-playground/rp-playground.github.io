@@ -69,7 +69,8 @@ Beyond it, the only move left is targeted fine-tuning.
 
 Verse-recall has two orthogonal difficulties. A query can be **lexical** — it reuses words from the original verse
 ("nel mezzo del cammin") — or **semantic / cross-lingual** — a paraphrase, or English ("the lovers who read Lancelot").
-No single retriever is good at both for free, so I run two and measure where each fails:
+No single retriever is good at both for free, so I followed the 
+conventional practice and run two, measuring where each fails:
 
 - **BM25** over the original Italian (`t.dante`), with word-unigram and character-5-gram tokenization. Strong on the
   lexical axis, blind to the semantic one.
