@@ -137,6 +137,43 @@ The effect is negligible and mixed: mean Recall@1 **0.71 → 0.72** (−0.02 on 
 the original verse `t.dante` is indexed, the Italian paraphrase is a largely redundant representation for verse recall —
 on the less-famous cantos as much as on canto 1. 
 
+### Is the canto-1 outlier really *memorization*?
+
+So far "fame" is an inference: canto 1 scores higher, and it is the most-quoted canto, so the model has *probably*
+memorized it. But a higher score on its own does not prove the *mechanism* — canto 1 could simply be lexically easier, or
+have cleaner, more abundant translations. To pin the mechanism down I ran a small ablation that contrasts the famous canto
+against the non-famous ones under three index conditions, asking two questions that a memorized exact string would answer
+"yes" to. First: does indexing the **original verse** beat indexing a meaning-equivalent **Italian paraphrase** — and only
+where there is a memorized surface form to lean on? Second: with **no Italian in the index at all** (only English
+translations and paraphrases), is the famous canto still recalled better, because the model recognizes the material
+cross-lingually from pre-training?
+
+<figure>
+  <img src="/assets/dante-retrieval-reality-gap/fig_memorization_ablation.png" alt="Grouped bar chart 'Memorization ablation — dense R@1 by index condition'. Two groups, 'canto 1 (famous, n=52)' and 'cantos 4/5/26/30 (non-famous, n=196)', each with three blue bars for the index condition: EN-only, + Italian paraphrase, + original verse. Canto 1 climbs steeply 0.79 → 0.86 → 0.92; the pooled non-famous cantos stay flat 0.67 → 0.70 → 0.71. Subtitle: exact-verse premium +0.058 (canto 1) vs +0.005 pooled; EN-only fame gap 0.79 vs 0.67 — both signals are canto-1-specific.">
+  <figcaption>Both memorization signatures are canto-1-specific: the original verse buys canto 1 a jump a meaning-equivalent paraphrase does not, and even English-only the famous canto is recalled better.</figcaption>
+</figure>
+
+Both signatures show up, and both are specific to canto 1. The **exact-verse premium** — the gain from indexing the
+original string over a semantically-equivalent Italian paraphrase — is **+0.058** on canto 1 but only **+0.005** pooled
+across the four non-famous cantos (95% CI [−0.03, +0.04], i.e. indistinguishable from zero). And with only the English
+representations in the index, canto 1 still sits at **0.79** against **0.67** for the non-famous cantos. The original verse
+buys canto 1 something a paraphrase of the same meaning does not, and the model knows the famous canto across languages —
+neither holds for the rest.
+
+| index condition | canto 1 (famous, n=52) | cantos 4/5/26/30 (pooled, n=196) |
+|---|---|---|
+| EN-only (no Italian in index) | 0.79 | 0.67 |
+| + Italian paraphrase | 0.86 | 0.70 |
+| + original verse (`t.dante`) | 0.92 | 0.71 |
+| **exact-verse premium** | **+0.058** | **+0.005** |
+
+Two honest caveats. The canto-1 premium's confidence interval just touches zero (n≈52, so a handful of queries move it),
+which is why the argument leans on the *combination* of the two signatures and the sharp contrast with the flat non-famous
+premium rather than on the premium alone. And this is a natural experiment on real text: I deliberately did **not** fabricate
+"fake Dante" to obscure the verse, because synthetic tercets would confound memorization with the model's fluency on
+invented archaic Italian — the fame gradient across real cantos is the cleaner test. With that, the memorization reading of
+the canto-1 outlier is no longer just plausible; it is what the ablation shows.
+
 Those sets were still single-canto: the evaluator benefits from knowing which canto the passage is in, so the gold
 only has to be distinguished among ~46 candidate tercets.
 
@@ -260,7 +297,7 @@ Before closing, several methodological weaknesses and inconsistencies in the cur
 
 - **Handling of Thematic Ambiguity**: The system categorizes only 10 out of 210 queries as "ambiguous (multi-gold)". Given the nature of thematic searches (e.g., "I felt lost"), there are likely many more valid matching tercets across the poem than a single designated gold standard, potentially making the Recall@1 metric an overly harsh penalty for semantic searches.
 
-- **Unproven Memorization Claim**: The 0.92 score on Canto 1 is attributed to the multilingual-e5-large model having memorized the famous text. While highly probable, this is presented without an ablation study (e.g., testing the model on obscured or fake text of similar structure) to confirm it.
+- **Memorization Claim — now backed by an ablation**: The 0.92 score on Canto 1 was originally attributed to the multilingual-e5-large model having memorized the famous text *without* an ablation to confirm it. The [memorization ablation](#is-the-canto-1-outlier-really-memorization) above closes that gap: indexing the original verse beats a meaning-equivalent Italian paraphrase by an *exact-verse premium* of +0.058 on Canto 1 vs +0.005 pooled across non-famous cantos, and Canto 1 stays ahead (0.79 vs 0.67) even with no Italian in the index — two canto-1-specific signatures of memorization. The residual weakness is statistical, not conceptual: the premium leg's 95% CI just touches zero at n≈52, so the conclusion rests on the *combination* of the two signatures rather than the premium alone.
 
 - **No qualitative error analysis**: The argument is entirely quantitative — there are no concrete failure examples (a query where BM25 wins and dense loses or vice versa; the thematically-similar tercet that outranks the gold in the reranker; the effect of an entity context on a specific name query). This weakens the "reranking is the bottleneck" diagnosis and leaves the planned fine-tuning without a catalogue of the confusions it is supposed to target.
 
