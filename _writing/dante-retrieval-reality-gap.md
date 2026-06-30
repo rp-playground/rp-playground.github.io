@@ -126,7 +126,7 @@ substring of its indexed target).
 
 <figure>
   <img src="/assets/dante-retrieval-reality-gap/fig_noisy_cross_canto_profile.png" alt="Profile of the cross-canto set: top panel shows gold tercets spread across 24 of 34 Inferno cantos; a query-mix stacked bar shows keyword 38%, semantic/episodic 30%, entity 21%, noisy fragment 6%, ambiguous 5%; difficulty 94 hard / 87 medium / 29 easy.">
-  <figcaption>The cross-canto set: gold tercets across 24 of 34 cantos, and a query mix built around real user search behavior.</figcaption>
+  <figcaption>The cross-canto set: gold tercets across 24 of 34 cantos.</figcaption>
 </figure>
 
 On this set, dense Recall@1 is **0.42**.
