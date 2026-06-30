@@ -46,7 +46,7 @@ MRR@10.
 **The investigation**
 
 On Inferno Canto 1 the dense retriever hit **Recall@1 0.92**. 
-The score is not representative of other cantos: the canto contains 
+The score cannot be taken as representative of other cantos: the canto contains 
 some of the most famous lines in Western literature, and a multilingual model trained on web data 
 has almost certainly memorized large parts of it.
 
