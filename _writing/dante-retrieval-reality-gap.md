@@ -36,7 +36,7 @@ the evaluation and diagnostic process that shaped its development.
 
 I wanted a system that finds the right *tercet* of Dante's *Divine Comedy* from a fuzzy query — a half-remembered
 fragment, a paraphrase, an English approximation, the name of a character. The user half-knows the text and the system
-returns the exact three lines.
+returns the exact three lines; three because the tercet is system's semantic unit.
 
 The retrieval stack is conventional: **BM25** over the original Italian, plus a **dense** bi-encoder
 (`multilingual-e5-large`, zero-shot) over English translations and paraphrases. Standard metrics: Recall@1, Recall@5,
