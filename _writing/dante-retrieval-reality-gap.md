@@ -116,7 +116,7 @@ those, dense Recall@1 clustered around **~0.72**.
 </figure>
 
 Those sets were still single-canto: the evaluator benefits from knowing which canto the passage is in, so the gold
-only has to be distinguished among ~46 candidates.
+only has to be distinguished among ~46 candidate tercets.
 
 The noisy cross-canto set removes that limitation. It was built from the start around actual user behavior (short
 keywords, episode recall, misremembered or blended details, cross-canto references) and is scored over the entire
