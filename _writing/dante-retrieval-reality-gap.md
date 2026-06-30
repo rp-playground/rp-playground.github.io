@@ -28,8 +28,8 @@ and returns the precise matching tercet with high precision. Example: "a metà d
 semantically relevant passages regardless of surface form. Example: "I was 35 and felt lost" → Inferno I:1–3.
 
 The architecture uses a two-stage pipeline — BM25 over the original Italian combined
-with dense retrieval over translations and paraphrases (data configuration at start, it will
-vary), fused with query-aware weighting and followed 
+with dense retrieval over translations and paraphrases (initial data configuration, subject to refinement), 
+fused with query-aware weighting and followed 
 by cross-encoder reranking. The work described here belongs to the verse-recall component and documents
 the evaluation and diagnostic process that shaped its development.
 
