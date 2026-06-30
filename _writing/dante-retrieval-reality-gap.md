@@ -103,8 +103,10 @@ Two representation fixes followed, each touching only the dense side (BM25 alrea
 Canto 1 is the most quoted canto in the poem. A multilingual model trained on the web has seen "Nel mezzo del cammin"
 thousands of times. 
 
-To check whether 0. 92 was specific to this famous canto, I created additional curated sets for cantos 5,
-26 and 30. These were generated via agent prompt + gating as generalization and validation probes, mainly to test the
+To check whether 0.92 was specific to this famous canto, 
+I run the system on additional curated sets for cantos 5,
+26 and 30. These sets were generated via agent prompt + gating primarily 
+as validation probes on the codebase, and now used to test the
 system on less famous material and see what typical performance looked like once the canto-1 outlier was removed. On
 those, dense Recall@1 clustered around **~0.72**.
 
