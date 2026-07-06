@@ -1,21 +1,24 @@
 ---
 layout: article
 title: "Lemmas over Surfaces: Routing BM25 for Dante Verse Recall"
-subtitle: "Lemma-normalized BM25 lifts Recall@10 from 0.61 to 0.67 on noisy Italian queries — then a query-type router beats it again, where naive fusion could not"
-description: On the lexical track of a Dante verse-retrieval system, lemma-normalized BM25 beats surface BM25 on 290 real
-  Italian queries. Fusing the two the naive way does not help; a per-query-type router does — and it recovers about a
-  third of the oracle headroom, honestly, on held-out queries.
-summary: Surface BM25 and lemma-normalized BM25 disagree on which Dante tercets they retrieve — surface wins near-literal
-  fragments, lemma wins paraphrases. Lemma is the better single index. But fusing them (RRF, a combined field) does not
-  beat lemma alone, because fusion averages instead of choosing. A router that picks surface-or-lemma per query type does
-  beat it, recovers ~1/3 of the oracle gap, and — measured leave-one-out — generalizes rather than overfits. The lesson
-  is that complementary retrievers want routing, not blending.
+subtitle: "Lemma-normalized BM25 lifts Recall@10 from 0.61 to 0.67 on noisy Italian queries; a query-type router provides further improvements where standard fusion methods do not"
+description: In the lexical retrieval component of a Dante verse-search system, 
+  lemma-normalized BM25 outperforms surface-level BM25 across 290 Italian queries. Standard score fusion methods do not improve results, whereas a per-query-type router increases performance, 
+  achieving approximately one-third of the theoretical oracle upper bound on held-out data.
+summary: Surface BM25 and lemma-normalized BM25 retrieve different sets of Dante tercets. 
+  Surface indexing is more effective for near-literal fragments, while lemma indexing performs 
+  better for paraphrased queries. Although the lemma index has higher overall accuracy, 
+  combining the two indexes via standard fusion (e.g., RRF, combined fields) does not surpass
+  the standalone lemma performance because fusion averages the scores instead of selecting the optimal 
+  retriever. A router that selects between the surface or lemma index based on query type outperforms 
+  the single index. It recovers approximately one-third of the oracle performance gap and demonstrates 
+  generalization in leave-one-out evaluation. This indicates that complementary retrieval methods benefit 
+  from conditional routing rather than score aggregation.
 date: 2026-07-06
 tags: [retrieval, evaluation, BM25, lemmatization, routing, RAG]
 published: true
 permalink: /writing/dante-lemma-bm25-routing/
 ---
-
 
 This article is part of a larger project to build *DanteGPT*,
 a semantic search system designed to retrieve specific passages from Dante’s Divine Comedy. 
