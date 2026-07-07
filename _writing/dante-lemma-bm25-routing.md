@@ -15,7 +15,7 @@ summary: Surface BM25 and lemma-normalized BM25 retrieve different sets of Dante
   generalization in leave-one-out evaluation. This indicates that complementary retrieval methods benefit 
   from conditional routing rather than score aggregation.
 date: 2026-07-06
-tags: [retrieval, evaluation, BM25, lemmatization, routing, RAG]
+tags: [retrieval, evaluation, BM25, lemmatization, routing, RAG, Divine Comedy]
 published: true
 permalink: /writing/dante-lemma-bm25-routing/
 ---
