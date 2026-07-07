@@ -7,11 +7,10 @@ description: In the lexical retrieval component of a Dante verse-search system,
   achieving approximately one-third of the theoretical oracle upper bound on held-out data.
 summary: Surface BM25 and lemma-normalized BM25 retrieve different sets of Dante tercets. 
   Surface indexing is more effective for near-literal fragments, while lemma indexing performs 
-  better for paraphrased queries. Although the lemma index has higher overall accuracy, 
-  combining the two indexes via standard fusion (e.g., RRF, combined fields) does not surpass
+  better for paraphrased queries. Combining the two indexes via standard fusion (e.g., RRF, combined fields) does not surpass
   the standalone lemma performance because fusion averages the scores instead of selecting the optimal 
   retriever. A router that selects between the surface or lemma index based on query type outperforms 
-  the single index. It recovers approximately one-third of the oracle performance gap and demonstrates 
+  the single index and demonstrates 
   generalization in leave-one-out evaluation. This indicates that complementary retrieval methods benefit 
   from conditional routing rather than score aggregation.
 date: 2026-07-06
