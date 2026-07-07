@@ -66,7 +66,12 @@ into base lemmas for the index natively and for free.
 ## Overall Performance: Lemma Beats Surface
 
 Testing was conducted over the Inferno (a corpus of 1,596 tercets) using an evaluation set of 290 noisy, 
-real-world Italian queries. In a direct aggregate comparison, the lemma-normalized index outperforms 
+real-world Italian queries. 
+This evaluation set is a subset of a larger benchmark generated via prompts given to 
+various LLM models—including Grok, Claude 4.8, and Claude Fable—which were 
+then manually picked, reviewed, and validated in [Argilla](https://argilla.io),
+an open-source data curation platform designed specifically for NLP and LLMs.
+In a direct aggregate comparison, the lemma-normalized index outperforms 
 the surface index across all metrics:  
 
 * Recall@10: Increased from 0.614 (surface) to 0.669 (lemma).
