@@ -28,7 +28,7 @@ and returns the precise matching tercet with high precision. Example: "a metà d
 semantically relevant passages regardless of surface form. Example: "I was 35 and felt lost" → Inferno I:1–3.
 
 The architecture uses a two-stage pipeline — BM25 over the original Italian combined
-with dense retrieval over translations and paraphrases (initial data configuration, subject to refinement), 
+with dense retrieval over translations and paraphrases (and, as §2 shows, the original Italian verses themselves),
 fused with query-aware weighting and followed 
 by cross-encoder reranking. The work described here belongs to the verse-recall component and documents
 the evaluation and diagnostic process that shaped its development.
@@ -40,8 +40,9 @@ fragment, a paraphrase, an English approximation, the name of a character. The u
 returns the exact three lines; three because the tercet is system's semantic unit.
 
 The retrieval stack is conventional: **BM25** over the original Italian, plus a **dense** bi-encoder
-(`multilingual-e5-large`, zero-shot) over English translations and paraphrases. Standard metrics: Recall@1, Recall@5,
-MRR@10.
+(`multilingual-e5-large`, zero-shot). The dense index starts over English translations and paraphrases; §2 then adds
+the original Italian verses to it, which turns out to be the single largest dense gain. Standard metrics: Recall@1,
+Recall@5, MRR@10.
 
 **The investigation**
 
@@ -197,19 +198,33 @@ On this set, dense Recall@1 is **0.42**.
 
 The earlier sets served their purposes: canto 1 as the high-fidelity development and productive within-canto reference, and the sets for 4/5/26/30 as generalization probes to test the system and de-risk the fame effect. The noisy cross-canto set is the one whose design priority was real-world conditions — how the retriever behaves when a user does not know the canto and is searching from partial, noisy memory. That is the number that dropped to 0.42.
 
-## 4. What actually moved the real number
+## 4. What actually improved results
 
-The realistic benchmark showed what actually worked.
+The realistic benchmark showed which changes helped in the full system and which only helped in isolation.
 
-**Entity grounding.** Adding a short descriptive context for each character (sourced from Wikipedia — see the note at the
-end) helped on the cross-canto set’s many
-name queries. The gain was much larger, however, after fixing a data bug: the contexts were attached to tercets where
-the character merely appeared, not where its name is mentioned. (Homer’s bio sat on four peripheral tercets instead of
-the line that says 'quelli è Omero'.) Moving each to its canonical tercet roughly doubled the improvement.
+**Entity contexts.** 
+I added short descriptive contexts for each character, sourced from Wikipedia (see note at the end for details). 
+I also corrected an attachment error: 
+the contexts had been linked to tercets where a character appears/is implied rather than to the specific tercet in which the character’s 
+name is spoken. For example, Homer’s description was attached to several peripheral tercets 
+like 
+
+*"Poi che la voce fu restata e queta, vidi quattro grand’ombre a noi venire: sembianz’avevan né trista né lieta."*
+
+along with the one that names him explicitly 
+
+*"quelli è Omero poeta sovrano; l’altro è Orazio satiro che vene; Ovidio è ’l terzo, e l’ultimo Ovidio."*.
+
+This correction improved BM25 on name queries. On the name-query slice of the cross-canto set, 
+Recall@1 rose from 0.05 to 0.26. However, the gain was limited to the BM25 track. 
+The dense retriever showed no benefit from the English contexts. Because query-aware fusion already reduces 
+BM25’s weight on English queries and the reranker reorders the final candidates, 
+the entity contexts produced no change in the end-to-end pipeline. 
+Reranked Recall@1 was 0.514 without the contexts and 0.510 with them. The name-query slice was also unchanged.
 
 **Fusion, the right way.** BM25 and dense are complementary per query type: BM25 wins Italian fragments and names, dense
 wins English and semantics. Fusing them with Reciprocal Rank Fusion at equal weights made things worse, because dense is
-the stronger track and blending in the weaker BM25 diluted it. The per-type view shows why a single static weight can't
+the stronger track and the weaker BM25 dilutes it. The per-type view shows why a single static weight can't
 win.
 
 <figure>
@@ -219,7 +234,7 @@ win.
 
 The fix is query-aware fusion: detect the query language and set BM25's weight to zero on English queries, where its
 Italian-only index is just noise, and high on Italian ones. On the cross-canto set fusion
-beats dense on R@5 and MRR.
+beats dense on R@5 and MRR. For details on the language detection algorithm currently used and its weakness, see par. **Methodological Weaknesses**.
 
 **Reranking**. A cross-encoder reads `(query, passage)` jointly and reorders the top-50
 candidates. On the real set, Recall@1 went **0.42 → 0.51**; on Canto 1, 0.92 → 0.96. It is the first component to improve
@@ -249,6 +264,15 @@ Recall@50 is 0.74, but the reranker only surfaces the gold at rank 1 for 51% of 
 And a bigger generic reranker doesn't fix it: across three off-the-shelf
 cross-encoders (120M to 568M), none beat the small `mmarco-mMiniLM`; all plateau around 0.47–0.51. Telling the gold tercet
 apart from 49 thematically similar Dante tercets needs domain knowledge, not more parameters.
+
+The same wall shows up from the upstream side. I tried two independent ways to feed the reranker a better candidate set
+for its hardest slice — character-name queries: indexing the **English** character name into BM25 (today it carries only
+the Italian one), and **relaxing** the query-aware rule that zeros BM25 on English queries. Both net to zero on the real
+set — reranked Recall@1 stays at 0.51 and the name-query slices are unchanged — and relaxing the fusion rule actually
+*hurts* the pre-rerank candidate set (English-paraphrase R@1 0.42 → 0.35, the BM25-on-English noise the rule was there to
+suppress). The reranker reads `(query, original verse + translations)` and never sees the entity context that would tell
+'Chiron' apart from the other centaurs, so better retrieval upstream cannot help when the component that makes the final
+call is blind to the signal that separates the gold.
 
 ## Conclusion
 
@@ -287,33 +311,60 @@ Before that, a few inexpensive improvements are still available:
 
 ## Methodological Weaknesses
 
-Before closing, several methodological weaknesses and inconsistencies in the current evaluation framework should be acknowledged, as they will need to be addressed in subsequent work:
+Before closing, the acknowledgment of a series of methodological weaknesses and inconsistencies in 
+the current evaluation framework to be addressed in subsequent work:
 
-- **The primary "real-world" benchmark is very small (n=210)**: The noisy cross-canto set — the one that drops performance to 0.42, and 0.51 after reranking — has only 210 queries. That is tiny for a production-oriented claim like *"the number for finding a Dante verse from a real, noisy, cross-canto query is around Recall@1 0.51"*. The per-type subgroups (keyword vs. semantic vs. entity) have even smaller cell sizes — the noisy-fragment and ambiguous cells hold only ~13 and ~10 queries — so a single query flipping moves those slices by ~8–10 points. No confidence intervals, bootstrap, or significance tests are reported; sampling variance alone could move the headline number by several points.
+- **The primary "real-world" benchmark is very small (n=210)**: The noisy cross-canto set — the one that drops 
+performance to 0.42, and 0.51 after reranking — has only 210 queries. Too little for anything productive. 
+The per-type subgroups (keyword vs. semantic vs. entity) have even smaller cell sizes — the noisy-fragment and ambiguous cells 
+hold only ~13 and ~10 queries — so a single query flipping moves those slices by ~8–10 points. 
+No confidence intervals, bootstrap, or significance tests are reported; 
+sampling variance alone could move the headline number by several points. 
+The same caveat applies to the §4 entity-grounding figures: the "BM25 lifts name-query R@1 from 0.05 to 0.26" claim 
+is computed on just 42 name queries (only 12 of them English).
 
-- **Language Detection Assumption**: The query-aware fusion sets BM25's weight to zero on English queries based on a deliberately lightweight heuristic (`fusion.py:detect_language`) — a count of Italian vs English function words plus an Italian-accent signal, with an `und` (undetermined) fallback when the two are tied. This is brittle exactly where the real-world set is hardest: on short, heavily misspelled, or blended Anglo-Italian queries the function-word signal is thin, so the detector lands in `und` or picks the wrong branch and BM25 is weighted wrongly. Crucially, the detector's accuracy on the actual eval queries is never measured, so the reported query-aware fusion gains on R@5/MRR rest on an unverified assumption and may be overstated. A more robust language/script detector is on the to-do list (see *What's next*).
+- **Language Detection Assumption**: The query-aware fusion sets BM25's weight to zero on English queries based on a deliberately lightweight heuristic (`fusion.py:detect_language`) — a count of Italian vs English function words plus an Italian-accent signal, with an `und` (undetermined) fallback when the two are tied. This is brittle exactly where the real-world set is hardest: on short, heavily misspelled, or blended Anglo-Italian queries the function-word signal is thin, so the detector lands in `und` or picks the wrong branch. Measured directly on the 190 cross-canto queries whose type implies a language, it is correct only **68%** of the time — and just **46%** on Italian (38 of 78 Italian queries fall through to `und`), vs 84% on English. The mitigating detail is that the dominant failure mode is the *conservative* `und` fallback (which applies a moderate BM25 weight, 0.3), not confident mis-branching: only **4 of 190** queries (~2%) are weighted toward the wrong language. So the query-aware gains on R@5/MRR are real rather than an artifact, but smaller than a correct detector would yield — many Italian queries get the `und` weight instead of the intended high BM25 weight. A more robust language/script detector is on the to-do list (see *What's next*).
 
-- **Heavy reliance on synthetic queries, with limited ecological validity**: Every eval query is machine-generated — agent prompt + gating, and the cross-canto set by Grok (model "Grok Build") — then passed through a decontamination audit (no query is an exact match or substring of its indexed target). The audit rules out trivial leakage, but it does not guarantee the queries *look like real ones*. LLM-written queries tend to be cleaner and more grammatical than how people actually half-remember verses: severe misspellings, distant memories blended across episodes, non-native paraphrases, translation and cultural artifacts. So performance on this set may be optimistic. No human-curated validation set, and no comparison against real query logs, is available to check that the synthetic distribution matches real users.
+- **Heavy reliance on synthetic queries, with limited validity**: Every eval query is machine-generated — agent 
+prompt + gating, and the cross-canto set by Grok (model "Grok Build") — then passed through a decontamination audit 
+(no query is an exact match or substring of its indexed target). The audit rules out trivial leakage, 
+but it does not guarantee the queries *look like real ones*. LLM-written queries tend to be cleaner and more 
+grammatical than how people actually half-remember verses: severe misspellings, distant memories blended across episodes,
+non-native paraphrases, translation and cultural artifacts. So performance on this set may be optimistic. 
+No human-curated validation set, and no comparison against real query logs, is available to check that the synthetic 
+distribution matches real users. And the generation pipeline itself is under-specified for reproduction: the exact prompts, 
+sampling temperature, gating criteria, and the precise decontamination rules are not described in the post nor linked to the ML 
+journal — and since *every* eval query is synthetic, that is a material reproducibility gap, not only a validity one.
 
 - **Handling of Thematic Ambiguity**: The system categorizes only 10 out of 210 queries as "ambiguous (multi-gold)". Given the nature of thematic searches (e.g., "I felt lost"), there are likely many more valid matching tercets across the poem than a single designated gold standard, potentially making the Recall@1 metric an overly harsh penalty for semantic searches.
-
-- **Memorization Claim — now backed by an ablation**: The 0.92 score on Canto 1 was originally attributed to the multilingual-e5-large model having memorized the famous text *without* an ablation to confirm it. The [memorization ablation](#is-the-canto-1-outlier-really-memorization) above closes that gap: indexing the original verse beats a meaning-equivalent Italian paraphrase by an *exact-verse premium* of +0.058 on Canto 1 vs +0.005 pooled across non-famous cantos, and Canto 1 stays ahead (0.79 vs 0.67) even with no Italian in the index — two canto-1-specific signatures of memorization. The residual weakness is statistical, not conceptual: the premium leg's 95% CI just touches zero at n≈52, so the conclusion rests on the *combination* of the two signatures rather than the premium alone.
 
 - **No qualitative error analysis**: The argument is entirely quantitative — there are no concrete failure examples (a query where BM25 wins and dense loses or vice versa; the thematically-similar tercet that outranks the gold in the reranker; the effect of an entity context on a specific name query). This weakens the "reranking is the bottleneck" diagnosis and leaves the planned fine-tuning without a catalogue of the confusions it is supposed to target.
 
 - **Inferno only**: Every benchmark is drawn from *Inferno*. *Purgatorio* and *Paradiso* differ in vocabulary, fame distribution, and thematic density, so none of these numbers — including the headline 0.51 — can be assumed to carry over to the full *Commedia*.
 
-- **Small deltas reported without significance testing**: Several conclusions rest on differences that, at n≈50 per single-canto set, are within sampling noise — e.g. the Italian-paraphrase ablation (mean R@1 +0.006, mixed in sign across cantos) and some per-canto gaps. They are read directionally, but nothing rules out that they are noise.
+- **Small deltas reported without significance testing**: Several conclusions rest on differences that, at n≈50 per single-canto set, are within sampling noise — e.g. the Italian-paraphrase ablation (mean R@1 +0.006, mixed in sign across cantos) and some per-canto gaps. They are read directionally, but nothing rules out that they are noise. More broadly, none of the headline numbers (0.42, 0.51, the fusion R@5/MRR gains, the entity net-zero) carry confidence intervals, and the bar charts have no error bars or uncertainty bands — so "negligible", "plateau", and "no improvement" are read visually rather than tested.
 
 - **Under-specified reranker comparison**: The "a bigger generic reranker doesn't help" claim spans "three off-the-shelf cross-encoders (120M–568M)", but the post does not name all of them, nor say whether they were instruction-tuned or how tercet-length inputs were truncated — details that matter for reproducing the plateau.
 
-- **The entity-context fix is not quantified**: §4 says moving each character's context to its canonical tercet "roughly doubled the improvement", but — unlike the precise before/after deltas given everywhere else — no Recall@1 figure is reported for this fix. The most-emphasized data-bug correction is the least precisely stated point in the post.
-
 - **`t.dante` provenance not specified**: The original-Italian text source (`t.dante`) is never pinned down — which edition, what digital provenance, and what spelling/punctuation normalization was applied. Since indexing it was the single largest dense gain, this is a reproducibility gap.
 
-**Inconsistencies**
+- **"Reranking is the bottleneck" understates a second ceiling**: calling reranking *the* bottleneck is fair for the immediate lever (recall@50 0.74 vs reranked R@1 0.51), but it obscures a second gap — initial retrieval already fails to bring the gold into the top-50 for 26% of queries. Even a perfect reranker caps the system at 0.74 on this set; closing the recall ceiling is a separate, later problem, not subsumed by fine-tuning the reranker.
 
-- **Contradictory Architecture Descriptions**: The introduction defines the dense retrieval index as running specifically "over translations and paraphrases". However, Section 2 notes that one of the representation fixes was "Indexing the original `t.dante` as a dense passage". The introductory summary does not accurately reflect the updated architecture used for the final benchmarks.
+- **Memorization mechanism not fully isolated**: the canto-1 ablation shows two signals (an exact-verse premium and a cross-lingual fame gap), but neither cleanly proves *memorization* over the simpler alternative that canto 1 has cleaner, more abundant English translations and easier lexical structure. The English-only fame gap (0.79 vs 0.67) is exactly what better translations would also produce; the memorization-specific signal is the exact-verse premium, whose 95% CI just touches zero. The reading leans on the *combination* of the two signals, not on a decisive test.
+
+- **Apparent tension in the entity-context recommendation**: §4 shows that adding entity context to the *index* nets to zero through the pipeline, yet *What's next* lists "add entity context for character queries" as an inexpensive improvement. These are not contradictory — the latter means feeding the entity text to the *reranker* (which currently reads only verse + translations and is blind to it), not re-indexing it — but the wording does not make the distinction explicit.
+
+- **Italian-paraphrase crowding not traced downstream**: §3 notes that Italian paraphrases slightly hurt R@5 on two cantos because near-duplicates crowd the top results, but treats the paraphrase only as *redundant*, not as potentially *harmful*. Whether that crowding dilutes the top-50 candidate pool that feeds the reranker is not measured.
+
+- **The 0.92 → 0.42 drop conflates three effects, not just query realism**: the framing attributes the fall "mainly" to a more realistic test set, but three factors move together — (i) the famous/memorized canto 1 vs average cantos (0.92 → ~0.71, single-canto), (ii) the search space growing from ~46 candidates (single-canto) to ~1,596 (whole Inferno), and (iii) cleaner dev-style queries vs noisy cross-canto ones. Factor (ii) alone is a large difficulty increase unrelated to query realism. A clean decomposition — e.g. the same noisy queries evaluated with an oracle canto restriction (single-canto mode) — is not reported, so the realism and search-space contributions are not separated.
+
+- **Possible circularity in query-type and difficulty labels**: the query-mix and difficulty splits (94 hard / 87 medium / 29 easy; the keyword/semantic/entity proportions) drive several per-slice conclusions, but the labels' provenance is not stated. If the same LLM that generated the queries also classified them, the strata are not independent of the generator and the per-type readings inherit that bias.
+
+- **"The embedding model is not the limiter" rests on the final number only**: the claim is inferred from BGE-M3 giving the same post-rerank R@1 as e5-large. It would be more conclusive with the intermediate evidence — whether BGE-M3 changed recall@50 or the RRF metrics. If recall@50 stayed flat the claim is solid; if it improved but the reranker did not capitalize, the diagnosis points at the reranker even more strongly. That pre-rerank comparison is not reported.
+
+- **Reproducibility specifics are thin beyond the reranker comparison**: exact model identifiers / Hugging Face paths (for `multilingual-e5-large`, BGE-M3, `mmarco-mMiniLM` and the three larger cross-encoders), the BM25 analyzer configuration (in particular the character-5-gram component), the precise query-aware RRF weights (the post says BM25 is weighted "high" on Italian queries without giving the value), and the reranker input formatting (how verse + translations are concatenated and truncated) are not pinned down — so the pipeline cannot be reproduced end-to-end from the post alone.
+
+- **Minor numeric inconsistency on the canto-1 Italian-paraphrase step**: §2 reports the gain as 0.79 → 0.87, while the memorization-ablation table (§3) shows 0.79 → 0.86 for the same step. The two come from different runs/configs (the development sequence vs the rigorous ablation) and the ~0.01 gap is within run-to-run variation, but the figures should be reconciled or the difference noted.
 
 **Note — entity contexts.** The per-character descriptive contexts were not hand-written. They were extracted by parsing
 the English Wikipedia [List of cultural references in the Divine Comedy](https://en.wikipedia.org/wiki/List_of_cultural_references_in_the_Divine_Comedy),

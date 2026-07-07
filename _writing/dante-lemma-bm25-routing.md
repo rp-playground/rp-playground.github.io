@@ -7,12 +7,9 @@ description: In the lexical retrieval component of a Dante verse-search system,
   achieving approximately one-third of the theoretical oracle upper bound on held-out data.
 summary: Surface BM25 and lemma-normalized BM25 retrieve different sets of Dante tercets. 
   Surface indexing is more effective for near-literal fragments, while lemma indexing performs 
-  better for paraphrased queries. Combining the two indexes via standard fusion (e.g., RRF, combined fields) does not surpass
-  the standalone lemma performance because fusion averages the scores instead of selecting the optimal 
-  retriever. A router that selects between the surface or lemma index based on query type outperforms 
-  the single index and demonstrates 
-  generalization in leave-one-out evaluation. This indicates that complementary retrieval methods benefit 
-  from conditional routing rather than score aggregation.
+  better for paraphrased queries. Standard fusion (e.g., RRF, combined fields) fails, a router 
+  that selects between the surface or lemma index based on query type outperforms. 
+  The most important take-away is (again) to never fall in love with an easy narrative.
 date: 2026-07-06
 tags: [retrieval, evaluation, BM25, lemmatization, routing, RAG, Divine Comedy]
 published: true
@@ -27,11 +24,16 @@ This article is part of a larger project to build *DanteGPT*, a semantic search 
 
 The core investigation here focuses on the lexical retrieval component, asking a fundamental architectural question: when running a BM25 lexical index over the original Italian text, should the index use surface forms (the exact text) or lemmas (the base dictionary forms of the words)?
 
-At first glance, the data provides a highly satisfying answer. It suggests that lemmatization is the clear winner because it elegantly translates Dante's complex, archaic verb conjugations into terms a modern user might type. However, a fundamental principle of applied machine learning is to **never fall in love with an easy narrative**. 
+At first glance, the data provides a highly satisfying answer. It suggests that lemmatization is the clear winner because it elegantly translates Dante's complex, archaic verb conjugations into terms a modern user might type. 
+However, a fundamental principle of applied ML and of life in general is to **never fall in love with an easy narrative**. 
 
 **The Reality**
 
-While the aggregate metrics show a clear victory for the lemma index, a rigorous decomposition of the data reveals a different reality. The underlying mechanism driving this success is not the sophisticated translation of poetic vocabulary, but rather the shallow, statistical matching of common grammatical function words. This evaluation demonstrates why complementary models require explicit routing rather than naive fusion, and why trusting the data decomposition is more important than trusting an intuitive story.
+While the aggregate metrics show a clear victory for the lemma index, a decomposition of the data reveals a different reality. The underlying mechanism driving this success is not the translation of poetic vocabulary, 
+but rather the shallow, statistical matching of common grammatical function words. 
+This evaluation demonstrates:
+* why complementary models require explicit routing rather than naive fusion
+* why trusting an intuitive story is dangerous.
 
 
 {:.no_toc}
@@ -137,24 +139,17 @@ While the lemma index improves overall recall for this category,
 its head-to-head win rate against the surface index is much more mixed (14 wins to 26 losses) 
 because the specific vocabulary overlap is much lower.
 
-The Categorization Caveat:
-These two types sit on a "fuzzy stylistic boundary". 
-All query types were assigned by a single offline LLM following a fixed taxonomy. Consequently, 
-the exact separation between a "modern" restatement and a "semantic" one is defined by that LLM's internal 
-logic. As a result, any flaws or biases in how the AI sorted these queries naturally 
-skew both our final performance scores and the rules the router learned.
-
 ## Naive Fusion fails
 
 Because surface and lemma indexes fail on different types of queries, 
-they are complementary. However, attempting to combine them to get the best of both worlds actively hurts performance.  
+they are complementary. However, attempting to combine them hurts performance.  
 
 * Two standard fusion methods were tested: a combined index (a bag-of-words using both form and lemma)
 and Reciprocal Rank Fusion (RRF).
 
 * Both methods performed worse than the single lemma index on Recall@10 and MRR@10 metrics.  
 
-* The fundamental failure occurs because fusion methods average the two rankings. When one specific retriever is clearly 
+* The failure occurs because fusion methods average the two rankings. When one specific retriever is clearly 
 correct for a given query, averaging simply dilutes the accurate result rather than highlighting it.  
 
 | index | R@1 | R@5 | R@10 | MRR@10 |
@@ -182,7 +177,7 @@ the theoretical maximum MRR headroom compared to an impossible, "perfect oracle"
 | lemma-full (best single) | 0.445 | 0.607 | 0.669 | 0.517 |
 | rrf (best fusion) | 0.421 | 0.624 | 0.641 | 0.500 |
 | **router-qt** (in-sample) | 0.462 | 0.617 | 0.676 | 0.530 |
-| **router-qt-loo** (honest) | 0.459 | 0.614 | 0.672 | 0.526 |
+| **router-qt-loo** | 0.459 | 0.614 | 0.672 | 0.526 |
 | oracle(s+l) | 0.476 | 0.648 | 0.679 | 0.547 |
 
 
@@ -210,7 +205,7 @@ scored higher for each individual query.
 Averaging these perfect, hindsight-driven choices gives us an MRR ceiling of 0.547. By comparing our baseline lemma 
 index (0.517) to this oracle ceiling (0.547), we can clearly see a maximum "headroom" of 0.030. We use this theoretical 
 yardstick to prove that our deployable router (0.526) successfully recovers about a third of the total possible
-improvement without cheating.
+improvement.
 
 ## Next Steps
 
@@ -236,7 +231,7 @@ the router's overall performance.
 
 * **Extremely Small Sub-Samples** The entire evaluation rests on a dataset of just 290 queries. 
 Consequently, highly specific categories like misspellings (n=5) or syntactic reordering (n=3) 
-lack statistical significance; their recorded metrics indicate a general trend rather than a reliable magnitude of impact.  
+lack statistical significance.  
 
 * **Inherent AI Labeling Bias** Because a single LLM categorized every query according to a set taxonomy, 
 any subjective fuzziness in its definitions (e.g., distinguishing between a "modern" versus a "semantic" paraphrase)
@@ -244,14 +239,14 @@ is hardwired into the router's core logic.
 
 * **Unfair Tokenization Penalties (hypothesis)** The underlying tokenizer automatically splits Italian contractions 
 (e.g., *nel* becomes *in* + *il*). When a user searches for exactly "nel", 
-the query tokenizer does not break it apart; it processes it as one whole, intact token.
+the query tokenizer does not break it apart; it processes it as one token.
 The surface index looks for an exact string match for "nel" in the text, 
 but the text only contains "in" and "il". Because the exact string is missing, the surface index registers a failure.  
 The *hypothesis* is that this asymmetry penalizes the surface index, making its baseline performance look slightly 
 worse than it actually is, simply because the tokenizer dismantled the function words before the search could happen. 
+
 **We tested this claim directly (see [Appendix A](#appendix-a-testing-the-tokenization-penalty-hypothesis)): the 
-mechanism is real, but the hypothesis does not hold — restoring the split symmetrically leaves the surface baseline 
-essentially unchanged (slightly worse, if anything), because the contraction pieces are the lowest-signal tokens 
+mechanism is real, but its impact insignificant. That's because the contraction pieces are the lowest-signal tokens 
 in the corpus.**
 
 
@@ -271,11 +266,14 @@ conjugations of the copula *essere* (*sono*/*era*/*fossimo* → *essere*). BM25 
 (*essere*'s is 0.73 precisely because it appears in ~48% of tercets), so their contribution is small and, by the 
 model's own logic, legitimate — but it is *shallow*, and it turns out to carry most of the measured gap. When the 
 same stopword filter is applied to **both** indexes, the Recall@10 gap collapses from +0.055 to +0.010 (the copula 
-*essere* alone accounts for a quarter of it) and, in lemma's supposed stronghold, the head-to-head win/loss flips 
+*essere* alone accounts for a quarter of it) and the win/loss flips 
 from 45/29 to 18/48 (see [Appendix B](#appendix-b-how-much-of-the-lemma-advantage-is-incidental)). This does not mean 
-the lemma advantage is fake. Modern paraphrases genuinely share copular structures with Dante's verses, meaning 
-the normalization of function words provides a real, measurable boost. However, it proves that the system's success 
-relies predominantly on shallow grammatical matching rather than decoding complex content words
+the lemma advantage is fake. Modern paraphrases share copular structures with Dante's verses, meaning 
+the normalization of function words provides a real, measurable boost. However, 
+
+**it proves that the system's success 
+relies predominantly on shallow grammatical matching rather than decoding complex content words (the easy narrative 
+we were tempted to believe).**
 
 ## Appendix A: Testing the Tokenization-Penalty Hypothesis
 
@@ -399,11 +397,10 @@ the full function-word filter gives the clean picture; the partial rows are incl
 | surface + stopword removal | 0.448 | 0.576 | 0.621 | 0.501 |
 | lemma + stopword removal | 0.448 | 0.593 | 0.631 | 0.508 |
 
-### The head-to-head flip in lemma's stronghold
+### The flip in lemma wins
 
-Aggregate metrics only narrow; the head-to-head count actually *reverses*. Restricting to the 
-`modern_italian_paraphrase` bucket — the 107 queries that supposedly justify lemmatization — and counting how many 
-each index ranks strictly better than the other:
+Restricting to the 
+`modern_italian_paraphrase` bucket — the 107 queries that should justify lemmatization — and counting:
 
 | modern_italian_paraphrase | lemma wins | lemma losses |
 |---|---|---|
@@ -412,9 +409,9 @@ each index ranks strictly better than the other:
 
 Without a stopword filter, the lemma index wins 45 of these queries and loses 29. Once the grammatical matches stop 
 counting, that flips to 18 wins against 48 losses: in the very category built to favour it, lemmatization now loses 
-more paraphrase queries than it wins. This is not in tension with the small *aggregate* edge in the table above — a 
-head-to-head count measures *direction* (how many queries each index ranks better), the aggregate measures *magnitude* 
-across all 290 queries, and the two need not agree.
+more paraphrase queries than it wins. This is not in contradiction with the small *aggregate* edge in the table above — a 
+count measures *direction* (how many queries each index ranks better), the aggregate measures *magnitude* 
+across all 290 queries.
 
 ### Takeaways
 
@@ -422,12 +419,12 @@ across all 290 queries, and the two need not agree.
 normalization, while only ~20% comes from the content-word morphology (e.g., *disse* → *dire*) the article 
 originally highlighted.
 
-* **A surviving edge.** The lemma index does keep a small, legitimate advantage on content words (MRR 0.508 vs 0.501) 
+* **A surviving edge.** The lemma index does keep a small advantage on content words (MRR 0.508 vs 0.501) 
 from successful dictionary collapses like *bianca* → *bianco* or *morde* → *mordere*.
 
 * **A design choice, not a bug.** The shared grammatical structure is a real statistical regularity that BM25 handles 
 correctly — removing it is *systematically* negative for the lemma index, not a wash, so it is genuine (if shallow) 
-signal. Whether to keep or strip these function-word matches is a valid engineering choice; the point is only that 
+signal. The point is only that 
 the narrative must honestly reflect that grammar, not deep vocabulary, is doing the heavy lifting.
 
 
