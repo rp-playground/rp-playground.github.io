@@ -46,6 +46,8 @@
         .filter(function (c) { return c.style.display !== 'none'; }).length;
       counts[sec.dataset.section || ''] = n;
       totalVisible += n;
+      var secBadge = sec.querySelector('.section-count');
+      if (secBadge) secBadge.textContent = '(' + n + ')';
     });
 
     if (hasTabs) {
