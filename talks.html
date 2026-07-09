@@ -69,7 +69,7 @@ permalink: /talks/
         {%- assign talks = site.talks | sort: "talk_date" | reverse -%}
         {%- if talks.size > 0 -%}
         <section class="item-section">
-          <h2>Talks</h2>
+          <h2>Talks <span class="section-count">({{ talks.size }})</span></h2>
           <div class="grid">
             {%- for t in talks -%}
             <a class="card item-card" href="{{ t.url }}"

@@ -72,7 +72,7 @@ permalink: /books/
         {%- assign books = pinned | concat: rest -%}
         {%- if books.size > 0 -%}
         <section class="item-section">
-          <h2>Books</h2>
+          <h2>Books <span class="section-count">({{ books.size }})</span></h2>
           <div class="grid">
             {%- for b in books -%}
             <a class="card item-card{% if b.pinned %} pinned{% endif %}" href="{{ b.url }}"
