@@ -11,44 +11,6 @@ summary: A running, opinionated reading list — interpretability, training, eva
 A running list of papers I want to read, each with a short note on **why** it
 matters and what I expect to learn. Newest additions go on top.
 
-## Language & evaluation
-
-### The BS-meter: A ChatGPT-Trained Instrument to Detect Sloppy Language-Games
-
-[arxiv.org/abs/2411.15129](https://arxiv.org/abs/2411.15129) · Trevisan, Giddens,
-Dillon & Blackwell · 2024
-
-Two classifiers are trained to separate 1,000 *Nature* papers from typical ChatGPT
-output, one an XGBoost model over word frequencies, the other a RoBERTa model over
-contextual embeddings. Their confidence scores barely agree (r = 0.282), so the
-authors average them to get a number that reflects both vocabulary and context.
-Rescaled to 0–100, that average becomes the **BS-meter**, with "bullshit" in
-Frankfurt's technical sense of indifference to truth rather than deliberate
-falsehood. The instrument is then applied to text that is neither scientific nor
-machine-generated. 45 UK party manifestos score a mean of 49.36 against 9.40 for
-45 transcripts of everyday spoken English from the British National Corpus,
-t(54) = 18.18, p < 0.001. A second experiment repeats the exercise on writing
-associated with David Graeber's bullshit jobs. Party manifestos sit near the
-ChatGPT end of the scale, and ordinary spoken English sits near the *Nature* end.
-
-*Why it matters:* most GPTs I use produce text that is fluent, agreeable, and
-indifferent to whether it is saying anything. I notice it every day, in a growing
-share of what I read, and not only in the text machines wrote. This is the first
-paper I have found that tries to measure that tendency instead of complaining
-about it.
-
-What I really want to sit with is the contamination problem the authors run into.
-Their whole design rests on a control set of human writing that predates or
-excludes ChatGPT, and they admit they cannot fully guarantee it. One of the
-supposedly non-bullshit control texts, advice on how to build a wall, comes back
-from the AI detector GPTZero at 84% probability of being machine-generated. The
-authors flag it and move on. I don't think it can be moved on from. Millions of
-professionals now let a model ghostwrite or "polish" their LinkedIn posts and
-internal reports, and all of that text flows into the corpora that later work will
-treat as the human baseline. So a dataset scraped from humans is no longer purely
-human, and the reference class the whole method depends on is dissolving while the
-method is being used to measure against it.
-
 ## Calibration & uncertainty
 
 ### On Calibration of Modern Neural Networks

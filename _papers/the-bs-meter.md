@@ -6,7 +6,8 @@ paper_year: 2024
 link: https://arxiv.org/abs/2411.15129
 date: 2026-07-09
 tags: [LLM evaluation, calibration]
-summary: "Two classifiers trained on Nature articles vs ChatGPT-4o imitations are turned into a 0–100 'bullshit' scale — a relative similarity index dressed up as an absolute measure."
+summary: "Two classifiers trained on Nature articles vs ChatGPT-4o imitations are turned into a 0–100 'bullshit' scale: 
+a relative similarity index dressed up as an absolute measure."
 ---
 
 The authors propose a conceptual-philosophical representation of ChatGPT consisting of two components:
