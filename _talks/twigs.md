@@ -1,5 +1,6 @@
 ---
 layout: talk
+published: false
 title: "Diffusion Twigs with Loop Guidance — Giangiacomo Mercatali at ETH Zurich"
 speaker: "Giangiacomo Mercatali"
 event: "ETH Zurich · Fin & Ins Math Seminar"
@@ -11,12 +12,36 @@ tags: [diffusion, graph generation, molecular design, guidance, generative-model
 summary: "Notes on Mercatali's Twigs — a diffusion model that splits structure and properties into a trunk and stems, and lets them negotiate through loop guidance instead of pinning the property on as a fixed label."
 ---
 
-Notes from Giangiacomo Mercatali's talk in ETH Zurich's Financial and Insurance
-Mathematics seminar. The broader talk surveyed several ways to constrain
-generative diffusion and flow models — conditioning, causal structure, partial
-physics, hard constraints — but I want to focus on the one paper he went deepest
-on: **Diffusion Twigs with Loop Guidance for Conditional Graph Generation**
-(NeurIPS 2024).
+Notes from Giangiacomo Mercatali's talk in ETH Zurich's Financial and Insurance Mathematics seminar. 
+Mercatali reviewed results from several of his papers; here I will focus on the paper I find most interesting: 
+Diffusion Twigs with Loop Guidance for Conditional Graph Generation (NeurIPS 2024).
+
+
+## Draft notes
+
+https://neurips.cc/media/neurips-2024/Slides/94177.pdf
+https://medium.com/@baicenxiao/understand-classifier-guidance-and-classifier-free-guidance-in-diffusion-model-via-python-e92c0c46ec18
+
+Notes from Giangiacomo Mercatali's talk in ETH Zurich's Financial and Insurance Mathematics seminar. 
+ Mercatali reviewed results from several of his papers; here I will focus on the paper I find most interesting: 
+ Diffusion Twigs with Loop Guidance for Conditional Graph Generation (NeurIPS 2024).
+ 
+ Task: generate a graph with certain desired properties.
+ Fundamental problem for: design of new drugs and materials.
+ 
+ Existing Guiding diffusion procedures:
+ - Classifier Guidance
+ - Classifier-free Guidance
+ 
+The forward process of a diffusion model: from image to noise 
+The backward process of a diffusion model: from noise to image
+
+To control the generated images: introduce conditional controls 
+
+Feature//	Classifier-Guided//	Classifier-Free Guidance
+Need to train another model?//	Yes, a classifier needs to be trained using noisy images.//	Not really, for example, CLIP can be used directly for text-to-image tasks.
+Need to retrain the diffusion model?//	No, pre-trained diffusion models are usable as is.//	Yes, diffusion needs to be retrained using this method.
+Control over final output//	Can control the generated category. The number of classes the classifier can identify is the number of classes you can control in generation.//	Any (almost) condition can be controlled.
 
 ## The problem
 
