@@ -1,7 +1,7 @@
 ---
 layout: article
 title: "The Reality Gap: Evaluating Verse Retrieval on Dante"
-subtitle: "More realistic benchmarks dropped Recall@1 from 0.92 to 0.42 — and showed what actually moved the needle"
+subtitle: "More realistic benchmarks dropped Recall@1 from 0.92 to 0.42"
 description: A retrieval system for finding verses of the Divine Comedy scored Recall@1 0.92 on the first canto. I evaluated the system on realistic cross-canto queries and the score dropped to 0.42. Further measurements showed the bottleneck is reranking, not initial recall.
 summary: My Dante verse-retrieval system scored Recall@1 0.92 on the first canto. I built benchmarks using keywords, half-remembered episodes, and cross-canto searches, and the score fell to 0.42. I tested a stronger encoder, query-aware fusion, and larger rerankers to address the gap. I report the negative results and the diagnostic measurements that identify the next required step.
 date: 2026-07-10
