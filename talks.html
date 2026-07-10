@@ -62,25 +62,25 @@ permalink: /talks/
 
     <div class="layout">
       <aside>
-        {%- include filter-aside.html items=site.talks year_field="talk_date" -%}
+        {%- include filter-aside.html items=site.talks -%}
       </aside>
 
       <main>
         <p class="search-empty" style="display:none">No matches.</p>
-        {%- assign talks = site.talks | sort: "talk_date" | reverse -%}
+        {%- assign talks = site.talks | sort: "date" | reverse -%}
         {%- if talks.size > 0 -%}
         <section class="item-section">
           <h2>Talks <span class="section-count">({{ talks.size }})</span></h2>
           <div class="grid">
             {%- for t in talks -%}
             <a class="card item-card" href="{{ t.url }}"
-               data-tags="|{{ t.tags | join: '|' }}|" data-period="{{ t.talk_date | default: t.date | date: '%B %Y' }}">
+               data-tags="|{{ t.tags | join: '|' }}|" data-period="{{ t.date | date: '%B %Y' }}">
               <h3>{{ t.title }}</h3>
               <p class="byline">{{ t.speaker | escape }}{% if t.speaker and t.event %} · {% endif %}{{ t.event | escape }}</p>
               <p>{{ t.summary }}</p>
               <div class="tags">
                 {%- for tag in t.tags -%}<span class="tag">{{ tag }}</span>{%- endfor -%}
-                <span class="meta-year">{{ t.talk_date | default: t.date | date: "%B %Y" }}</span>
+                <span class="meta-year">{{ t.date | date: "%B %Y" }}</span>
               </div>
             </a>
             {%- endfor -%}

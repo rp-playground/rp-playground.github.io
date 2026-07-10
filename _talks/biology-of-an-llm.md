@@ -4,7 +4,7 @@ title: "On the Biology of a Large Language Model"
 speaker: "Josh Batson"
 event: "Stanford CS25 V5"
 talk_date: 2025-05-13
-date: 2026-06-13
+date: 2026-05-01   # watched the recording in May 2026 (only month is displayed)
 link: https://www.youtube.com/watch?v=vRQs7qfIDaU&t=1947s
 link_label: "Recording (Stanford CS25 V5) ↗"
 tags: [interpretability, mechanistic-interpretability, attribution-graphs, LLM, Anthropic]

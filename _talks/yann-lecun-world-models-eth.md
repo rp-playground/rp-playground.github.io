@@ -4,7 +4,7 @@ title: "World Models — Yann LeCun at ETH Zurich"
 speaker: "Yann LeCun"
 event: "ETH Zurich"
 talk_date: 2026-05-29
-date: 2026-06-06
+date: 2026-05-29   # attended live — watched date coincides with the talk date
 link: https://bit.ly/PAth2AMI
 link_label: "A Path Towards Autonomous Machine Intelligence ↗"
 tags: [world models, JEPA, self-supervised, energy-based models]

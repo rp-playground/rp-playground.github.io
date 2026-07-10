@@ -75,7 +75,9 @@
       <div class="paper-links"><a href="{{ page.link }}" target="_blank" rel="noopener">{{ page.link_label | default: "Slides / video ↗" }}</a></div>
       {% endif %}
       <p class="paper-meta">
-        {% if page.talk_date %}Given {{ page.talk_date | date: "%B %-d, %Y" }}{% elsif page.date %}Noted {{ page.date | date: "%B %Y" }}{% endif %}
+        {%- assign given_key = page.talk_date | date: "%Y-%m-%d" -%}
+        {%- assign watched_key = page.date | date: "%Y-%m-%d" -%}
+        {% if page.talk_date and page.date and given_key == watched_key %}Given & watched {{ page.talk_date | date: "%B %-d, %Y" }}{% elsif page.talk_date and page.date %}Given {{ page.talk_date | date: "%B %-d, %Y" }} · Watched {{ page.date | date: "%B %Y" }}{% elsif page.talk_date %}Given {{ page.talk_date | date: "%B %-d, %Y" }}{% elsif page.date %}Watched {{ page.date | date: "%B %Y" }}{% endif %}
         {% if page.tags %}<span class="tags">{% for t in page.tags %}<span class="tag">{{ t }}</span>{% endfor %}</span>{% endif %}
       </p>
     </header>
