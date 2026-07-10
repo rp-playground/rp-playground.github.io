@@ -3,6 +3,10 @@ layout: paper
 title: "Papers to read"
 pinned: true
 collapsible: true
+# use_build_date makes the listed/displayed month+year track the site build
+# time (see filter-aside.html, papers.html, paper.html) so this running list
+# always shows the current month. `date` stays as a static fallback.
+use_build_date: true
 date: 2026-06-14
 tags: [reading list]
 summary: A running, opinionated reading list — interpretability, training, evaluation — with a one-line motivation per paper so I never open one without knowing why.

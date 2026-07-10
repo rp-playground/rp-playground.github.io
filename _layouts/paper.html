@@ -100,7 +100,7 @@
       <div class="paper-links"><a href="{{ page.link }}" target="_blank" rel="noopener">Read paper ↗</a></div>
       {% endif %}
       <p class="paper-meta">
-        {% if page.date %}Read {{ page.date | date: "%B %Y" }}{% endif %}
+        {% if page.use_build_date %}Updated {{ site.time | date: "%B %Y" }}{% elsif page.date %}Read {{ page.date | date: "%B %Y" }}{% endif %}
         {% if page.tags %}<span class="tags">{% for t in page.tags %}<span class="tag">{{ t }}</span>{% endfor %}</span>{% endif %}
       </p>
     </header>

@@ -76,14 +76,15 @@ permalink: /papers/
           <h2>Papers <span class="section-count">({{ papers.size }})</span></h2>
           <div class="grid">
             {%- for p in papers -%}
+            {%- assign pdate = p.date -%}{%- if p.use_build_date -%}{%- assign pdate = site.time -%}{%- endif -%}
             <a class="card item-card{% if p.pinned %} pinned{% endif %}" href="{{ p.url }}"
-               {% if p.pinned %}data-pinned="true" {% endif %}data-tags="|{{ p.tags | join: '|' }}|" data-period="{{ p.date | date: '%B %Y' }}">
+               {% if p.pinned %}data-pinned="true" {% endif %}data-tags="|{{ p.tags | join: '|' }}|" data-period="{{ pdate | date: '%B %Y' }}">
               <h3>{{ p.title }}</h3>
               <p class="byline">{{ p.authors | escape }}{% if p.authors and p.paper_year %} · {% endif %}{{ p.paper_year }}</p>
               <p>{{ p.summary }}</p>
               <div class="tags">
                 {%- for t in p.tags -%}<span class="tag">{{ t }}</span>{%- endfor -%}
-                <span class="meta-year">{{ p.date | date: "%B %Y" }}</span>
+                <span class="meta-year">{{ pdate | date: "%B %Y" }}</span>
               </div>
             </a>
             {%- endfor -%}

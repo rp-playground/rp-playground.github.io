@@ -15,6 +15,7 @@
 {%- for item in items -%}
   {%- for t in item.tags -%}{%- assign tag_acc = tag_acc | append: t | append: "~" -%}{%- endfor -%}
   {%- assign dval = item[yfield] | default: item.date -%}
+  {%- if item.use_build_date -%}{%- assign dval = site.time -%}{%- endif -%}
   {%- assign sortkey = dval | date: "%Y-%m" -%}
   {%- assign label = dval | date: "%B %Y" -%}
   {%- assign period_acc = period_acc | append: sortkey | append: "|" | append: label | append: "~" -%}
