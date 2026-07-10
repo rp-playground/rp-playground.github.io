@@ -13,6 +13,8 @@ description: "My replication of the fast.ai results from the 'Improving Training
 
 <div class="toc" markdown="1">
 
+My replication of the fast.ai results from the 'Improving Training Stability' section of [chapter 13 of fastbook](https://github.com/fastai/fastbook/blob/master/13_convolutions.ipynb), reimplemented in pure PyTorch (no fastai library) on MNIST.
+
 **Contents**
 {:.no_toc}
 * TOC
