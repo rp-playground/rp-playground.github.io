@@ -30,3 +30,6 @@ collections:
   talks:
     output: true
     permalink: /talks/:name/
+  courses:
+    output: true
+    permalink: /courses/:name/
