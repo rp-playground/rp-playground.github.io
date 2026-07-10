@@ -77,13 +77,13 @@ permalink: /books/
           <div class="grid">
             {%- for b in books -%}
             <a class="card item-card{% if b.pinned %} pinned{% endif %}" href="{{ b.url }}"
-               {% if b.pinned %}data-pinned="true" {% endif %}data-tags="|{{ b.tags | join: '|' }}|" data-year="{{ b.date | date: '%Y' }}">
+               {% if b.pinned %}data-pinned="true" {% endif %}data-tags="|{{ b.tags | join: '|' }}|" data-period="{{ b.date | date: '%B %Y' }}">
               <h3>{{ b.title }}</h3>
               <p class="byline">{{ b.authors | escape }}{% if b.authors and b.book_year %} · {% endif %}{{ b.book_year }}</p>
               <p>{{ b.summary }}</p>
               <div class="tags">
                 {%- for t in b.tags -%}<span class="tag">{{ t }}</span>{%- endfor -%}
-                <span class="meta-year">{{ b.date | date: "%Y" }}</span>
+                <span class="meta-year">{{ b.date | date: "%B %Y" }}</span>
               </div>
             </a>
             {%- endfor -%}

@@ -73,7 +73,7 @@
     </nav>
     <header class="site">
       <h1>Raffaele P.</h1>
-      <p class="subtitle">From physics to finance to ML (learning) — experiments, write-ups, talks  &amp; papers</p>
+      <p class="subtitle">From physics to finance to learning ML — experiments, write-ups, talks, courses  &amp; papers</p>
       <div class="links">
         <!-- TODO: real links -->
         <a href="https://github.com/YOUR_USERNAME">GitHub</a>
@@ -107,12 +107,12 @@
           <div class="grid">
             {%- for w in writing -%}
             <a class="card item-card" href="{{ w.url }}"
-               data-tags="|{{ w.tags | join: '|' }}|" data-year="{{ w.date | date: '%Y' }}">
+               data-tags="|{{ w.tags | join: '|' }}|" data-period="{{ w.date | date: '%B %Y' }}">
               <h3>{{ w.title }}</h3>
               <p>{{ w.summary }}</p>
               <div class="tags">
                 {%- for t in w.tags -%}<span class="tag">{{ t }}</span>{%- endfor -%}
-                <span class="meta-year">{{ w.date | date: "%Y" }}</span>
+                <span class="meta-year">{{ w.date | date: "%B %Y" }}</span>
               </div>
             </a>
             {%- endfor -%}
@@ -125,12 +125,12 @@
           <div class="grid">
             {%- for p in projects -%}
             <a class="card item-card" href="{{ p.url }}"
-               data-tags="|{{ p.tags | join: '|' }}|" data-year="{{ p.date | date: '%Y' }}">
+               data-tags="|{{ p.tags | join: '|' }}|" data-period="{{ p.date | date: '%B %Y' }}">
               <h3>{{ p.title }}</h3>
               <p>{{ p.summary }}</p>
               <div class="tags">
                 {%- for t in p.tags -%}<span class="tag">{{ t }}</span>{%- endfor -%}
-                <span class="meta-year">{{ p.date | date: "%Y" }}</span>
+                <span class="meta-year">{{ p.date | date: "%B %Y" }}</span>
               </div>
             </a>
             {%- endfor -%}

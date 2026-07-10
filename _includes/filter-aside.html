@@ -1,23 +1,27 @@
 {%- comment -%}
-  Sidebar: search box + tag/year filters.
+  Sidebar: search box + tag/date filters.
   Caller passes the item list:  {% include filter-aside.html items=site.papers %}
   Tags are ranked by frequency (desc); only the top N show, the rest collapse
   behind a "+ N more" toggle wired in assets/js/filter.js.
+  Dates are grouped by month + year ("July 2026"); each period entry is stored
+  as "YYYY-MM|Month YYYY" so a plain string sort orders them chronologically.
 {%- endcomment -%}
 {%- assign items = include.items -%}
 {%- assign visible_n = 8 -%}
 {%- assign yfield = include.year_field | default: "date" -%}
 
 {%- assign tag_acc = "" -%}
-{%- assign year_acc = "" -%}
+{%- assign period_acc = "" -%}
 {%- for item in items -%}
   {%- for t in item.tags -%}{%- assign tag_acc = tag_acc | append: t | append: "~" -%}{%- endfor -%}
-  {%- assign y = item[yfield] | default: item.date | date: "%Y" -%}
-  {%- assign year_acc = year_acc | append: y | append: "~" -%}
+  {%- assign dval = item[yfield] | default: item.date -%}
+  {%- assign sortkey = dval | date: "%Y-%m" -%}
+  {%- assign label = dval | date: "%B %Y" -%}
+  {%- assign period_acc = period_acc | append: sortkey | append: "|" | append: label | append: "~" -%}
 {%- endfor -%}
 {%- assign tag_occ = tag_acc | split: "~" -%}
 {%- assign uniq_tags = tag_occ | uniq -%}
-{%- assign all_years = year_acc | split: "~" | uniq | sort | reverse -%}
+{%- assign all_periods = period_acc | split: "~" | uniq | sort | reverse -%}
 
 {%- comment -%} Rank tags by count: build "NNN:tag" keys, sort, reverse. {%- endcomment -%}
 {%- assign ranked = "" -%}
@@ -50,9 +54,11 @@
 {%- endif -%}
 {%- endif -%}
 
-{%- if all_years.size > 0 -%}
-<div class="label">Year</div>
-{%- for y in all_years -%}
-<button class="filter" data-filter="year" data-value="{{ y }}">{{ y }}</button>
+{%- if all_periods.size > 0 -%}
+<div class="label">Date</div>
+{%- for p in all_periods -%}
+  {%- if p == "" -%}{%- continue -%}{%- endif -%}
+  {%- assign parts = p | split: "|" -%}
+<button class="filter" data-filter="period" data-value="{{ parts[1] }}">{{ parts[1] }}</button>
 {%- endfor -%}
 {%- endif -%}

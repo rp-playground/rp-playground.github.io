@@ -18,7 +18,7 @@
     if (card.dataset.pinned === 'true') return true;
     if (type === 'all') return true;
     if (type === 'tag') return ('|' + card.dataset.tags + '|').indexOf('|' + value + '|') !== -1;
-    if (type === 'year') return card.dataset.year === value;
+    if (type === 'period') return card.dataset.period === value;
     return true;
   }
 
@@ -83,7 +83,7 @@
     // Reflect filter + search in the URL hash so the view is shareable.
     var parts = [];
     if (state.type === 'tag') parts.push('tag=' + encodeURIComponent(state.value));
-    else if (state.type === 'year') parts.push('year=' + encodeURIComponent(state.value));
+    else if (state.type === 'period') parts.push('period=' + encodeURIComponent(state.value));
     if (state.query) parts.push('q=' + encodeURIComponent(state.query));
     history.replaceState(null, '', parts.length ? '#' + parts.join('&') : location.pathname);
   }
@@ -135,7 +135,7 @@
     var k = p.slice(0, i);
     var v = decodeURIComponent(p.slice(i + 1));
     if (k === 'tag') { state.type = 'tag'; state.value = v; }
-    else if (k === 'year') { state.type = 'year'; state.value = v; }
+    else if (k === 'period') { state.type = 'period'; state.value = v; }
     else if (k === 'q') { state.query = v.toLowerCase(); }
   });
   if (search && state.query) search.value = state.query;

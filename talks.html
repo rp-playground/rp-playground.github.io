@@ -74,13 +74,13 @@ permalink: /talks/
           <div class="grid">
             {%- for t in talks -%}
             <a class="card item-card" href="{{ t.url }}"
-               data-tags="|{{ t.tags | join: '|' }}|" data-year="{{ t.talk_date | default: t.date | date: '%Y' }}">
+               data-tags="|{{ t.tags | join: '|' }}|" data-period="{{ t.talk_date | default: t.date | date: '%B %Y' }}">
               <h3>{{ t.title }}</h3>
               <p class="byline">{{ t.speaker | escape }}{% if t.speaker and t.event %} · {% endif %}{{ t.event | escape }}</p>
               <p>{{ t.summary }}</p>
               <div class="tags">
                 {%- for tag in t.tags -%}<span class="tag">{{ tag }}</span>{%- endfor -%}
-                <span class="meta-year">{{ t.talk_date | default: t.date | date: "%Y" }}</span>
+                <span class="meta-year">{{ t.talk_date | default: t.date | date: "%B %Y" }}</span>
               </div>
             </a>
             {%- endfor -%}
