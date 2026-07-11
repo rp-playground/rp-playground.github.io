@@ -36,11 +36,11 @@ def conv(ni, nf, ks=3, act=True):
 
 def simple_cnn():
     return sequential(
-        conv(1 ,8, ks=5),        #14x14
-        conv(8 ,16),             #7x7
-        conv(16,32),             #4x4
-        conv(32,64),             #2x2
-        conv(64,10, act=False),  #1x1
+        conv(1, 8, ks=5),         #14x14
+        conv(8, 16),              #7x7
+        conv(16, 32),             #4x4
+        conv(32, 64),             #2x2
+        conv(64, 10, act=False),  #1x1
         Flatten(),
     )
 ```
