@@ -281,11 +281,16 @@ from the source:
 To do this we use the ActivationStats callback, which records the mean, standard deviation, and histogram of 
 activations of every trainable layer* 
 
+
 ### batch number on the x-axis
 
 number of batches (len(train_dl)) = 937. 937 batches of 60 images each = 59968 (not 60000 because drop_last=True)
 
 ### What the plots measure
 
-the plot of mean, std and "% near zero"  vs batch measure
+on the y-axis: mean, std and "% near zero"  per batch 
 e.g. the mean plot measures how the mean of the activations for a given layer changes during training 
+
+### epochs > 1
+
+stat * epochs
