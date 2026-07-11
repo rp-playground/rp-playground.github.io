@@ -291,6 +291,15 @@ number of batches (len(train_dl)) = 937. 937 batches of 60 images each = 59968 (
 on the y-axis: mean, std and "% near zero"  per batch 
 e.g. the mean plot measures how the mean of the activations for a given layer changes during training 
 
-### epochs > 1
+### What changes when epochs > 1
 
-stat * epochs
+The hook (fastbook13.py:162-171) fires on every forward pass 
+while module.training is True and appends one scalar 
+(or one 40-bin histogram) per batch: the mean/std over the entire output tensor, 
+the fraction of activations ≤ 0.01, and torch.histc(out, bins=40, min=0, max=10).
+
+Hence: 
+
+* The hooks stay registered across epochs and there is no reset between epochs, so the lists simply accumulate one entry per training batch, concatenated across all epochs. 
+With bs=512 and drop_last=True, that’s 117 batches/epoch, so the 5-epoch batchnorm run records 585 points per layer.
+* the x-axis is the global batch index across all epochs, not batch-within-epoch. 
