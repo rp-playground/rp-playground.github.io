@@ -57,7 +57,7 @@ I applied two changes to the dense index:
 2. Indexing the original `t.dante` as a dense passage improved it from 0.87 to 0.92.
 
 <figure>
-  <img src="/assets/dante-retrieval-reality-gap/fig_improvements_canto1.png" alt="Bar chart titled 'Representations that improve dense — Inferno canto 1 (R@1)'. X-axis labels centered under the bars: 'BM25 + e5-large' / '(EN trans. + paraphrases)', 'Italian paraphrases' / 'added to index', 'Original t.dante' / 'as dense passage'. Dense bars rise 0.79 → 0.87 → 0.92; grey BM25 bars flat ~0.73.">
+  <img src="/assets/dante-retrieval-reality-gap/fig_improvements_canto1.png" alt="Bar chart titled 'Representations that improve dense: Inferno canto 1 (R@1)'. X-axis labels centered under the bars: 'BM25 + e5-large' / '(EN trans. + paraphrases)', 'Italian paraphrases' / 'added to index', 'Original t.dante' / 'as dense passage'. Dense bars rise 0.79 → 0.87 → 0.92; grey BM25 bars flat ~0.73.">
   <figcaption>The dense retriever’s Recall@1 improves as we add more text it can match against (Italian paraphrases, then the original verses). BM25 (grey line) stays flat as a lexical baseline.</figcaption>
 </figure>
 
@@ -77,8 +77,8 @@ I tested the system on curated sets for cantos 4, 5, 26, and 30 to see if the 0.
 On Canto 1, Italian paraphrases added no value once the original verse was indexed. I tested whether paraphrases help on less-famous cantos by generating them for cantos 4, 5, 26, and 30. I measured the dense retriever with and without them.
 
 <figure>
-  <img src="/assets/dante-retrieval-reality-gap/fig_it_paraphrase_effect.png" alt="Grouped bars 'Isolated effect of Italian paraphrases — dense R@1 per canto'. For cantos 4/5/26/30, a light-blue 't.dante only' bar next to a darker-blue '+ Italian paraphrases' bar (both dense): 0.70/0.68, 0.67/0.67, 0.75/0.77, 0.72/0.74. Subtitle: negligible/mixed once t.dante is indexed (mean 0.71 → 0.72).">
-  <figcaption>Adding Italian paraphrases on top of the original verse moves dense R@1 by +0.006 on average — negligible and mixed.</figcaption>
+  <img src="/assets/dante-retrieval-reality-gap/fig_it_paraphrase_effect.png" alt="Grouped bars 'Isolated effect of Italian paraphrases: dense R@1 per canto'. For cantos 4/5/26/30, a light-blue 't.dante only' bar next to a darker-blue '+ Italian paraphrases' bar (both dense): 0.70/0.68, 0.67/0.67, 0.75/0.77, 0.72/0.74. Subtitle: negligible/mixed once t.dante is indexed (mean 0.71 → 0.72).">
+  <figcaption>Adding Italian paraphrases on top of the original verse moves dense R@1 by +0.006 on average: negligible and mixed.</figcaption>
 </figure>
 
 The effect was small and inconsistent. Mean Recall@1 went from 0.71 to 0.72 (−0.02 on Canto 4, 0 on Canto 5, +0.02 on Cantos 26 and 30). It decreased Recall@5 on two cantos because near-duplicate sentences crowded the top results. The Italian paraphrase remains redundant across cantos once the original verse is indexed.
@@ -88,7 +88,7 @@ The effect was small and inconsistent. Mean Recall@1 went from 0.71 to 0.72 (−
 Canto 1 scores higher and is frequently quoted, suggesting memorization. But Canto 1 might just have easier vocabulary or better translations. I ran an ablation contrasting Canto 1 with the other cantos under three index conditions. First, I tested whether indexing the original verse outperforms an Italian paraphrase on the famous canto. Second, I tested whether the famous canto is still recalled better when the index contains only English text.
 
 <figure>
-  <img src="/assets/dante-retrieval-reality-gap/fig_memorization_ablation.png" alt="Grouped bar chart 'Memorization ablation — dense R@1 by index condition'. Two groups, 'canto 1 (famous, n=52)' and 'cantos 4/5/26/30 (non-famous, n=196)', each with three blue bars for the index condition: EN-only, + Italian paraphrase, + original verse. Canto 1 climbs steeply 0.79 → 0.86 → 0.92; the pooled non-famous cantos stay flat 0.67 → 0.70 → 0.71. Subtitle: exact-verse premium +0.058 (canto 1) vs +0.005 pooled; EN-only fame gap 0.79 vs 0.67 — both signals are canto-1-specific.">
+  <img src="/assets/dante-retrieval-reality-gap/fig_memorization_ablation.png" alt="Grouped bar chart 'Memorization ablation, dense R@1 by index condition'. Two groups, 'canto 1 (famous, n=52)' and 'cantos 4/5/26/30 (non-famous, n=196)', each with three blue bars for the index condition: EN-only, + Italian paraphrase, + original verse. Canto 1 climbs steeply 0.79 → 0.86 → 0.92; the pooled non-famous cantos stay flat 0.67 → 0.70 → 0.71. Subtitle: exact-verse premium +0.058 (canto 1) vs +0.005 pooled; EN-only fame gap 0.79 vs 0.67, both signals are canto-1-specific.">
   <figcaption>Both memorization signatures are canto-1-specific: the original verse buys canto 1 a jump a meaning-equivalent paraphrase does not, and even English-only the famous canto is recalled better.</figcaption>
 </figure>
 
@@ -139,7 +139,7 @@ I used query-aware fusion to detect the query language. It sets BM25's weight to
 **Reranking.** A cross-encoder evaluates `(query, passage)` pairs and reorders the top-50 candidates. Recall@1 increased from 0.42 to 0.51 on the cross-canto set, and from 0.92 to 0.96 on Canto 1. This component improved over dense and fusion baselines on both benchmarks.
 
 <figure>
-  <img src="/assets/dante-retrieval-reality-gap/fig_realworld_pipeline.png" alt="Grouped bars on the cross-canto set: R@1 and MRR@10 across four pipeline stages — BM25, dense, RRF query-aware, + reranker. R@1 climbs 0.24, 0.42, 0.42, 0.51.">
+  <img src="/assets/dante-retrieval-reality-gap/fig_realworld_pipeline.png" alt="Grouped bars on the cross-canto set: R@1 and MRR@10 across four pipeline stages: BM25, dense, RRF query-aware, + reranker. R@1 climbs 0.24, 0.42, 0.42, 0.51.">
   <figcaption>The stack on real-world queries: lexical and semantic retrieval, then query-aware fusion, then cross-encoder reranking.</figcaption>
 </figure>
 
@@ -211,6 +211,6 @@ This evaluation framework contains methodological weaknesses:
 - **Circularity in labels**: The LLM that generated the queries likely classified their difficulty, introducing bias.
 - **Encoder limit claim**: The conclusion that the encoder is not the limiter relies only on the post-rerank score.
 
-**Note — entity contexts.** The per-character descriptive contexts were extracted by parsing the English Wikipedia [List of cultural references in the Divine Comedy](https://en.wikipedia.org/wiki/List_of_cultural_references_in_the_Divine_Comedy), then mapping each name to its Italian form via the Italian Wikipedia character categories — e.g. [Personaggi citati nella Divina Commedia (Inferno)](https://it.wikipedia.org/wiki/Categoria:Personaggi_citati_nella_Divina_Commedia_%28Inferno%29).
+**Note, entity contexts.** The per-character descriptive contexts were extracted by parsing the English Wikipedia [List of cultural references in the Divine Comedy](https://en.wikipedia.org/wiki/List_of_cultural_references_in_the_Divine_Comedy), then mapping each name to its Italian form via the Italian Wikipedia character categories, e.g. [Personaggi citati nella Divina Commedia (Inferno)](https://it.wikipedia.org/wiki/Categoria:Personaggi_citati_nella_Divina_Commedia_%28Inferno%29).
 
 *This is a working draft from an ongoing project; numbers and figures are reproducible from the project's versioned ML journal.*

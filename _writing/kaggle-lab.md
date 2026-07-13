@@ -1,7 +1,7 @@
 ---
 layout: article
 title: "A reproducible Kaggle log, regressions included"
-description: A small experiment-tracking framework for Kaggle — changelog-first runs, auto-submit, score polling, and an append-only log. The useful part wasn't the leaderboard climb; it was the 15 regressions it made me keep.
+description: "A small experiment-tracking framework for Kaggle: changelog-first runs, auto-submit, score polling, and an append-only log. The useful part wasn't the leaderboard climb; it was the 15 regressions it made me keep."
 summary: I built a tiny framework so every Kaggle submission was a falsifiable run. The leaderboard went 16704 → 12438, but the thing I actually got from it was an instructive log of the 15 ideas that made the score worse.
 date: 2026-06-07
 tags: [MLOps, experiment tracking, Kaggle, reproducibility]
@@ -38,7 +38,7 @@ git SHA, a SHA1 of the submission file (so I can't silently re-submit the same C
 the changelog, and the Kaggle score.
 
 The `parent` field is what turns the log from a list into a tree. I can ask for the
-graph with `kaggle-lab tree` and read the actual shape of the search — where I
+graph with `kaggle-lab tree` and read the actual shape of the search: where I
 branched, backed out, and branched again.
 
 ## The log is append-only
@@ -53,10 +53,10 @@ RMSE. But the notebook it pointed at actually did something else: it applied
 were from an *earlier* version of the same notebook that had regressed by +123 and
 been rolled back. My headline result had the wrong explanation attached to it.
 
-I fixed it the way the framework is supposed to be fixed — a new row, `supersedes`
+I fixed it the way the framework is supposed to be fixed: a new row, `supersedes`
 pointing at the original, with the correct change and hypothesis. The raw log still
-shows the wrong line; the canonical state — what the tooling shows after collapsing to the latest record 
-per run — shows the correction. This is what an append-only log is for: 
+shows the wrong line; the canonical state (what the tooling shows after collapsing to the latest record 
+per run) shows the correction. This is what an append-only log is for: 
 I relabelled my best result, and both the wrong line and the correction stay visible.
 
 ## The climb wasn't a climb
@@ -114,8 +114,8 @@ A few things generalised past this one competition:
   same base models by about 88 RMSE points. With the log I could attribute that to
   the one change instead of guessing.
 - **The CV–LB gap is real on small tabular data.** With 1455 rows over 5 folds, 
-  each validation fold is small enough that the CV score is noisy — it shifts with how the rows land in folds,
-  not just with the model — and local CV disagreed with the leaderboard more than once. 
+  each validation fold is small enough that the CV score is noisy (it shifts with how the rows land in folds,
+  not just with the model), and local CV disagreed with the leaderboard more than once. 
   That's why I added a fixed 20% holdout as a third, untouched check.
 
 ## Where I'd take it next
@@ -124,7 +124,7 @@ Two directions interest me. Neither is built yet.
 
 **Let an agent drive the loop.** The log is already machine-readable. Each run
 states a change and a hypothesis, carries its parent, and records the score that
-change produced — most of what an agent would need to run the search itself: read
+change produced. That is most of what an agent would need to run the search itself: read
 the tree, propose the next change with a written hypothesis, submit it through the
 same `run` path, read the new score, repeat. Karpathy's framing of an autonomous research
 loop is the obvious reference here.
@@ -133,10 +133,10 @@ loop is the obvious reference here.
 started there. MLflow maps onto it cleanly: a kaggle-lab run becomes an MLflow run,
 the changelog becomes params and tags, the public score a metric, the notebook and
 submission CSV artifacts, and `parent_run_id` a nested run. In return I'd get a UI to
-sort and compare runs and a model registry to serve a chosen submission by version —
+sort and compare runs and a model registry to serve a chosen submission by version,
 the loop I built separately on an [MNIST project](/writing/mnist-mlflow/).
 
 ## What it isn't
 
-It isn't a way to win Kaggle. The artifact I care about is the log: 37 runs, 15 of them failures,
+It isn't a way to win Kaggle. The artifact that matters is the log: 37 runs, 15 of them failures,
 each one a claim I can check against a SHA and a date.

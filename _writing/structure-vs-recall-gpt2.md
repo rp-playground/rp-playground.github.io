@@ -2,8 +2,8 @@
 layout: article
 title: "The capital of France is ` now`"
 subtitle: "Structure vs. Recall in GPT-2 Small"
-description: GPT-2 small continues "The capital of France is" with " now", not " Paris". A walk through the tools — logit lens, tuned lens, direct logit attribution, activation and path patching — that test whether the model is continuing a form or failing to retrieve a fact, and where the answer actually lives.
-summary: Feed GPT-2 small "The capital of France is" and it answers " now", not " Paris". The tempting reading is language-as-structure over fact-recall; this is the attempt to check that reading with real tools — and the trivial explanation (token frequency and training data) that comes back instead.
+description: GPT-2 small continues "The capital of France is" with " now", not " Paris". A walk through the tools, logit lens, tuned lens, direct logit attribution, activation and path patching, that test whether the model is continuing a form or failing to retrieve a fact, and where the answer actually lives.
+summary: Feed GPT-2 small "The capital of France is" and it answers " now", not " Paris". The tempting reading is language-as-structure over fact-recall; this is the attempt to check that reading with real tools, and the trivial explanation (token frequency and training data) that comes back instead.
 date: 2026-06-20
 published: false
 tags: [mech-interp, transformers, interpretability, GPT-2]
@@ -37,7 +37,7 @@ belongs to encyclopedias and grammar books and almost nowhere else.
 And encyclopedias and grammar books are not among the fifteen domains that contributed 
 the most data by volume to WebText, as the model card records.
 
-[Wikipedia wasn’t just underrepresented in WebText — it was deliberately removed during 
+[Wikipedia wasn’t just underrepresented in WebText: it was deliberately removed during 
 construction (the GPT-2 paper’s dataset section says they stripped Wikipedia documents 
 to avoid overlap with evaluation sets). Worth verifying against the source, but if it 
 holds, “the canonical encyclopedia was explicitly excluded” is a sharper claim
@@ -46,8 +46,8 @@ holds, “the canonical encyclopedia was explicitly excluded” is a sharper cla
 What follows is a beginner’s attempt to investigate the questions thoroughly and answer it 
 plainly, using the concepts and tools of mechanistic interpretability.
 
-Its value, I think, lies less in the subject or the answers — the field is by now saturated 
-with similar and better explorations — than in the introduction to mechanistic interpretability 
+Its value, I think, lies less in the subject or the answers (the field is by now saturated 
+with similar and better explorations) than in the introduction to mechanistic interpretability 
 it gave me.
 
 ## The observation
@@ -57,7 +57,7 @@ the token `␣now` (the word "now" with a space in front), and `·Paris` means `
 bare token `Paris` with no space. 
 
 The `·now` we saw isn't special to the end of the sentence. 
-If you let the model predict greedily at every position, not just the last one, it does the same thing each time — it picks 
+If you let the model predict greedily at every position, not just the last one, it does the same thing each time: it picks 
 the word that fits the grammar, not a word that adds a fact:
 
 ```
@@ -67,12 +67,12 @@ pos 4  '...The capital of France'  -> ','
 pos 5  '...The capital of France is' -> ' now'
 ```
 
-I see a promise of Paris at pos 4, after the predicted comma. It appears to me the comma like setting up the phrase 
-"The capital of France, Paris, is…". We will verify it, in the Experiments section.
+I see a promise of Paris at pos 4, after the predicted comma. The comma looks to me like it is setting up the phrase 
+"The capital of France, Paris, is…". We will verify it in the Experiments section.
 
 ## A note on the greedy decoding
 
-Greedy decoding reports only the **argmax** — the single most probable token. So the trace shows that `·now` beats every other token for *first place*; it does **not** show that `·Paris` is absent from the distribution. Tokens like `·now`, `·a`, `·home`, `·one` are generic post-copula continuations that are valid across essentially every topic in the corpus. For `·Paris` to take the top slot it has to outscore that entire mass of generic continuations, and at 124M it doesn't.
+Greedy decoding reports only the **argmax**: the single most probable token. So the trace shows that `·now` beats every other token for *first place*; it does **not** show that `·Paris` is absent from the distribution. Tokens like `·now`, `·a`, `·home`, `·one` are generic post-copula continuations that are valid across essentially every topic in the corpus. For `·Paris` to take the top slot it has to outscore that entire mass of generic continuations, and at 124M it doesn't.
 
 Recall is most likely present but pushed down, not missing.
 
@@ -112,9 +112,7 @@ if the data penalty also applies, France is partly a special case.
 
 ## The mechanistic picture
 
-## The mechanistic picture
-
-Grammatical continuation is learned early and robust — roughly high-order n-gram statistics.
+Grammatical continuation is learned early and robust: roughly high-order n-gram statistics.
 
 Factual recall is a specific stored lookup. In the key–value-memory view of MLPs (Geva et al., 2021), 
 the subject representation accumulates attributes across mid layers, and a later attention head moves 
@@ -124,13 +122,13 @@ Causal tracing (Meng et al., 2022, ROME) localizes the decisive step to mid-laye
 
 If that picture holds in a model this small, it predicts where to look: the `·Paris` write should sit in the 
 mid-layer MLPs, with a layer-wise read showing the name promoted there before the output settles. 
-The prediction can fail in two telling ways — a single attention head might carry the write instead, 
+The prediction can fail in two telling ways: a single attention head might carry the write instead, 
 or the MLPs might suppress the name rather than store it. §3's lenses and direct attribution decide which.
 
 Whatever recall machinery exists at 124M is weak: the France→Paris write isn't sharp enough to outrank 
 the generic continuation. The obvious lever is a larger model. If this is capacity-limited recall, 
 scaling up should sharpen the write and, at some size, lift `·Paris` to the top along a clean monotone 
-curve — which would separate "too small to recall yet" from "structurally unable to." A ragged curve, 
+curve, which would separate "too small to recall yet" from "structurally unable to." A ragged curve, 
 or a name that never reaches the top at any size, would point back to the data rather than the parameter count. 
 §2 runs the scale.
 
@@ -139,10 +137,10 @@ or a name that never reaches the top at any size, would point back to the data r
 At `"The capital of France"` the argmax is a comma. The most natural reading of that comma is that the model is 
 setting up an **appositive**: *"The capital of France, Paris, is…"*. 
 
-The prompt's trailing `"…is"` forecloses the appositive and forces a predicate-nominative slot — and that slot is exactly where the generic continuation wins. The same logic runs through the whole trace: pos 3 `"The capital of"` → `·the` (a determiner, not a country), pos 4 → comma (appositive setup), pos 5 → `·now` (generic predicate). At every position the model takes the locally grammatical continuation and never commits to content.
+The prompt's trailing `"…is"` forecloses the appositive and forces a predicate-nominative slot, and that slot is exactly where the generic continuation wins. The same logic runs through the whole trace: pos 3 `"The capital of"` → `·the` (a determiner, not a country), pos 4 → comma (appositive setup), pos 5 → `·now` (generic predicate). At every position the model takes the locally grammatical continuation and never commits to content.
 
 We can assume that Paris, the knowledge, isn't simply missing; it is **more accessible under one syntactic 
-frame than another**. Recall here is *frame-sensitive* — and this is the sharpest of the bets, because it can 
+frame than another**. Recall here is *frame-sensitive*, and this is the sharpest of the bets, because it can 
 be settled at fixed weights: if changing only the syntax, an appositive or a cloze in place of the 
 predicate-nominative, lifts `·Paris` toward the top, then the knowledge was present and gated by form; 
 if the frame makes no difference, the reading is wrong. §4 makes the swap.
@@ -155,10 +153,10 @@ the name is present but outranked (§1); larger models should raise `·Paris` un
 the component that writes `·Paris` should be a mid-layer MLP (§3); 
 rewording the prompt, at fixed weights, should lift `·Paris` toward the top (§4);
 and France's low rank is either the general frame effect that holds for every capital, 
-or partly a penalty specific to France — §7 settles which.
+or partly a penalty specific to France: §7 settles which.
 
-Two further experiments depend on these rather than testing claims of their own — the causal check in §5 and 
-the feature-level analysis in §6 — and are introduced where they appear.
+Two further experiments depend on these rather than testing claims of their own (the causal check in §5 and 
+the feature-level analysis in §6), and are introduced where they appear.
 
 ### 1. Locate `·Paris` in the distribution
 
@@ -175,14 +173,14 @@ for s in (" Paris", "Paris"):
 
 *Prediction:* `·Paris` lands in the top tens of tokens but not at rank 0. If it's genuinely far down (rank ≫ 1000), the "present but outcompeted" story weakens and the data-dilution explanation gets relatively more weight.
 
-*Result.* The leading-space token `·Paris` sits at **rank 92** (log-prob −6.42) — present and clearly sub-argmax, not buried. The bare `Paris` (the wrong tokenization after a trailing space) is far down at rank 12 973; both are single tokens.
+*Result.* The leading-space token `·Paris` sits at **rank 92** (log-prob −6.42): present and clearly sub-argmax, not buried. The bare `Paris` (the wrong tokenization after a trailing space) is far down at rank 12 973; both are single tokens.
 
 | token | segmentation | rank | log-prob | multitoken |
 |---|---|---|---|---|
 | `" Paris"` | `[" Paris"]` | 92 | −6.42 | False |
 | `"Paris"`  | `["Paris"]`  | 12 973 | −14.57 | False |
 
-Rank 92 out of ~50 k shows clearly that recall is there — the open question is what holds it down, 
+Rank 92 out of ~50 k shows clearly that recall is there: the open question is what holds it down, 
 which is what (4) and (5) test.
 
 ### 2. The scale curve
@@ -192,7 +190,7 @@ Run the same measurement across `gpt2` (124M) → `gpt2-medium` (355M) → `gpt2
 *Prediction:* `·Paris` climbs monotonically with scale and crosses into first place at some size. 
 A clean monotone curve is the actual evidence that this is **capacity-limited recall** rather than impossibility.
 
-*Result.* The curve does **not** behave as predicted. `·Paris` improves sharply but **non-monotonically**, and it **never wins the argmax** — not even at 1.5B:
+*Result.* The curve does **not** behave as predicted. `·Paris` improves sharply but **non-monotonically**, and it **never wins the argmax**, not even at 1.5B:
 
 | model | params | rank of `·Paris` | log-prob | argmax? |
 |---|---|---|---|---|
@@ -206,7 +204,7 @@ Two things contradict the capacity-limited prediction **for France**.
 First, the curve is non-monotonic: `gpt2-medium` 
 pulls `·Paris` to rank 3, but `gpt2-large` regresses to 54 before `gpt2-xl` recovers to rank 2. 
 Second, the winning token shifts (`·now` → `·the` → `·a`) but stays generic; at gpt2-xl `·Paris` actually 
-outscores `·now` (logit diff +1.26) but loses to ` a` — so for France, `·Paris` is *never* the argmax, at any scale here.
+outscores `·now` (logit diff +1.26) but loses to ` a`, so for France, `·Paris` is *never* the argmax, at any scale here.
 
 But four ranks on one prompt can't carry a claim about capacity, so I re-ran the measurement 
 as a distribution over the twelve-capital probe set of §7 at every scale:
@@ -220,30 +218,28 @@ as a distribution over the twelve-capital probe set of §7 at every scale:
 
 The **non-monotonicity** is real: the population median zigzags the same way (27 → 2 → 33 → 0.5), 
 with `gpt2-large` regressing. 
-But capacity is clearly **not** irrelevant — by gpt2-xl the median capital *is* the argmax 
+But capacity is clearly **not** irrelevant: by gpt2-xl the median capital *is* the argmax 
 (median 0.5, six of twelve winning), so for most subjects scale favours the recall. 
 
 **France→Paris is the outlier**: it sits among the worst capitals (rank 2 at xl while the median is 0), 
 which is the §1 data-dilution pattern again. 
 
 <figure>
-  <img src="/assets/structure-vs-recall/section_8_median-ranks.png" alt="Top: median rank of the capital token (log y) versus model size (log x) for gpt2, gpt2-medium, gpt2-large, gpt2-xl, with IQR error bars — 27, 2, 33, 0.5, a non-monotonic curve where gpt2-large regresses well above gpt2-medium and gpt2-xl reaches the rank-1 line. Bottom: per-country rank distributions (box plots with points) at each scale, showing the same non-monotonic spread.">
-  <figcaption>RUN A — median rank of the capital across the twelve-capital probe set, by scale (IQR (the interquartile range) bars), 
+  <img src="/assets/structure-vs-recall/section_8_median-ranks.png" alt="Top: median rank of the capital token (log y) versus model size (log x) for gpt2, gpt2-medium, gpt2-large, gpt2-xl, with IQR error bars: 27, 2, 33, 0.5, a non-monotonic curve where gpt2-large regresses well above gpt2-medium and gpt2-xl reaches the rank-1 line. Bottom: per-country rank distributions (box plots with points) at each scale, showing the same non-monotonic spread.">
+  <figcaption>RUN A: median rank of the capital across the twelve-capital probe set, by scale (IQR (the interquartile range) bars), 
 with the per-country distribution below. 
-<code>gpt2-large</code> regresses, but by <code>gpt2-xl</code> the median capital is the argmax (6 / 12) — capacity does most of the work across subjects; France is the outlier.</figcaption>
+<code>gpt2-large</code> regresses, but by <code>gpt2-xl</code> the median capital is the argmax (6 / 12): capacity does most of the work across subjects; France is the outlier.</figcaption>
 </figure>
 
 <figure>
-  <img src="/assets/structure-vs-recall/section_2_plotrank-log-prob-vs-scale.png" alt="Two line plots across gpt2, gpt2-medium, gpt2-large, gpt2-xl. Left: rank of the ' Paris' token on a log axis — 92, 3, 54, 2 — a non-monotonic dip that never reaches rank 1 (dashed line). Right: log-prob of ' Paris' — −6.42, −3.71, −5.93, −3.08 — the mirror-image non-monotonic curve.">
-  <figcaption>Rank (left, log axis) and log-prob (right) of the leading-space token <code>·Paris</code> across the GPT-2 family, for the France prompt. The dashed line marks rank 1: for France, `·Paris` never crosses it. The improvement is real but non-monotonic; across the twelve-capital population (table above) most capitals do reach the argmax by gpt2-xl — France is the outlier.</figcaption>
+  <img src="/assets/structure-vs-recall/section_2_plotrank-log-prob-vs-scale.png" alt="Two line plots across gpt2, gpt2-medium, gpt2-large, gpt2-xl. Left: rank of the ' Paris' token on a log axis: 92, 3, 54, 2: a non-monotonic dip that never reaches rank 1 (dashed line). Right: log-prob of ' Paris': −6.42, −3.71, −5.93, −3.08: the mirror-image non-monotonic curve.">
+  <figcaption>Rank (left, log axis) and log-prob (right) of the leading-space token <code>·Paris</code> across the GPT-2 family, for the France prompt. The dashed line marks rank 1: for France, `·Paris` never crosses it. The improvement is real but non-monotonic; across the twelve-capital population (table above) most capitals do reach the argmax by gpt2-xl: France is the outlier.</figcaption>
 </figure>
 
 ### 3.1 Layer-wise emergence by logit lens
 
 Apply the logit lens (nostalgebraist) or, better, a tuned lens (Belrose et al., 2023) across layers to find
 *where* `·Paris` is promoted, if at all.
-
-Apply the logit lens (nostalgebraist), or better a tuned lens (Belrose et al., 2023), across layers to find where `·Paris` is promoted, if at all.
 
 *Prediction:* if ROME's localization holds, the `·Paris` logit should jump at specific late mid-layer MLPs in 
 the larger models, while in 124M the promotion may never rise above the generic-continuation mass. 
@@ -259,8 +255,8 @@ that 92 is exactly the §1 number.
 
 
 <figure>
-  <img src="/assets/structure-vs-recall/section_3_logit-lens.png" alt="A line plot, logit-lens rank of the ' Paris' token by stage on a log y-axis, across 26 stages from 0_pre to final_post for gpt2 small. The rank stays around 10^4 for the early stages, declines through the middle, drops steeply to an internal minimum near rank 13 around 9_mid, bumps up slightly, and the final_post stage settles around rank 10^2 — the model's true output rank of 92.">
-  <figcaption>Logit-lens rank of the leading-space token <code>·Paris</code> across 26 stages in gpt2 small (log axis). Promoted from rank ~10⁴ to an internal minimum of <strong>rank ≈ 13 around <code>9_mid</code></strong>, then easing back to <code>final_post</code> = rank 92, the model's true output (§1). A lens trajectory — a mid-stack rise and a return to the surface level — suggestive, but a lens read, not a direct measurement of the Paris logit.</figcaption>
+  <img src="/assets/structure-vs-recall/section_3_logit-lens.png" alt="A line plot, logit-lens rank of the ' Paris' token by stage on a log y-axis, across 26 stages from 0_pre to final_post for gpt2 small. The rank stays around 10^4 for the early stages, declines through the middle, drops steeply to an internal minimum near rank 13 around 9_mid, bumps up slightly, and the final_post stage settles around rank 10^2: the model's true output rank of 92.">
+  <figcaption>Logit-lens rank of the leading-space token <code>·Paris</code> across 26 stages in gpt2 small (log axis). Promoted from rank ~10⁴ to an internal minimum of <strong>rank ≈ 13 around <code>9_mid</code></strong>, then easing back to <code>final_post</code> = rank 92, the model's true output (§1). A lens trajectory, a mid-stack rise and a return to the surface level, suggestive, but a lens read, not a direct measurement of the Paris logit.</figcaption>
 </figure>
 
 ### 3.2 Layer-wise emergence by tuned lens
@@ -277,8 +273,7 @@ A trained **tuned lens** (Belrose et al., 2023) confirms the shape with an indep
 | 5 | 1 462  | −9.54  | | 12 | **4** | **−3.43** |
 | 6 | 1 174  | −9.53  | |    |     |       |
 
-Comparing the two lenses and looking at where they disagree is quite interesting. 
-At the final stage, the only one with a known answer, the raw logit lens gives 92 
+The two lenses disagree at the final stage, the only one with a known answer: the raw logit lens gives 92 
 (exact, by construction) while the tuned lens gives rank 4: it ranks `·Paris` too high. 
 
 By construction the tuned lens (see https://tuned-lens.readthedocs.io/en/latest/) 
@@ -287,17 +282,17 @@ on average across text, so it cannot reproduce a suppression specific to one fra
 Removing `·Paris` here is exactly that kind of input-specific operation (§3–§6): 
 the lens applies its average-case mapping, under which the capital is more available, 
 and reads rank 4 where the model says 92. The size of that overshoot measures how far this frame 
-sits from the text the lens was fit on — the §1 data-dilution point once more.
+sits from the text the lens was fit on: the §1 data-dilution point once more.
 
 What both lenses support is modest: `·Paris` rises in the mid-stack reads, and is not the top token at the output. 
-The stronger claim — that the name is computed mid-stack and then outcompeted — is a lens inference, not a measurement, 
+The stronger claim, that the name is computed mid-stack and then outcompeted, is a lens inference, not a measurement, 
 so I measured it directly (next).
 
 ### 3.3 Layer-wise emergence by direct logit attribution
 
 *Direct logit attribution (the lens-free version).* Decompose the real final-position residual 
 into per-component contributions, apply the model's own fixed `ln_final` scale, and project each onto 
-the `·Paris` − `·now` logit direction. The pieces sum back to the true logit difference — the reconstruction 
+the `·Paris` − `·now` logit direction. The pieces sum back to the true logit difference: the reconstruction 
 check passes to within ≈ 1e-6. 
 Two things fall out:
 
@@ -310,8 +305,8 @@ Two things fall out:
 | L8H11 | +0.27 | | L8H10          | −0.30 |
 | L9H3  | +0.24 | | `L5_mlp`    | −0.28 |
 
-**Promotion is localized to one head.** A single attention head, **L9H8, writes +1.81** to the `·Paris` − `·now` logit 
-— more than three times the next component. 
+**Promotion is localized to one head.** A single attention head, **L9H8, writes +1.81** to the `·Paris` − `·now` logit, 
+more than three times the next component. 
 
 **Suppression is the MLPs and the unembed bias**, all writing toward the generic continuation.
 
@@ -332,27 +327,27 @@ So a specific recall head writes the name, the MLPs (and the bias) write
 the generic continuation more strongly, and the name loses. 
 
 In §6 we talked about a "generic mass"; now we can give a name to that mass, the late MLPs.
-Furthermore, this inverts the ROME expectation from §3: the writer is a single attention head — L9H8, 
-contributing +1.81 to the `·Paris` − `·now` logit, more than three times the next component — not the mid-layer MLPs, 
+Furthermore, this inverts the ROME expectation from §3: the writer is a single attention head, L9H8 
+(+1.81 to the `·Paris` − `·now` logit, more than three times the next component), not the mid-layer MLPs, 
 and those MLPs here suppress the name (`L10_mlp` −1.17, `L7_mlp` −0.77) rather than store it.
 
 A note: DLA credits only a component's *direct* contribution to the logit, so a head that acts *through* a later 
 component is credited to that component instead. 
-Path patching (§5) is the test that separates the two, and it confirms L9H8 directly
-— while showing that L9H8's own output is then routed *suppressively*. 
+Path patching (§5) is the test that separates the two, and it confirms L9H8 directly, 
+while showing that its own output is then routed *suppressively*. 
 
 ### 4. Frame-sensitivity sweep
 
 Hold scale fixed and vary only the syntactic frame, measuring the rank of `·Paris` in each:
 
-- predicate-nominative — `"The capital of France is"`
-- appositive — `"The capital of France,"`
-- QA — `"Q: What is the capital of France? A:"`
-- cloze / definitional — `"The capital of France is the city of"`
+- predicate-nominative: `"The capital of France is"`
+- appositive: `"The capital of France,"`
+- QA: `"Q: What is the capital of France? A:"`
+- cloze / definitional: `"The capital of France is the city of"`
 
-*Prediction:* the appositive and QA frames surface `·Paris` much higher — plausibly at argmax — even at 124M. If a frame change alone flips the readout at fixed weights, the knowledge was there and gated by syntax, which is the central claim made directly observable.
+*Prediction:* the appositive and QA frames surface `·Paris` much higher, plausibly at argmax, even at 124M. If a frame change alone flips the readout at fixed weights, the knowledge was there and gated by syntax, which is the central claim made directly observable.
 
-*Result.* This is the cleanest evidence in the whole piece. At **fixed weights**, changing only the frame moves `·Paris` from rank 92 to **rank 0 — the argmax** — in two of the four frames:
+*Result.* This is the cleanest evidence in the whole piece. At **fixed weights**, changing only the frame moves `·Paris` from rank 92 to **rank 0, the argmax**, in two of the four frames:
 
 | frame | prompt | rank | log-prob | argmax |
 |---|---|---|---|---|
@@ -362,10 +357,10 @@ Hold scale fixed and vary only the syntactic frame, measuring the rank of `·Par
 | cloze / definitional | `"The capital of France is the city of"` | **0** | −2.33 | **yes** |
 
 The appositive (`…France,`) and the cloze (`…is the city of`) both put `·Paris` first; 
-the QA frame surfaces it to rank 4. Nothing about the model changed — only the syntax of the slot. 
+the QA frame surfaces it to rank 4. Nothing about the model changed: only the syntax of the slot. 
 
 So `·now` wins the predicate-nominative slot not because the model cannot recall Paris, 
-but because this construction favors a generic predicate over the name — the knowledge is *present and gated by frame*.
+but because this construction favors a generic predicate over the name: the knowledge is *present and gated by frame*.
 
 ### 5. Causal test: activation patching
 
@@ -382,10 +377,10 @@ The real causal structure only appears when we restrict the patch to individual 
 
 To find the exact location of the memory, we try patching one component's 
 final-position output at a time (each head's `z`, each layer's `mlp_out`) from the appositive donor, 
-with a non-Paris control alongside — confirms the causal direction and then springs a trap. 
+with a non-Paris control alongside. The control run confirms the causal direction and then exposes a confound. 
 The control passes cleanly: the appositive donor flips `·Paris` to the argmax, while a 
 different-country donor (`"The capital of Germany is"`) moves it by at most Δ = 0.86, 
-never to the top (best rank 65 vs baseline 92) — **11.5× weaker**. So the flip is real 
+never to the top (best rank 65 vs baseline 92): **11.5× weaker**. So the flip is real 
 and **donor-specific**, not "any patch saturates the output". 
 
 But the *localization* half fails, 
@@ -394,7 +389,7 @@ nor a mid-to-late circuit; it is **`L0_mlp`** (Δ = +9.86, the only single compo
 argmax alone). The reason is a confound: donor and receiver are a *minimal pair*, differing only in 
 their final token (`,` vs `is`), so patching the earliest token-carrying component swaps the frame 
 at its root and lets the rest of the network recompute appositive-style. The patch is localizing 
-**the frame lever — the final token — not a Paris circuit**: it is the early-layer twin of the 
+**the frame lever, the final token, not a Paris circuit**: it is the early-layer twin of the 
 full-residual saturation above (flat there because the whole state is injected, concentrated 
 at `L0_mlp` here because that is where the token difference enters). The mid-stack MLP gradient 
 (`L5`–`L10`, Δ ≈ +2 to +3) 
@@ -402,7 +397,7 @@ sits downstream of the same token difference, so it isn't an independent recall 
 
 | patched component (real donor) | Δ logit(`·Paris`−`·now`) | rank(`·Paris`) |
 |---|---|---|
-| `L0_mlp` — flips alone | **+9.86** | **0** |
+| `L0_mlp`: flips alone | **+9.86** | **0** |
 | `L8_mlp` | +3.32 | 3 |
 | `L7_mlp` | +3.15 | 5 |
 | `L5_mlp` | +2.90 | 5 |
@@ -413,38 +408,38 @@ sits downstream of the same token difference, so it isn't an independent recall 
 | `L9H8` (DLA winner) | +0.47 | 55 |
 
 <figure>
-  <img src="/assets/structure-vs-recall/section_8_runb.png" alt="Top: two per-head patch heatmaps, layer by head, of the change in the Paris-now logit. Left (real appositive donor) has structure — a strong negative cell at L10H7 and scattered positive cells; right (Germany control donor) is nearly uniform near zero. Bottom: a bar chart of the top component patch effects for the real donor, with L0_mlp far largest (~+9.86), the MLPs dominating the positive side past the dashed line marking the §5 full-residual +5.17, and attention heads small.">
-  <figcaption>RUN B — per-component patch. <strong>Heatmaps</strong>: the real donor (left) moves the `·Paris`−`·now` logit in a structured way; the Germany control (right) is nearly flat — the flip is donor-specific. <strong>Bars</strong>: the effect is carried by MLPs, led by <code>L0_mlp</code>, not by a localized recall head (<code>L9H8</code> is small) — because the donor differs only in the final token.</figcaption>
+  <img src="/assets/structure-vs-recall/section_8_runb.png" alt="Top: two per-head patch heatmaps, layer by head, of the change in the Paris-now logit. Left (real appositive donor) has structure: a strong negative cell at L10H7 and scattered positive cells; right (Germany control donor) is nearly uniform near zero. Bottom: a bar chart of the top component patch effects for the real donor, with L0_mlp far largest (~+9.86), the MLPs dominating the positive side past the dashed line marking the §5 full-residual +5.17, and attention heads small.">
+  <figcaption>RUN B: per-component patch. <strong>Heatmaps</strong>: the real donor (left) moves the `·Paris`−`·now` logit in a structured way; the Germany control (right) is nearly flat: the flip is donor-specific. <strong>Bars</strong>: the effect is carried by MLPs, led by <code>L0_mlp</code>, not by a localized recall head (<code>L9H8</code> is small): because the donor differs only in the final token.</figcaption>
 </figure>
 
-*Path patching settles it.* Two donor-free follow-ups pin down what the saturating patch and the confounded donor could not (the reconstruction here closes to 4.8e-7, so these are exact). First, the `L0_mlp` "localization" is a donor artifact: the two frames are a minimal pair — an assert confirms they differ *only* in the final token — and patching the raw token embedding alone (`hook_embed` at the final position) flips `·Paris` to the argmax with Δ = +9.68, essentially all of `L0_mlp`'s +9.86. The patch localized the frame *token*, not a recall circuit. Second, the DLA writer `L9H8` is causally real: ablating only its *direct* path to the logit (downstream frozen) drops the `·Paris` − `·now` logit by −1.80 — exactly its DLA write, the 0.002 gap being the final-LayerNorm nonlinearity — and collapses `·Paris` from rank 92 to **370**. But its *total* effect is small (Δ −0.68, rank 92 → 164 when fully ablated), because its routing through later layers is **suppressive (−1.12)**, cancelling more than half of its own +1.80 direct write — which is why the donor patch saw L9H8 as negligible. And the MLPs that dominated that patch write *nothing* to `·Paris` directly: their direct DLA is near-zero or negative (`L0_mlp` −1.01, `L7_mlp` −0.77, `L10_mlp` −1.17). The MLP stack *suppresses* the name — the §6 generic mass, now confirmed at the component level by an independent method — while a single head writes it.
+*Path patching settles it.* Two donor-free follow-ups pin down what the saturating patch and the confounded donor could not (the reconstruction here closes to 4.8e-7, so these are exact). First, the `L0_mlp` "localization" is a donor artifact: the two frames are a minimal pair (an assert confirms they differ *only* in the final token), and patching the raw token embedding alone (`hook_embed` at the final position) flips `·Paris` to the argmax with Δ = +9.68, essentially all of `L0_mlp`'s +9.86. The patch localized the frame *token*, not a recall circuit. Second, the DLA writer `L9H8` is causally real: ablating only its *direct* path to the logit (downstream frozen) drops the `·Paris` − `·now` logit by −1.80 (exactly its DLA write, the 0.002 gap being the final-LayerNorm nonlinearity) and collapses `·Paris` from rank 92 to **370**. But its *total* effect is small (Δ −0.68, rank 92 → 164 when fully ablated), because its routing through later layers is **suppressive (−1.12)**, cancelling more than half of its own +1.80 direct write, which is why the donor patch saw L9H8 as negligible. And the MLPs that dominated that patch write *nothing* to `·Paris` directly: their direct DLA is near-zero or negative (`L0_mlp` −1.01, `L7_mlp` −0.77, `L10_mlp` −1.17). The MLP stack *suppresses* the name (the §6 generic mass, now confirmed at the component level by an independent method) while a single head writes it.
 
 So **computation, writer, and gate are three different places**: `L9H8` writes `·Paris`; the MLP stack suppresses it directly, and L9H8's own output is routed back against it downstream; and the final-token frame is the lever the activation patch was really moving.
 
 <figure>
   <img src="/assets/structure-vs-recall/section_9_test2.png" alt="A table of the top-8 attention heads by direct logit attribution (L9H8 first at +1.806, about four times the next), and a bar chart for L9H8 comparing its DLA write (+1.81), the support removed by ablating only its direct path (+1.80, nearly identical, rank 92 to 370), and the much smaller support removed by total ablation (+0.68, rank 92 to 164).">
-  <figcaption>TEST 2 — path patching <code>L9H8</code>. Its direct-path ablation reproduces its DLA write almost exactly (a real causal writer, +1.80), but its <em>total</em> effect is small (+0.68): the head's output is routed suppressively downstream (−1.12), cancelling half of what it writes.</figcaption>
+  <figcaption>TEST 2: path patching <code>L9H8</code>. Its direct-path ablation reproduces its DLA write almost exactly (a real causal writer, +1.80), but its <em>total</em> effect is small (+0.68): the head's output is routed suppressively downstream (−1.12), cancelling half of what it writes.</figcaption>
 </figure>
 
 <figure>
   <img src="/assets/structure-vs-recall/section_9_bonus.png" alt="A scatter plot, one point per MLP, of the donor patch effect (y axis, total) against the direct logit attribution to the Paris-minus-now direction (x axis, write). L0_mlp sits at top-left (patch about +9.9, write about −1.0); L7_mlp and L10_mlp also have large patch effects but near-zero or negative write. The MLPs with the biggest patch effects write little or nothing to Paris.">
-  <figcaption>BONUS — patch ≠ write. Per MLP, the donor patch effect (total) against the direct write to `·Paris`. The MLPs that dominate the patch (<code>L0</code>, <code>L7</code>, <code>L10</code>) write *negatively* to the name: their patch effect is frame-routing, while their direct contribution suppresses `·Paris`.</figcaption>
+  <figcaption>BONUS: patch ≠ write. Per MLP, the donor patch effect (total) against the direct write to `·Paris`. The MLPs that dominate the patch (<code>L0</code>, <code>L7</code>, <code>L10</code>) write *negatively* to the name: their patch effect is frame-routing, while their direct contribution suppresses `·Paris`.</figcaption>
 </figure>
 
-*Where the routing lands — and what it is.* One thread was left: L9H8's own output is routed *suppressively* (−1.12), but through what? A last-writer decomposition answers exactly — the per-component edges reconstruct the ablated-minus-clean final residual to machine precision (Δ ≈ 3.5e-7; linear total −0.687 vs the true ablation −0.685). The obvious guess is refuted. This *routed* suppression is **not** the MLPs — those suppress `·Paris` *directly* and independently of L9H8 (`L10_mlp`'s routed share is only ~3 %, the MLP stack's ~10 %, and `L11_mlp` even *helps*). It is downstream **attention**: `L10_attn` (48 % of the −1.12) and `L11_attn` (42 %), 90 % between them, concentrated in two heads — **L10H0 (−0.39) and L11H2 (−0.50)**.
+*Where the routing lands, and what it is.* One thread was left: L9H8's own output is routed *suppressively* (−1.12), but through what? A last-writer decomposition answers exactly: the per-component edges reconstruct the ablated-minus-clean final residual to machine precision (Δ ≈ 3.5e-7; linear total −0.687 vs the true ablation −0.685). The obvious guess is refuted. This *routed* suppression is **not** the MLPs: those suppress `·Paris` *directly* and independently of L9H8 (`L10_mlp`'s routed share is only ~3 %, the MLP stack's ~10 %, and `L11_mlp` even *helps*). It is downstream **attention**: `L10_attn` (48 % of the −1.12) and `L11_attn` (42 %), 90 % between them, concentrated in two heads: **L10H0 (−0.39) and L11H2 (−0.50)**.
 
-And those two heads are themselves `·Paris` writers — the #3 and #4 in the DLA table (+0.38 and +0.31). What L9H8 does is *halve their write*: without L9H8 they would contribute +0.77 and +0.81; with it, +0.38 and +0.31. The dominant Paris-writing head **downregulates the weaker, redundant Paris writers below it** — an *explaining-away* among the name's own writers. That is where more than half of L9H8's +1.80 direct write goes, and why it nets only +0.68: most of it is spent inhibiting L10H0 and L11H2, not feeding the MLPs. So the gate on `·Paris` has **two distinct parts**, not one: the MLP stack writes the generic continuation directly and independently (§6), and on top of it L9H8 suppresses its own redundant downstream echoes. The single distributed suppressor the SAE pass alone suggested was the obvious-but-wrong channel — the kind of miss this whole piece is about.
+And those two heads are themselves `·Paris` writers: the #3 and #4 in the DLA table (+0.38 and +0.31). What L9H8 does is *halve their write*: without L9H8 they would contribute +0.77 and +0.81; with it, +0.38 and +0.31. The dominant Paris-writing head **downregulates the weaker, redundant Paris writers below it**: an *explaining-away* among the name's own writers. That is where more than half of L9H8's +1.80 direct write goes, and why it nets only +0.68: most of it is spent inhibiting L10H0 and L11H2, not feeding the MLPs. So the gate on `·Paris` has **two distinct parts**, not one: the MLP stack writes the generic continuation directly and independently (§6), and on top of it L9H8 suppresses its own redundant downstream echoes. The single distributed suppressor the SAE pass alone suggested was the obvious-but-wrong channel: the kind of miss this whole piece is about.
 
 <figure>
   <img src="/assets/structure-vs-recall/section_10_l9h8.png" alt="A horizontal bar chart, effect on the Paris-minus-now logit for each downstream receiver of L9H8's output (negative = suppresses Paris). L10_attn (about −0.54) and L11_attn (about −0.47) are the two large negative bars; L9_mlp (−0.12), L10_mlp (−0.03) are small, and L11_mlp is slightly positive. Total indirect routing −1.12.">
-  <figcaption>Where L9H8's −1.12 suppressive routing is realized, by last-writer decomposition (closes exactly). It is carried by downstream <em>attention</em> — `L10_attn` and `L11_attn`, and within them `L10H0` and `L11H2` — not the MLPs.</figcaption>
+  <figcaption>Where L9H8's −1.12 suppressive routing is realized, by last-writer decomposition (closes exactly). It is carried by downstream <em>attention</em>, `L10_attn` and `L11_attn`, and within them `L10H0` and `L11H2`, not the MLPs.</figcaption>
 </figure>
 
 ### 6. SAE feature analysis and causal suppression
 
-Port the suppression methodology directly. At the layers implicated in (3)/(5), check whether an SAE has an interpretable `France` / `capital` / `Paris`-association feature, and whether it fires on this prompt. Then suppress it and confirm `·Paris` drops further; amplify it and check whether `·Paris` surfaces in the predicate-nominative frame. This is the same move as causal suppression of the `whales` feature in the Moby-Dick narrator task, applied to a factual-recall target instead of a narrative one — and it would let the three-regime taxonomy (content-routed recall / heuristic substitution / format fallback) be tested on a fact rather than a literary retrieval.
+Port the suppression methodology directly. At the layers implicated in (3)/(5), check whether an SAE has an interpretable `France` / `capital` / `Paris`-association feature, and whether it fires on this prompt. Then suppress it and confirm `·Paris` drops further; amplify it and check whether `·Paris` surfaces in the predicate-nominative frame. This is the same move as causal suppression of the `whales` feature in the Moby-Dick narrator task, applied to a factual-recall target instead of a narrative one, and it would let the three-regime taxonomy (content-routed recall / heuristic substitution / format fallback) be tested on a fact rather than a literary retrieval.
 
-*Result.* Using the layer-7 residual SAE (`7-res-jb`), I took the top-activating features on the prompt and ablated each one (`scale = 0`), reading the effect on `·Paris` (baseline rank 92). The picture is **distributed, and runs the opposite way to the naive expectation**: most of the strongly-active features are *suppressing* `·Paris` — removing them lifts it — and none is a clean "Paris feature".
+*Result.* Using the layer-7 residual SAE (`7-res-jb`), I took the top-activating features on the prompt and ablated each one (`scale = 0`), reading the effect on `·Paris` (baseline rank 92). The picture is **distributed, and runs the opposite way to the naive expectation**: most of the strongly-active features are *suppressing* `·Paris`, removing them lifts it, and none is a clean "Paris feature".
 
 The fifteen features that fire most strongly on the prompt, each linked to its Neuronpedia page:
 
@@ -486,13 +481,13 @@ Ablating each one (`scale = 0`) and re-reading the rank of `·Paris`:
 | 8715  | 2.98 | 108 | **supports** |
 | 10165 | 6.99 | 188 | **supports** (the top-activating feature) |
 
-Ablating the strongest suppressor (17045) moves `·Paris` from 92 to 47 — a real lift, but nowhere near the argmax. Conversely the *highest-activating* feature, 10165, is one of the few that *support* `·Paris`: removing it pushes the rank down to 188. So at this layer/position the active features are predominantly generic-continuation promoters competing with the name, rather than a single interpretable France→Paris circuit. That is evidence *against* the clean single-feature suppression story and *for* the distributed "generic mass" account from §3–§4.
+Ablating the strongest suppressor (17045) moves `·Paris` from 92 to 47: a real lift, but nowhere near the argmax. Conversely the *highest-activating* feature, 10165, is one of the few that *support* `·Paris`: removing it pushes the rank down to 188. So at this layer/position the active features are predominantly generic-continuation promoters competing with the name, rather than a single interpretable France→Paris circuit. That is evidence *against* the clean single-feature suppression story and *for* the distributed "generic mass" account from §3–§4.
 
 ### 7. Generalization across the relation
 
-Everything above could be idiosyncratic to France→Paris. Build a small probe set of other `(country → capital)` pairs, then other relation types (`author → notable work`, etc.), and check whether the frame-sensitivity and scale patterns hold subject-to-subject or vary with subject frequency. A structured ground truth — e.g. a knowledge graph used the way the Céline graph anchors the literary work — turns this from a handful of prompts into a measured distribution over subjects, which is what a venue will want.
+Everything above could be idiosyncratic to France→Paris. Build a small probe set of other `(country → capital)` pairs, then other relation types (`author → notable work`, etc.), and check whether the frame-sensitivity and scale patterns hold subject-to-subject or vary with subject frequency. A structured ground truth, e.g. a knowledge graph used the way the Céline graph anchors the literary work, turns this from a handful of prompts into a measured distribution over subjects, which is what a venue will want.
 
-*Result.* The phenomenon is **not** idiosyncratic to France. Across twelve `(country → capital)` pairs in the predicate-nominative frame, the capital is **never the argmax (0 / 12)** — yet it is recoverable in every case, with a **median rank of 27**:
+*Result.* The phenomenon is **not** idiosyncratic to France. Across twelve `(country → capital)` pairs in the predicate-nominative frame, the capital is **never the argmax (0 / 12)**: yet it is recoverable in every case, with a **median rank of 27**:
 
 | subject | capital | rank | log-prob | | subject | capital | rank | log-prob |
 |---|---|---|---|---|---|---|---|---|
@@ -503,21 +498,21 @@ Everything above could be idiosyncratic to France→Paris. Build a small probe s
 | Egypt   | Cairo  | 27 | −5.42 | | Austria  | Vienna  | 260 | −7.68 |
 | Russia  | Moscow | 27 | −5.27 | | Germany  | Berlin  | 27  | −5.19 |
 
-So the `…is ___` construction suppresses the bare capital for *every* subject — the frame effect is general, not a France quirk. What varies, and varies a lot, is *how far down* the name sits: Rome/Athens/Madrid hover near the top (rank 7–11) while Ottawa and Vienna fall past 200. Notably **France→Paris (92) is one of the harder cases**, consistent with §1's data-dilution finding — the "capital of France is" phrasing is unusually appositive-dominated in text, and "Paris" carries many non-capital senses. The spread tracks something subject-specific (plausibly subject/target frequency), which is exactly the measured distribution a follow-up should model.
+So the `…is ___` construction suppresses the bare capital for *every* subject, the frame effect is general, not a France quirk. What varies, and varies a lot, is *how far down* the name sits: Rome/Athens/Madrid hover near the top (rank 7–11) while Ottawa and Vienna fall past 200. Notably **France→Paris (92) is one of the harder cases**, consistent with §1's data-dilution finding, the "capital of France is" phrasing is unusually appositive-dominated in text, and "Paris" carries many non-capital senses. The spread tracks something subject-specific (plausibly subject/target frequency), which is exactly the measured distribution a follow-up should model.
 
 ---
 
 ## What the experiments settle
 
-The rhetorical statement — *"a small model follows structure instead of recalling"* — was best treated as a hypothesis with a sign, and the runs above give it one.
+The rhetorical statement, *"a small model follows structure instead of recalling"*, was best treated as a hypothesis with a sign, and the runs above give it one.
 
-**Confirmed: the knowledge is present and frame-dependent, not absent.** `·Paris` is sub-argmax (rank 92) in the predicate-nominative frame (§1), yet changing only the syntax surfaces it to the **argmax** — rank 0 in the appositive and cloze frames (§4), at fixed weights. That single result carries the claim on its own; it needs no lens and no patch. Activation patching points the same way (§5), but it largely re-derives §4 — its donor is the predicate-nominative frame with the final `is` swapped for a comma, so what it really shows is that the **copula in the final slot is the thing doing the suppressing**. And §3's direct logit attribution turns the internal story from inference into measurement: a single head (L9H8) writes `·Paris`, the late MLPs and the unembed bias write the generic continuation more strongly, and the name is outranked — competition, not a gate. Greedy decoding reads out the structural channel; the factual channel is present, just outranked.
+**Confirmed: the knowledge is present and frame-dependent, not absent.** `·Paris` is sub-argmax (rank 92) in the predicate-nominative frame (§1), yet changing only the syntax surfaces it to the **argmax**: rank 0 in the appositive and cloze frames (§4), at fixed weights. That single result carries the claim on its own; it needs no lens and no patch. Activation patching points the same way (§5), but it largely re-derives §4: its donor is the predicate-nominative frame with the final `is` swapped for a comma, so what it really shows is that the **copula in the final slot is the thing doing the suppressing**. And §3's direct logit attribution turns the internal story from inference into measurement: a single head (L9H8) writes `·Paris`, the late MLPs and the unembed bias write the generic continuation more strongly, and the name is outranked: competition, not a gate. Greedy decoding reads out the structural channel; the factual channel is present, just outranked.
 
-**Complicated: capacity helps — unevenly — and France is an outlier.** The original framing implied a clean capacity story: `·Paris` wins once the model is big enough. Run as a distribution over the twelve-capital probe set, capacity *does* mostly win — by gpt2-xl the median capital is the argmax (six of twelve), up from none at gpt2 small (§2, §7). But it wins **non-monotonically** — `gpt2-large` is a real regression — and **France→Paris is the exception that doesn't**: rank 2 even at 1.5B, among the worst capitals at every scale. For this subject the limitation lives in the **construction and the data** — the `…is ___` slot is appositive-dominated and `P(capital | "the capital of X is")` is soft in the training distribution — while for most subjects raw size eventually carries it. And within gpt2 small the suppression is distributed, not a single circuit: no single SAE feature carries the `·Paris` readout — at L7 the strongest active features are generic-continuation promoters, not a France→Paris circuit (§6).
+**Complicated: capacity helps, unevenly, and France is an outlier.** The original framing implied a clean capacity story: `·Paris` wins once the model is big enough. Run as a distribution over the twelve-capital probe set, capacity *does* mostly win: by gpt2-xl the median capital is the argmax (six of twelve), up from none at gpt2 small (§2, §7). But it wins **non-monotonically** (`gpt2-large` is a real regression), and **France→Paris is the exception that doesn't**: rank 2 even at 1.5B, among the worst capitals at every scale. For this subject the limitation lives in the **construction and the data**: the `…is ___` slot is appositive-dominated and `P(capital | "the capital of X is")` is soft in the training distribution, while for most subjects raw size eventually carries it. And within gpt2 small the suppression is distributed, not a single circuit: no single SAE feature carries the `·Paris` readout; at L7 the strongest active features are generic-continuation promoters, not a France→Paris circuit (§6).
 
-**Open: the parts that didn't resolve.** Three things stay genuinely unexplained, and a faithful account should keep them in view rather than round them off. *Why the scale curve zigzags.* Running the §7 probe set at every scale settled that the dip is **real, not single-prompt noise** — the population median regresses at gpt2-large too (§2). What stays unexplained is *why* a larger model recalls these capitals worse; that is a question about data and tokenization across the released checkpoints, not one more rank. *How L9H8 inhibits the other writers.* The routing is now understood as *explaining-away* (§5): L9H8 halves the `·Paris` write of L10H0 and L11H2. What's left is the *channel* — does L9H8 move those heads' attention pattern away from the Paris-bearing position (QK), or change what they read from it (OV)? A path patch splitting `L9H8 → {L10H0, L11H2}` into their `hook_q`/`hook_k` versus `hook_v` would say which, turning the explaining-away from located to mechanistically explained. *What the suppressing features represent.* §6's strongest live L7 features are continuation-promoters, and the component-level DLA agrees the L7 MLP suppresses `·Paris` (−0.77) — so the suppression is genuinely distributed across the MLP stack, not an artifact of the wrong layer. What those features *mean* (their Neuronpedia labels) is the cheap next look that would turn "generic mass" into named features. None of these is cosmetic; each is a seam where the clean story could still split.
+**Open: the parts that didn't resolve.** Three things stay genuinely unexplained, and a faithful account should keep them in view rather than round them off. *Why the scale curve zigzags.* Running the §7 probe set at every scale settled that the dip is **real, not single-prompt noise**: the population median regresses at gpt2-large too (§2). What stays unexplained is *why* a larger model recalls these capitals worse; that is a question about data and tokenization across the released checkpoints, not one more rank. *How L9H8 inhibits the other writers.* The routing is now understood as *explaining-away* (§5): L9H8 halves the `·Paris` write of L10H0 and L11H2. What's left is the *channel*: does L9H8 move those heads' attention pattern away from the Paris-bearing position (QK), or change what they read from it (OV)? A path patch splitting `L9H8 → {L10H0, L11H2}` into their `hook_q`/`hook_k` versus `hook_v` would say which, turning the explaining-away from located to mechanistically explained. *What the suppressing features represent.* §6's strongest live L7 features are continuation-promoters, and the component-level DLA agrees the L7 MLP suppresses `·Paris` (−0.77), so the suppression is genuinely distributed across the MLP stack, not an artifact of the wrong layer. What those features *mean* (their Neuronpedia labels) is the cheap next look that would turn "generic mass" into named features. None of these is cosmetic; each is a seam where the clean story could still split.
 
-With that owed, the headline. It is not "small models can't recall"; it is that in this frame, at every scale, a structural-continuation prior outranks a present-but-soft factual signal, and the softness is as much in the data as in the model. That is the more interesting half — and, by the lights of the Perse passage, the one still closest to its own lamasery: a clean sentence is exactly the kind of thing that turns out to have a less flattering explanation waiting.
+The headline is not "small models can't recall". In this frame, at every scale, a structural-continuation prior outranks a present-but-soft factual signal, and the softness is as much in the data as in the model.
 
 ### References
 

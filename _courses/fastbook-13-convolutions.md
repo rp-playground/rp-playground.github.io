@@ -1,7 +1,7 @@
 ---
 layout: article
 title: "Convolutions"
-subtitle: "fast.ai · Practical Deep Learning for Coders — Chapter 13"
+subtitle: "fast.ai · Practical Deep Learning for Coders: Chapter 13"
 course: "Practical Deep Learning for Coders"
 lesson: 13
 source: https://github.com/fastai/fastbook/blob/master/13_convolutions.ipynb
@@ -158,16 +158,16 @@ From fastai:
 
 *Larger batches have gradients that are more accurate, since they're calculated from more data.*
 
-But on its own it does **not** rescue an unnormalized net — fastai
+But on its own it does **not** rescue an unnormalized net: fastai
 stays collapsed at 0.1135. Here the same `bs=512` usually **does** train
 (0.8766 above).
 
 Same recipe, different outcome. Same architecture. What
 we cannot match is:
 
-1. **Weight initialization** — PyTorch and fastai init the conv layers
+1. **Weight initialization**: PyTorch and fastai init the conv layers
    differently.
-2. **RNG / batch order** — the DataLoader shuffle.
+2. **RNG / batch order**: the DataLoader shuffle.
 
 With `bs=512` the gradient is averaged over 8× more samples than `bs=64`, so the
 optimization steps are much less noisy even at the high `lr=0.06`. Whether the

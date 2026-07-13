@@ -7,16 +7,16 @@ link: https://www.oreilly.com/library/view/designing-machine-learning/9781098107
 date: 2026-06-19
 pinned: true
 tags: [ML systems, deployment, MLOps, model compression]
-summary: "Takeaways from Chapter 7 (model deployment) — deploying a model is an engineering problem, not an ML one."
+summary: "Takeaways from Chapter 7 (model deployment): deploying a model is an engineering problem, not an ML one."
 ---
 
-*Takeaways from Chapter 7 of the book — on deploying ML models.*
+*Takeaways from Chapter 7 of the book: on deploying ML models.*
 
 <div class="toc" markdown="1">
 
 **Contents**
 
-- **[Chapter 7 · Model deployment](#ch7)** — deploying a model is an engineering problem, not an ML one
+- **[Chapter 7 · Model deployment](#ch7)**: deploying a model is an engineering problem, not an ML one
   - [The deployment myths I was carrying](#ch7-myths)
   - [Batch vs. online prediction](#ch7-batch)
   - [The two-pipeline bug](#ch7-two-pipeline)
@@ -99,7 +99,7 @@ Roblox applied quantization to BERT to handle over a billion daily requests on C
 
 ### Cloud vs. edge {#ch7-cloud-edge}
 
-The cloud is easy to start with but accumulates massive costs.
+The cloud is easy to start with, but the costs accumulate as usage grows.
 
 Network latency is often the real system bottleneck. You can reduce inference time from 30 ms to 20 ms, but network round-trips can take seconds. Optimizing inference time while ignoring network packet transit time is a misallocation of effort. Edge computing runs on the device, solving connectivity issues and easing privacy compliance, but it requires the local hardware to have the memory and battery to support the computation.
 

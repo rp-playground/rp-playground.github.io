@@ -2,15 +2,15 @@
 layout: article
 title: "Replicating a GPT-2 Transformer Block from the Residual Stream"
 subtitle: "Rebuilding block 0 by hand and checking every tensor against TransformerLens"
-description: Rebuilding block 0 of GPT-2 by hand from the residual stream — recomputing LayerNorm, attention and the MLP from their parts and checking each step against TransformerLens's activation cache, all the way from token IDs to logits.
-summary: A hands-on tour of the mechanistic-interpretability tooling — reconstruct GPT-2's first transformer block from the residual stream, one variable per box in the dataflow diagram, and verify every arrow against the activation cache.
+description: "Rebuilding block 0 of GPT-2 by hand from the residual stream: recomputing LayerNorm, attention and the MLP from their parts and checking each step against TransformerLens's activation cache, all the way from token IDs to logits."
+summary: "A hands-on tour of the mechanistic-interpretability tooling: reconstruct GPT-2's first transformer block from the residual stream, one variable per box in the dataflow diagram, and verify every arrow against the activation cache."
 date: 2026-06-23
 tags: [mech-interp, transformers, interpretability, GPT-2, TransformerLens]
 published: true
 permalink: /writing/replicating-gpt2-block/
 ---
 
-This article rebuilds **block 0** of GPT-2 by hand — recomputing each step from its parts
+This article rebuilds **block 0** of GPT-2 by hand: recomputing each step from its parts
 and checking it against *TransformerLens*'s activation cache.
 I wrote it to introduce myself to the tools available for doing mechanistic-interpretability:
 reconstructing a block this way is a good way to learn what
@@ -53,7 +53,7 @@ each hook actually holds. It follows the dataflow diagram exactly:
         resid_post            (hook_resid_post)
 ```
 
-The two equations the diagram encodes (GPT-2 is **pre-norm** — each sub-block normalizes a *copy* of the residual and its output is *added back*):
+The two equations the diagram encodes (GPT-2 is **pre-norm**: each sub-block normalizes a *copy* of the residual and its output is *added back*):
 
 ```
 resid_mid  = resid_pre + Attention( LN1(resid_pre) )
@@ -121,7 +121,7 @@ resid_post  (1, 3, 768)
 
 ---
 
-## 2. Core replication — the two additions
+## 2. Core replication: the two additions
 
 The whole diagram in three lines. 
 `attn` and `mlp` are the *contributions*, that include the nonlinearities (LayerNorm / Attention / MLP).
@@ -189,7 +189,7 @@ check("blocks.0.hook_out == resid_post",  cache['blocks.0.hook_out'],    resid_p
 ### 3.3 Attention output is *not* what the MLP reads
 
 `attn.hook_out` does not feed 
-the MLP directly. Two operations sit between them in the diagram — the residual add, then `LN2`.
+the MLP directly. Two operations sit between them in the diagram: the residual add, then `LN2`.
 
 ```python
 # attn.hook_out is NOT mlp.in.hook_in:
@@ -303,7 +303,7 @@ check("blocks.0.hook_resid_post == blocks.1.hook_resid_pre",
 [PASS] blocks.0.hook_resid_post == blocks.1.hook_resid_pre
 ```
 
-### 3.8 Capstone — the whole network is one big sum
+### 3.8 Capstone: the whole network is one big sum
 
 Because every block *only adds* to the residual stream, the final residual is the token + positional embeddings plus the sum of every attention and MLP contribution across all layers. This is the property that makes direct logit attribution possible.
 
@@ -351,7 +351,7 @@ From token IDs to logits, every intermediate tensor in the diagram has now been 
 
 - **Pre-norm.** GPT-2 normalizes a *copy* of the residual for each sub-block; the raw residual passes through untouched on the skip connection. That is why `resid_pre`, not `LN1(resid_pre)`, is the term added back at the first `+`.
 - **The bridge keeps native weights.** `TransformerBridge` preserves the HuggingFace implementation, so LayerNorm gain/bias are not folded into adjacent matrices (unlike the default `HookedTransformer.from_pretrained` path). The reconstructions in 3.4–3.6 work because the LN parameters are still live.
-- **Conv1D layout.** GPT-2's `c_attn`, `c_proj`, `c_fc` are `Conv1D`, storing weights as `[in, out]`. The matmul is `x @ W + b` with no transpose — the opposite of `nn.Linear`.
+- **Conv1D layout.** GPT-2's `c_attn`, `c_proj`, `c_fc` are `Conv1D`, storing weights as `[in, out]`. The matmul is `x @ W + b` with no transpose: the opposite of `nn.Linear`.
 - **GELU variant.** GPT-2 uses `gelu_new`, the tanh approximation: `F.gelu(x, approximate='tanh')`.
 - **Weight tying.** The unembedding is the transpose of the token-embedding table `wte.weight`; there is no separate unembed matrix and no logit bias.
 - **`eps`.** GPT-2's `layer_norm_epsilon` is `1e-5`.

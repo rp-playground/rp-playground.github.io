@@ -17,7 +17,7 @@ The core voice rules apply primarily to narrative writing. Calibrate the tone an
 
 ## Do
 
-- **Write in the first person.** (When applicable, see above). "I built mine in pure PyTorch." "This is the case I care about." Own the work and the opinions.
+- **Write in the first person.** (When applicable, see above). "I built mine in pure PyTorch." Own the work and the opinions.
 - **Have a point of view.** Say which result mattered, which approach you'd pick, what surprised you. A flat, neutral report is worse than a stated opinion.
 - **Value negative and surprising results.** If the fancy method lost to the baseline, lead with that. The surprising or humbling finding is usually the reason the piece is worth reading.
 - **Keep a narrative spine**, but a grounded one: setup → what I tried → what actually happened → what I take from it.
@@ -50,7 +50,7 @@ The core voice rules apply primarily to narrative writing. Calibrate the tone an
 - **Don't pile up decorative metaphors** ("a thermometer that goes from lukewarm to lukewarm," "take it out behind the shed," "waltz in," "wearing a badge").
 - **Cut the Similes.** Avoid heavy reliance on similes (comparisons using "like" or "as"). 
 - **Ban Syrupy Praise.** Do not use over-enthusiastic, generic compliments (e.g., "wonderful question," "brilliant insight," "you've captured the essence"). Keep the tone neutral and direct.
-- **Limit Em Dashes.** Severely restrict the use of em dashes (—). Do not lean on the em-dash for a dramatic reveal at the end of every other sentence. Use it sparingly, for genuine asides.
+- **Ban Em Dashes.** 
 - **Don't use throat-clearing or hype** ("It's worth noting that," "Importantly," "In today's fast-paced world of ML," "game-changer," "powerful").
 - **Stop Over-explaining.** Answer the core question immediately. Do not launch into a broad historical or philosophical background before delivering the answer.
 - **Break Up Triplets.** Avoid stacking examples or adjectives in perfect groups of three (the mechanical "rule of three").
@@ -73,6 +73,9 @@ The core voice rules apply primarily to narrative writing. Calibrate the tone an
 - **Don't use jargon without unpacking it.** If a term needs prior knowledge, either say it plainly or explain it in the same sentence.
   - ✗ "The raw weights are noisier, since a linear model has no spatial prior."
   - ✓ "The model learns one independent weight per pixel, with nothing tying neighbouring pixels together, so the raw weights look speckled."
+- **No sentences of the "this is the case I care about"-type.** Don't announce your interest in a specific scenario as a meta-statement. Instead, directly explain why the scenario matters or what it reveals.
+  - ✗ "When evaluating this, the high-latency regime is the case I really care about."
+  - ✓ "The high-latency regime is where the fallback mechanism actually breaks."
 
 ## Calibration note
 

@@ -1,7 +1,7 @@
 ---
 layout: article
 title: "Past 99%: where a confident MNIST model is wrong"
-description: The confidence-calibration angle on the MNIST × MLflow project — reliability/ECE says how confidently the model is wrong, a UMAP of its features says where, with Colah's t-SNE visualization as the ancestor.
+description: "The confidence-calibration angle on the MNIST × MLflow project: reliability/ECE says how confidently the model is wrong, a UMAP of its features says where, with Colah's t-SNE visualization as the ancestor."
 summary: Reliability/ECE tells you how confidently the model is wrong; a UMAP of its features tells you where.
 date: 2026-06-06
 tags: [calibration, ECE, UMAP, t-SNE, MNIST]
@@ -14,7 +14,7 @@ confidently** the model is wrong.*
 
 ## The remaining "1%"
 
-The champion `conv_net` hits ~99% test accuracy; here I focus on the other 1% —
+The champion `conv_net` hits ~99% test accuracy; here I focus on the other 1%:
 the test digits the model still gets wrong, and what they have in common.
 
 A reliability diagram, the obvious first tool, can't tell you that (the figure
@@ -23,7 +23,7 @@ fall.
 
 <figure class="narrow">
   <img src="/assets/mnist/reliability_diagram_conv_net.png" alt="Reliability diagram for the champion conv net, with a confidence histogram">
-  <figcaption>Reliability diagram with a count histogram. The curve sits almost on the diagonal (ECE ≈ 0.002), and the histogram shows why: nearly all predictions pile into the top confidence bin — and there they're right.</figcaption>
+  <figcaption>Reliability diagram with a count histogram. The curve sits almost on the diagonal (ECE ≈ 0.002), and the histogram shows why: nearly all predictions pile into the top confidence bin, and there they're right.</figcaption>
 </figure>
 
 The ECE of **~0.002** looks excellent, but it's a flattered number: the model is so
@@ -38,24 +38,24 @@ To see *where* the mistakes happen, I project the model's representation down to
 It's an old idea: in 2014 Chris Olah's
 [*Visualizing MNIST*](https://colah.github.io/posts/2014-10-Visualizing-MNIST/)
 used **t-SNE** to flatten MNIST into a picture and watch the digit classes pull
-apart. I use **UMAP** (McInnes et al., 2018) instead of t-SNE — see
+apart. I use **UMAP** (McInnes et al., 2018) instead of t-SNE: see
 [Performance Comparison of Dimension Reduction Implementations](https://umap-learn.readthedocs.io/en/latest/benchmarking.html)
 for why it's the better choice.
 
 A second difference from Colah: he projected the **raw pixels**. I project the conv
-net's **penultimate-layer activations** — the 128-d representation just before the
+net's **penultimate-layer activations**: the 128-d representation just before the
 classifier, where the model actually makes its decision.
 
 <figure>
   <img src="/assets/mnist/umap_penultimate_conv_net.png" alt="UMAP of the conv net's penultimate-layer activations: ten clean clusters by class, with misclassifications at the cluster edges">
-  <figcaption>UMAP of the conv net's penultimate-layer activations. <strong>Left:</strong> coloured by true class — ten clean, well-separated clusters. <strong>Right:</strong> coloured by confidence (viridis, almost entirely high — note the colorbar), with the 134 misclassifications marked as red ✕.</figcaption>
+  <figcaption>UMAP of the conv net's penultimate-layer activations. <strong>Left:</strong> coloured by true class, ten clean, well-separated clusters. <strong>Right:</strong> coloured by confidence (viridis, almost entirely high, note the colorbar), with the 134 misclassifications marked as red ✕.</figcaption>
 </figure>
 
 ## Where it's wrong
 
-**The classes are cleanly separated.** Ten well-separated clusters — the geometric
+**The classes are cleanly separated.** Ten well-separated clusters: the geometric
 reason the model is confident almost everywhere. And that separation comes from the
-model, not the data. To see it, run the same UMAP — same parameters, same seed — on
+model, not the data. To see it, run the same UMAP, same parameters, same seed, on
 the raw 784-d pixels, then on the MLP's penultimate features, then on the conv
 net's. The raw pixels (à la Colah) overlap heavily; the MLP starts pulling the
 classes apart but leaves them touching; the conv net produces clean, separated
@@ -63,12 +63,12 @@ clusters.
 
 <figure>
   <img src="/assets/mnist/umap_ladder_conv_net.png" alt="Three-panel UMAP of the same MNIST test set: raw pixels with overlapping bleeding clusters, MLP penultimate features partly separated, conv penultimate features in ten clean clusters">
-  <figcaption>The same UMAP on three input spaces, all coloured by true class — the complexity ladder made geometric. <strong>Left:</strong> raw pixels — digit clouds overlap and leak into each other. <strong>Middle:</strong> the MLP's penultimate features — clusters forming but still loose and touching. <strong>Right:</strong> the conv net's penultimate features — ten tight, separated clusters. The data and projection are identical across the three panels; separation increases with model class, matching the ECE that roughly halves at each rung.</figcaption>
+  <figcaption>The same UMAP on three input spaces, all coloured by true class: the complexity ladder made geometric. <strong>Left:</strong> raw pixels: digit clouds overlap and leak into each other. <strong>Middle:</strong> the MLP's penultimate features: clusters forming but still loose and touching. <strong>Right:</strong> the conv net's penultimate features: ten tight, separated clusters. The data and projection are identical across the three panels; separation increases with model class, matching the ECE that roughly halves at each rung.</figcaption>
 </figure>
 
 
 **The errors sit on the borders.** The 134 misclassifications aren't scattered at
-random — they sit at the edges of the clusters, and a few fall into the neighbouring
+random: they sit at the edges of the clusters, and a few fall into the neighbouring
 cluster they get confused with. That's where an ambiguous digit lands: a sloppy `4`
 near the `9` cluster, a `5` near the `3`. The geometry and the confusion matrix are
 two independent views, and they agree. Rank
@@ -87,13 +87,13 @@ especially close in 2D, while `2↔9` sit close but never confuse.
 {% comment %}
 [//]: # (**And they lean toward their confuser.** It's tempting to read more into the)
 
-[//]: # (picture — that each error is *pulled* toward the digit it gets mistaken for, like)
+[//]: # (picture: that each error is *pulled* toward the digit it gets mistaken for, like)
 
 [//]: # (a charge drifting to the opposite pole. UMAP doesn't preserve global directions)
 
 [//]: # (faithfully, so I checked it rather than eyeballed it. Mark each error with two)
 
-[//]: # (classes — **fill = predicted, ring = true** — and link it to its predicted-class)
+[//]: # (classes, **fill = predicted, ring = true**, and link it to its predicted-class)
 
 [//]: # (centroid:)
 
@@ -102,7 +102,7 @@ especially close in 2D, while `2↔9` sit close but never confuse.
 
 [//]: # (  <img src="/assets/mnist/umap_error_polarization_conv_net.png" alt="Misclassifications, each marker filled by predicted class and ringed by true class, linked to the predicted-class centroid">)
 
-[//]: # (  <figcaption>Each marker is a misclassification: <strong>fill = predicted class, ring = true class</strong> &#40;match both to the coloured centroids&#41;, with a faint line to the predicted centroid. The marker sits at the sample's <em>learned representation</em>, not its label — and that representation is what drove the &#40;wrong&#41; prediction, so it's already pulled toward the predicted side. A green-filled, red-ringed marker is a `3` the model read as a `2`; if it's drifted all the way into the `2` cloud, it's a `3` read as a `2` <em>confidently</em>.</figcaption>)
+[//]: # (  <figcaption>Each marker is a misclassification: <strong>fill = predicted class, ring = true class</strong> &#40;match both to the coloured centroids&#41;, with a faint line to the predicted centroid. The marker sits at the sample's <em>learned representation</em>, not its label: and that representation is what drove the &#40;wrong&#41; prediction, so it's already pulled toward the predicted side. A green-filled, red-ringed marker is a `3` the model read as a `2`; if it's drifted all the way into the `2` cloud, it's a `3` read as a `2` <em>confidently</em>.</figcaption>)
 
 [//]: # (</figure>)
 
@@ -114,7 +114,7 @@ especially close in 2D, while `2↔9` sit close but never confuse.
 
 [//]: # (**84%** lean further toward the confuser than their class baseline does. The)
 
-[//]: # (extreme cases are the strongest tell — **39%** drift *past the midpoint*, all the)
+[//]: # (extreme cases are the strongest tell: **39%** drift *past the midpoint*, all the)
 
 [//]: # (way into the predicted cluster &#40;those are the markers whose fill matches the cloud)
 
@@ -122,7 +122,7 @@ especially close in 2D, while `2↔9` sit close but never confuse.
 
 [//]: # (`2` island&#41;. And the drift tracks confidence: how far an error sits along that)
 
-[//]: # (axis correlates with its softmax confidence &#40;**r ≈ 0.41**&#41; — the ones that drift)
+[//]: # (axis correlates with its softmax confidence &#40;**r ≈ 0.41**&#41;: the ones that drift)
 
 [//]: # (all the way in average **85%** confidence versus **69%** for those left near the)
 
@@ -133,11 +133,11 @@ especially close in 2D, while `2↔9` sit close but never confuse.
 [//]: # (the specific digit the model mistook it for. The metaphor survives the check.)
 
 [//]: # ()
-[//]: # (Put the two halves together and you get the honest reading of "99%": the model)
+[//]: # (Put the two halves together and you get the actual reading of "99%": the model)
 
 [//]: # (isn't 99%-accurate *uniformly*. Its 1% is concentrated in specific, interpretable)
 
-[//]: # (places — the genuine overlap between visually similar digits — and that's a)
+[//]: # (places, the genuine overlap between visually similar digits, and that's a)
 
 [//]: # (residue calibration can't scrub away, because at the border the inputs really are)
 
@@ -160,7 +160,7 @@ calibrated.
   <figcaption>The `logistic` model's per-class weight templates (red pushes <em>toward</em> the class, blue <em>against</em>). Display-smoothed with a Gaussian blur: the model learns one independent weight per pixel, with nothing tying neighbouring pixels together, so the raw weights look speckled. You can still make out a ring for `0`, the stroke of `2`, the loop of `6`.</figcaption>
 </figure>
 
-Calibration improves steadily — ECE roughly halves at each step up the ladder:
+Calibration improves steadily: ECE roughly halves at each step up the ladder:
 
 | rung        | test accuracy | test ECE |
 |-------------|:-------------:|:--------:|

@@ -17,7 +17,7 @@ for out-of-distribution detection. The core observation:
 
 ## Noteworthy
 
-It is the reference point every later OOD method is measured against — including
+It is the reference point every later OOD method is measured against, including
 the energy score I compared it to on my own
 [bear detector](/writing/ood-detection/). On a tiny 3-class head the MSP is
 squeezed into `[1/3, 1]`, yet it still held up better than energy on the

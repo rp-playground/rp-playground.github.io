@@ -25,7 +25,7 @@ This article is part of a larger project to build *DanteGPT*, a semantic search 
 The core investigation here focuses on the lexical retrieval component, asking a fundamental architectural question: when running a BM25 lexical index over the original Italian text, should the index use surface forms (the exact text) or lemmas (the base dictionary forms of the words)?
 
 At first glance, the data provides a highly satisfying answer. It suggests that lemmatization is the clear winner because it elegantly translates Dante's complex, archaic verb conjugations into terms a modern user might type. 
-However, a fundamental principle of applied ML and of life in general is to **never fall in love with an easy narrative**. 
+However, the decomposition below shows this easy narrative is wrong. 
 
 **The Reality**
 
@@ -74,7 +74,7 @@ into base lemmas for the index natively and for free.
 Testing was conducted over the Inferno (a corpus of 1,596 tercets) using an evaluation set of 290 noisy, 
 real-world Italian queries. 
 This evaluation set is a subset of a larger benchmark generated via prompts given to 
-various LLM models—including Grok, Claude 4.8, and Claude Fable—which were 
+various LLM models-including Grok, Claude 4.8, and Claude Fable-which were 
 then manually picked, reviewed, and validated in [Argilla](https://argilla.io),
 an open-source data curation platform designed specifically for NLP and LLMs.
 In a direct aggregate comparison, the lemma-normalized index outperforms 
@@ -116,7 +116,7 @@ altered and consequently user queries ruined by broadening the results to unrela
 | entity_level | 31 | −0.032 | 54.8% → 54.8% | 2 / 3 |
 | ambiguous_fragment | 8 | −0.085 | 100% → 100% | 0 / 3 |
 | italian_misspelled | 5 | −0.198 | 100% → 80.0% | 0 / 1 |
-| others (typo, reorder, …) | ≤5 each | ~0 | ~100% | — |
+| others (typo, reorder, …) | ≤5 each | ~0 | ~100% | – |
 
 **Note on Paraphrase Query Types**
 
@@ -128,7 +128,7 @@ but the prompt maintains the general content and structure of the original verse
 Because it stays structurally close to the source, this type inherently advantages lexical matching 
 (like BM25) and is generally easier for the system to resolve. 
 This specific bucket drives the entire aggregate win for the lemma index, 
-as lemmatization realigns the user's modern inflections with the text's original forms — though *which* inflections 
+as lemmatization realigns the user's modern inflections with the text's original forms, though *which* inflections 
 do the work turns out to be mostly grammatical rather than lexical (see [Appendix B](#appendix-b-how-much-of-the-lemma-advantage-is-incidental)).  
 
 * **Italian Semantic Paraphrase**: These queries are completely stripped of Dante's original lexicon, 
@@ -225,7 +225,7 @@ dynamically with the dense retrieval systems.
 Here we list weaknesses that must be addressed before moving to production:  
 
 * **The "Perfect Classifier" Illusion** The router's leave-one-out success relies on a flawless, 
-offline classifier to determine the query type—a tool that does not actually exist at runtime. 
+offline classifier to determine the query type, a tool that does not actually exist at runtime. 
 Once a real predictive model is deployed, its inevitable classification errors will directly degrade 
 the router's overall performance.  
 
@@ -259,12 +259,12 @@ routed to the surface index, the surface index is essentially playing on an easi
 setting for those searches. This makes the surface index appear artificially stronger in those buckets 
 than it might be if every search were held to the same strict, single-target standard
 
-* **The Lemma Advantage Is Mostly Function-Word Normalization** The headline result — lemma beats surface — was 
+* **The Lemma Advantage Is Mostly Function-Word Normalization** The headline result, lemma beats surface, was 
 measured without any stopword control. Lemmatization does not only collapse the inflections of *content* words (the 
 advertised mechanism, *disse*/*dicea* → *dire*); it also collapses those of *function* words, above all the 
 conjugations of the copula *essere* (*sono*/*era*/*fossimo* → *essere*). BM25 already down-weights these via IDF 
 (*essere*'s is 0.73 precisely because it appears in ~48% of tercets), so their contribution is small and, by the 
-model's own logic, legitimate — but it is *shallow*, and it turns out to carry most of the measured gap. When the 
+model's own logic, legitimate, but it is *shallow*, and it turns out to carry most of the measured gap. When the 
 same stopword filter is applied to **both** indexes, the Recall@10 gap collapses from +0.055 to +0.010 (the copula 
 *essere* alone accounts for a quarter of it) and the win/loss flips 
 from 45/29 to 18/48 (see [Appendix B](#appendix-b-how-much-of-the-lemma-advantage-is-incidental)). This does not mean 
@@ -307,8 +307,8 @@ surface index this way (`del` ×13, `nella` ×10, `nel` ×6, `dal` ×5, `dell` �
 
 ### The penalty is not real
 
-If the hypothesis held, making the two sides *symmetric* — splitting contractions in the query too, so `nel` → 
-`in` + `il` on both sides — should recover lost recall. It does not. It is neutral-to-slightly-negative, both on 
+If the hypothesis held, making the two sides *symmetric* (splitting contractions in the query too, so `nel` → 
+`in` + `il` on both sides) should recover lost recall. It does not. It is neutral-to-slightly-negative, both on 
 all queries and on the affected subset alone:
 
 | scope | variant | R@1 | R@5 | R@10 | MRR@10 |
@@ -320,7 +320,7 @@ all queries and on the affected subset alone:
 | 48 affected | surface + query split | 0.3333 | 0.5417 | 0.5833 | 0.4248 |
 | 48 affected | **Δ** | **−0.0208** | 0.0000 | 0.0000 | **−0.0163** |
 
-On the affected subset, restoring the split changes 27 rankings — but 17 get *worse* and only 10 get better.
+On the affected subset, restoring the split changes 27 rankings, but 17 get *worse* and only 10 get better.
 
 ### Why: contraction pieces carry almost no signal
 
@@ -340,10 +340,10 @@ A content word carries 4–7× the weight of a contraction fragment. Losing the 
 
 ### Takeaway
 
-The tokenization asymmetry exists but it does **not** affect the surface baseline — the surface-vs-lemma gap reported 
+The tokenization asymmetry exists but it does **not** affect the surface baseline: the surface-vs-lemma gap reported 
 in this article is not an artifact of contraction splitting. Where the lemma index *does* gain is inflection collapse: 
 the query form and the text form are **both** in the corpus but differ as strings while sharing a lemma 
-(`dicea` ↔ `disse` → `dire`) — and, as [Appendix B](#appendix-b-how-much-of-the-lemma-advantage-is-incidental) shows, 
+(`dicea` ↔ `disse` → `dire`), and, as [Appendix B](#appendix-b-how-much-of-the-lemma-advantage-is-incidental) shows, 
 most of that collapse is on grammatical function words rather than content words.
 
 Reproduce with:
@@ -357,8 +357,8 @@ python scripts/tokenization_penalty.py --subset-only  # only the 48 affected que
 
 The central results of the evaluation rely on a baseline that does not strip stopwords from the text. 
 Because the verb *essere* appears in 48% of the corpus (768 out of 1,596 tercets), BM25 correctly 
-assigns it a low Inverse Document Frequency (IDF) score of 0.73. That down-weighting is legitimate — the term is 
-weak signal the model has already discounted, not noise it ignores — but in a close ranking race even a small, 
+assigns it a low Inverse Document Frequency (IDF) score of 0.73. That down-weighting is legitimate: the term is 
+weak signal the model has already discounted, not noise it ignores; but in a close ranking race even a small, 
 down-weighted grammatical match can dictate the winner.
 
 ### The impact of the verb "to be"
@@ -371,13 +371,13 @@ single match and the lemma rank falls from 1 back to 4.
 
 ### The test: same stopword filter on both indexes
 
-To measure the effect fairly, we identify stopwords by **lemma** (so *sono* and *era* — both *essere* — are removed 
+To measure the effect fairly, we identify stopwords by **lemma** (so *sono* and *era*, both *essere*, are removed 
 together) and strip them from documents *and* queries, for surface and lemma alike, then rebuild the indexes and 
 re-score all 290 queries. The lemma-minus-surface gap shrinks sharply as the stoplist grows:
 
 | stoplist removed (from both indexes) | gap MRR@10 | gap Recall@10 |
 |---|---|---|
-| none — *the article's baseline* | +0.0196 | +0.0552 |
+| none: *the article's baseline* | +0.0196 | +0.0552 |
 | `essere` only | +0.0166 | +0.0414 |
 | auxiliaries/copulas (`essere, avere, stare, fare`) | +0.0205 | +0.0483 |
 | **full function-word list** (articles, prepositions, pronouns, conjunctions, copulas) | **+0.0071** | **+0.0103** |
@@ -386,7 +386,7 @@ The single word *essere* accounts for about a **quarter** of the Recall@10 advan
 erases **~81%** of it (and ~64% of the MRR gap). The four-system table below shows why: stopword removal *helps* the 
 surface index and slightly *hurts* the lemma index, converging them.
 
-The effect is not strictly monotonic across *partial* stoplists — removing the auxiliaries *avere*/*stare*/*fare* on 
+The effect is not strictly monotonic across *partial* stoplists: removing the auxiliaries *avere*/*stare*/*fare* on 
 top of *essere* nudges the gap back up (+0.0483), because those verbs interact differently with the two indexes. Only 
 the full function-word filter gives the clean picture; the partial rows are included for transparency, not as a trend.
 
@@ -400,7 +400,7 @@ the full function-word filter gives the clean picture; the partial rows are incl
 ### The flip in lemma wins
 
 Restricting to the 
-`modern_italian_paraphrase` bucket — the 107 queries that should justify lemmatization — and counting:
+`modern_italian_paraphrase` bucket, the 107 queries that should justify lemmatization, and counting:
 
 | modern_italian_paraphrase | lemma wins | lemma losses |
 |---|---|---|
@@ -409,7 +409,7 @@ Restricting to the
 
 Without a stopword filter, the lemma index wins 45 of these queries and loses 29. Once the grammatical matches stop 
 counting, that flips to 18 wins against 48 losses: in the very category built to favour it, lemmatization now loses 
-more paraphrase queries than it wins. This is not in contradiction with the small *aggregate* edge in the table above — a 
+more paraphrase queries than it wins. This is not in contradiction with the small *aggregate* edge in the table above: a 
 count measures *direction* (how many queries each index ranks better), the aggregate measures *magnitude* 
 across all 290 queries.
 
@@ -423,9 +423,9 @@ originally highlighted.
 from successful dictionary collapses like *bianca* → *bianco* or *morde* → *mordere*.
 
 * **A design choice, not a bug.** The shared grammatical structure is a real statistical regularity that BM25 handles 
-correctly — removing it is *systematically* negative for the lemma index, not a wash, so it is genuine (if shallow) 
+correctly: removing it is *systematically* negative for the lemma index, not a wash, so it is genuine (if shallow) 
 signal. The point is only that 
-the narrative must honestly reflect that grammar, not deep vocabulary, is doing the heavy lifting.
+the narrative must reflect that grammar, not deep vocabulary, is doing the heavy lifting.
 
 
 Reproduce with:

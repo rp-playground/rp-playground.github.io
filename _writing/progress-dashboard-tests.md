@@ -45,7 +45,7 @@ know 3 of 5 cards are mastered, average mastery should read 60%.
 The obvious way to make that data is to drive the app as a student: log in, open
 a session, answer cards, then check the teacher page. I wanted that, since it
 runs the real path a student takes. But it fails on two counts. Producing the
-volume — dozens of graduated cards, reviews across many days — would mean
+volume, dozens of graduated cards, reviews across many days, would mean
 clicking through hundreds of answers. And clicking only ever happens now, while
 half the metrics are defined over past windows; there is no way to click a review
 into last week.
@@ -63,8 +63,8 @@ The metrics need history, though, and `record_review` won't produce it on its
 own. It reads the student from the login session and always stamps the review
 with the current time, with no way to pass a date. So I record each review now,
 then move its timestamp back with a second update and set each card's mastery
-state directly — a separate backdating step that keeps the simulation cleaner
-and, more importantly, leaves the recording call untouched.
+state directly: a separate backdating step that keeps the simulation cleaner
+and leaves the recording call untouched.
 
 Calling `record_review` directly checks that the recording function works, but
 not that the session screen actually calls it. So one scenario does the whole
@@ -87,7 +87,7 @@ below is built this way: the on-track student reads 63% mastery and
 80% retention, the at-risk one 0% and 20%. The cohort header pools the underlying
 data, not the two students: mastery is graduated cards over all cards (5 of 12,
 so 42%) and retention is correct reviews over all reviews (17 of 25, so 68%).
-Neither is the average of Ana's and Boris's numbers — both lean toward Ana, who
+Neither is the average of Ana's and Boris's numbers: both lean toward Ana, who
 has more cards and did more of the reviews.
 
 <figure>
@@ -101,7 +101,7 @@ category bars shift too: Recognition, which both students drilled, climbs from
 the cohort's 73% to her 84%, while Production, which only she did, stays at 60%.
 
 <figure>
-  <img src="/assets/slovo/progress-dashboard-per-student.png" alt="The same Progress page filtered to one student, Ana Novak: the title reads 'Progress — Ana Novak' with a 'Back to cohort' link and the student selector set to her. The KPI row now reads 63% average mastery, 20 reviews, 80% retention, 0 categories below threshold. The category bars show Production at 60% and Recognition at 84%; the retention curve, activity heatmap and the 'dom → kuća' frequent-error row are all scoped to her, and the roster is gone.">
+  <img src="/assets/slovo/progress-dashboard-per-student.png" alt="The same Progress page filtered to one student, Ana Novak: the title reads 'Progress: Ana Novak' with a 'Back to cohort' link and the student selector set to her. The KPI row now reads 63% average mastery, 20 reviews, 80% retention, 0 categories below threshold. The category bars show Production at 60% and Recognition at 84%; the retention curve, activity heatmap and the 'dom → kuća' frequent-error row are all scoped to her, and the roster is gone.">
   <figcaption>The same dashboard filtered to one student (note the "Back to cohort" link). The header now reports Ana's own 63% mastery and 80% retention, not the cohort's pooled 42% and 68%, and every panel narrows to just her reviews.</figcaption>
 </figure>
 
@@ -124,8 +124,8 @@ bucket instead (38.5, 37.5, 36.5) gives half a day of margin and fixes it.
 ## What I take from it
 
 I expected a dashboard bug and found none. What the simulation did instead was
-make me pin down each metric far more precisely than reading the page would —
-what counts as mastered, which window retention uses, how the curve buckets — and
+make me pin down each metric far more precisely than reading the page would
+(what counts as mastered, which window retention uses, how the curve buckets), and
 working out that bucketing exactly is what surfaced the bug hiding in it. On top
 of that, the definitions now live as runnable checks with real numbers next to
 them, instead of SQL I have to re-read.
@@ -142,14 +142,14 @@ screen itself builds the call, so it is the one that would catch the drift.
 
 <figure>
   <img src="/assets/slovo/recording-paths.svg" alt="A left-to-right diagram of two paths into the database. Top path: 'student session UI (one scenario)' to 'submitReview server action' to 'record_review'. Bottom path: 'every other scenario calls directly' arrows straight into 'record_review', skipping the screen. From 'record_review' a final arrow goes to 'review_log + srs_state'.">
-  <figcaption>Two ways a review reaches the database. One scenario drives the real session screen, so the UI to <code>submitReview</code> to <code>record_review</code> chain runs once. Every other scenario calls <code>record_review</code> directly, entering below the screen — so a change in what the screen passes would slip past them.</figcaption>
+  <figcaption>Two ways a review reaches the database. One scenario drives the real session screen, so the UI to <code>submitReview</code> to <code>record_review</code> chain runs once. Every other scenario calls <code>record_review</code> directly, entering below the screen, so a change in what the screen passes would slip past them.</figcaption>
 </figure>
 
 ## The off-the-shelf version
 
 Claude and I built all of this by hand, so afterwards I looked up what production
-suites use. Each of the three jobs has a standard tool. The scenario plan — the
-students, cards, and graded reviews — is what factory_boy and Faker generate, and
+suites use. Each of the three jobs has a standard tool. The scenario plan (the
+students, cards, and graded reviews) is what factory_boy and Faker generate, and
 their fixed random seeds would have made the off-by-one reproducible instead of
 dependent on the exact values. Controlling time is the one that would have
 prevented it: a clock-mocker like time-machine runs the real code inside a frozen

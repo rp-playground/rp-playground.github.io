@@ -1,10 +1,10 @@
 ---
 layout: talk
-title: "World Models — Yann LeCun at ETH Zurich"
+title: "World Models: Yann LeCun at ETH Zurich"
 speaker: "Yann LeCun"
 event: "ETH Zurich"
 talk_date: 2026-05-29
-date: 2026-05-29   # attended live — watched date coincides with the talk date
+date: 2026-05-29   # attended live: watched date coincides with the talk date
 link: https://bit.ly/PAth2AMI
 link_label: "A Path Towards Autonomous Machine Intelligence ↗"
 tags: [world models, JEPA, self-supervised, energy-based models]
@@ -15,7 +15,7 @@ Notes from Yann LeCun's **World Models** talk at ETH Zurich. The through-line is
 blunt: current LLMs are a dead end for human-level AI. What's needed instead are
 **objective-driven systems built around world models** that predict the
 consequences of actions in an *abstract representation space*, trained by
-**non-generative self-supervised learning** — his **JEPA** family, grounded in
+**non-generative self-supervised learning**: his **JEPA** family, grounded in
 energy-based models. The work sits under his new venture, **AMI Labs** (Advanced
 Machine Intelligence).
 
@@ -27,7 +27,7 @@ LeCun opens with Piaget:
 
 Intelligence is **not** an accumulation of declarative knowledge, and **not** a
 collection of skills. It's *the ability to handle new situations with little or
-no prior training* — and it should be measured by **speed of learning**, not by
+no prior training*, and it should be measured by **speed of learning**, not by
 performance on any single benchmark.
 
 ### Text is not enough
@@ -47,10 +47,10 @@ Sensory data dwarfs text, so language alone cannot ground intelligence.
 
 Two ways to build an agentic system:
 
-- **System 1 — action prediction.** State → action, directly. No reasoning, no
+- **System 1: action prediction.** State → action, directly. No reasoning, no
   way to imagine the effect of an action. *"This is how LLM-based agentic systems
-  (VLA) work — or don't."*
-- **System 2 — planning.** Use a **world model** to predict the consequences of
+  (VLA) work: or don't."*
+- **System 2: planning.** Use a **world model** to predict the consequences of
   candidate actions, and **search** for the actions that achieve the goal. This
   is the AMI Labs approach.
 
@@ -64,7 +64,7 @@ The proposed architecture for inference:
   outcome.
 - The predicted state feeds a **task objective** and a **guardrail objective**
   (safety constraints).
-- Actions are **optimized** to minimize the task cost — applied
+- Actions are **optimized** to minimize the task cost: applied
   auto-regressively *in representation space*, explicitly **akin to Model
   Predictive Control (MPC)**.
 
@@ -94,8 +94,8 @@ The JEPA alternative:
 Joint-embedding networks can cheat by collapsing every input to a constant
 embedding. Training must actively prevent this. Two families do so:
 
-- **Distillation** — DINO, I-JEPA, V-JEPA.
-- **Information maximization** — VICReg, Barlow Twins, and the newest, **SIGReg**.
+- **Distillation**: DINO, I-JEPA, V-JEPA.
+- **Information maximization**: VICReg, Barlow Twins, and the newest, **SIGReg**.
 
 The objective: maximize the information content of the embeddings while
 minimizing prediction error. (A Google Scholar search for "JEPA" now returns
@@ -110,16 +110,16 @@ $\hat{y} = \arg\min_y F(x, y)$.
 
 Three regimes for shaping the energy surface:
 
-1. **Collapse** — a flat surface (useless).
-2. **Contrastive methods** — push energy down on data, up on contrastive points.
-3. **Regularized methods** — limit the *volume* of low-energy space. LeCun's
+1. **Collapse**: a flat surface (useless).
+2. **Contrastive methods**: push energy down on data, up on contrastive points.
+3. **Regularized methods**: limit the *volume* of low-energy space. LeCun's
    preferred route.
 
 ## LeJEPA / SIGReg
 
 The talk's newest technical contribution (Balestriero & LeCun):
 
-- **SIGReg — Sketched Isotropic Gaussian Regularization** — forces the embedding
+- **SIGReg, Sketched Isotropic Gaussian Regularization**, forces the embedding
   distribution toward an **isotropic Gaussian** via normality tests along many
   random 1-D projections.
 - It captures degenerate subspaces and reshapes data to isotropic Gaussian even
@@ -137,7 +137,7 @@ The talk's newest technical contribution (Balestriero & LeCun):
 
 It should **not** be a world simulator, a digital twin, a generative model, or a
 video generator. It **should** be an **action-conditioned predictor in abstract
-representation space** — ideally differentiable — operating over a **hierarchy of
+representation space**, ideally differentiable, operating over a **hierarchy of
 abstractions**: lower levels for short-range, detailed prediction; higher levels
 for long-range, coarse prediction.
 
@@ -146,14 +146,14 @@ for long-range, coarse prediction.
 
 ## The results backing it up
 
-- **I-JEPA** (CVPR 2023) — more compute-efficient than MAE/iBOT on
+- **I-JEPA** (CVPR 2023): more compute-efficient than MAE/iBOT on
   semi-supervised ImageNet.
-- **DINOv3** — *"the best generic image representation system in the world,
+- **DINOv3**: *"the best generic image representation system in the world,
   entirely self-supervised"*; large gains on depth (+33%), tracking (+34%),
   segmentation (+22%) over weakly-supervised baselines.
-- **V-JEPA 2** — *"the best video representation system in the world"*, trained
+- **V-JEPA 2**: *"the best video representation system in the world"*, trained
   on ~1M hours of unlabeled video; wins across EK100, SSv2, Diving48, video QA.
-- **V-JEPA & intuitive physics** — common-sense physics emerges from
+- **V-JEPA & intuitive physics**: common-sense physics emerges from
   self-supervised video pretraining, measurable via a violation-of-expectation
   "surprise" signal.
 
@@ -172,6 +172,6 @@ And the line he leaves on screen:
 > If you are interested in human-level AI, don't work on LLMs.
 
 AMI Labs aims to build hierarchical JEPA world models that produce causal,
-predictive models of complex systems directly from data — from biomedical and
+predictive models of complex systems directly from data: from biomedical and
 physical sciences to aerospace (an Airbus A380 carries ~25,000 sensors sampled
 ~5000 times a second).

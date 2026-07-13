@@ -31,7 +31,7 @@
 
 **Problem:** The Divine Comedy has no usable semantic search tool. Keyword search fails across languages and across the centuries of paraphrase that separate a modern reader from the text. This project builds a retrieval system answering two distinct query classes: *verse recall* (return the matching tercet for a text fragment) and *thematic search* (surface semantically relevant passages for a modern concept or feeling).
 
-**Architecture:** Two-stage pipeline — bi-encoder (FAISS dense retrieval over modern-language translations and paraphrases) + BM25 (original Italian, lexical track) fused via query-aware weighted RRF, reranked by a multilingual cross-encoder. The original Italian is a display target, not a retrieval corpus. Phase 2 adds LLM query expansion with chain-of-thought prompting for thematic queries.
+**Architecture:** Two-stage pipeline — bi-encoder (FAISS dense retrieval over modern-language translations and paraphrases) + BM25 (original Italian, lexical track) fused via query-aware weighted RRF, reranked by a multilingual cross-encoder. The original Italian is a display target, not a retrieval corpus. Phase 2 adds LLM query expansion with chain-of-thought prompting for thematic queries. The entire pipeline is instrumented with an observability platform (Phoenix or Langfuse) for trace collection and error analysis.
 
 ```
 Query → [Dense (FAISS) + BM25] → Fusion (RRF) → Dedup (max pool) → Cross-encoder → Lookup → Display
@@ -277,11 +277,11 @@ Expected output for the example query:
 
 Start zero-shot; add few-shot examples once 20+ high-delta log entries are available (positive-delta pairs are the natural training signal). Enforce JSON schema via function calling / tool use — do not rely on free-form text parsing.
 
-**Logging specification:**
+**Logging and Observability (via Phoenix/Langfuse):**
 
-Every expansion call must be logged. The reformulation step is otherwise a black box: end-to-end nDCG@10 tells you whether the full pipeline worked, but not whether the LLM helped or hurt. Without logs, failure modes are invisible.
+Every expansion call, retriever score, and cross-encoder score must be traced. The reformulation step is otherwise a black box: end-to-end nDCG@10 tells you whether the full pipeline worked, but not whether the LLM helped or hurt. Without comprehensive traces (using an open-source observability tool like Arize Phoenix or Langfuse), failure modes are invisible.
 
-Minimum log record per query:
+Minimum span attributes to capture per query:
 
 ```json
 {
@@ -483,6 +483,11 @@ The monitoring step (Level 1) is mandatory regardless: representation-type match
 
 ## 6. Evaluation Framework
 
+**Error Analysis First.** Before defining static evaluation sets or training models, we must perform qualitative error analysis (open coding and axial coding). This is the "secret sauce" of AI evaluation:
+1. **Dimensional Sampling:** Generate 100+ diverse queries using dimensions like Canticle (Inf/Purg/Par), Theme (emotional/metaphor/conceptual), and User Persona (scholar/student/casual).
+2. **Review Traces:** Run these queries through the Phase 0 baseline. Review the Phoenix/Langfuse traces and take notes on failure modes.
+3. **Axial Coding:** Categorize the failures (e.g., "False Cognate Error", "Overweighting BM25", "Paraphrase Dominance") to prioritize fixes.
+
 **Ground truth must be defined before training.** The two retrieval tasks have fundamentally different evaluation structures and cannot share a single protocol:
 
 | Property | Verse recall (Phase 1) | Thematic search (Phase 2) |
@@ -609,10 +614,11 @@ Before committing to all 100 queries, run a **30–40 query pilot**:
 
 The pilot also provides a time estimate per query: annotation of 50-candidate pools for thematic queries typically takes 10–20 minutes per annotator per query. With 100 queries and 2 annotators, budget 35–70 hours of annotation effort before starting.
 
-**Full annotation protocol:**
+**Full annotation protocol & LLM-as-a-Judge:**
 
 - **Annotators:** minimum 2 per query; disagreements resolved by adjudication (third annotator or majority vote)
 - **Inter-annotator agreement:** Cohen's kappa ≥ 0.60 required before annotations are used for evaluation; queries below threshold are re-annotated or removed
+- **LLM-as-a-Judge (Scaling Up):** Once human annotation has established a gold standard of 100 queries, build an LLM Judge (e.g., GPT-4o) using the same 0-3 grading rubric. Supply it with the user query, retrieved tercet, and Hollander's commentary to provide semantic context. Evaluate the judge's alignment with human annotators. If alignment is high, use the LLM Judge for continuous CI/CD evaluation, applying statistical correction against the human baseline to account for judge bias.
 - **Scope:** annotators assess the original Italian tercet alongside its translations — relevance is judged on meaning, not surface form
 - **Pool size:** each query is judged against a pool of 50 candidate tercets (top-50 from the baseline retriever), not the full corpus
 

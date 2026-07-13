@@ -10,4 +10,4 @@ tags: [to read]
 summary: "Modern neural nets are systematically overconfident; a single temperature parameter (temperature scaling) recalibrates them remarkably well."
 ---
 
-*On the reading list — notes to come.*
+*On the reading list: notes to come.*

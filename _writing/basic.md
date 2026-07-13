@@ -1,7 +1,7 @@
 ---
 layout: article
 title: "Basic: what 32-bit float representation means"
-description: Bits, bytes, and what quantization actually buys you — from float32 down to int8, with the model-size arithmetic worked out.
+description: "Bits, bytes, and what quantization actually buys you: from float32 down to int8, with the model-size arithmetic worked out."
 summary: A bit is a logical state, a byte is eight of them, and quantization is what happens when you decide a parameter doesn't need all 32.
 date: 2026-07-10
 tags: [quantization, float32, int8, inference]
@@ -20,8 +20,8 @@ architectures.
 ## Quantization
 
 Quantization is a technique to reduce the computational and memory costs of
-running inference by representing model parameters with low-precision data —
-like 8-bit integer (`int8`) — instead of the usual 32-bit floating point
+running inference by representing model parameters with low-precision data,
+like 8-bit integers (`int8`), instead of the usual 32-bit floating point
 (`float32`).
 
 ## The arithmetic
@@ -56,7 +56,7 @@ A float32 splits its 32 bits into three fields:
 
 The value is roughly: sign × mantissa × 2^exponent. The exponent field lets the
 number scale up to 2¹²⁷, so the maximum finite float32 is about
-**3.4 × 10³⁸** — vastly larger than 2³².
+**3.4 × 10³⁸**, vastly larger than 2³².
 
 The trade-off is precision. There are still only 2³² bit patterns, spread across
 that enormous range, so the values are not evenly spaced. Near zero, adjacent
@@ -68,5 +68,5 @@ significant decimal digits of precision everywhere: it can represent
 Contrast with `int8`/`int32`: integers cover a small range with exact, evenly
 spaced values; floats cover a huge range with relative (percentage-scale)
 precision. This is why quantizing float32 weights to int8 requires a scale
-factor — you are mapping a wide, unevenly-spaced representation onto 256 evenly
+factor: you are mapping a wide, unevenly-spaced representation onto 256 evenly
 spaced levels.
