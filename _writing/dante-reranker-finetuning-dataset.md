@@ -86,6 +86,25 @@ The rejection pile captures mismatches and the ambiguous score-1 matches. A scor
 
 The rejection pile is dominated by off-by-one errors and incorrect speaker attributions. Entity lookups also fail frequently if the query uses a name that appears in multiple cantos. The strict filter keeps the training set restricted to queries the judge could tie to a single tercet.
 
+Here is the exact breakdown of the final judged queries. It perfectly illustrates the "ambiguity" penalty (Score 1) hitting the entity lookups the hardest:
+
+| Query type | Score 2 (Promoted) | Score 1 (Ambiguous) | Score 0 (Mismatch) | Total |
+|---|---|---|---|---|
+| `misremembered_quote_it` | 528 | 11 | 0 | 539 |
+| `character_line_it` | 520 | 22 | 0 | 542 |
+| `scene_recall_it` | 478 | 35 | 4 | 517 |
+| `knowledge_required_it` | 450 | 69 | 16 | 535 |
+| `english_translation_fragment` | 180 | 4 | 0 | 184 |
+| `exact_italian_fragment` | 175 | 7 | 0 | 182 |
+| `modern_italian_paraphrase` | 164 | 14 | 3 | 181 |
+| `english_semantic_paraphrase` | 162 | 16 | 4 | 182 |
+| `entity_it_descriptor` | 124 | 25 | 27 | 176 |
+| `thematic_philosophical` | 122 | 17 | 4 | 143 |
+| `entity_en_name` | 114 | 43 | 6 | 163 |
+| `thematic_emotional` | 111 | 26 | 6 | 143 |
+| `entity_it_name` | 94 | 51 | 11 | 156 |
+| **Total** | **3,222** | **340** | **81** | **3,643** |
+
 ## The first four runs
 
 I have run the pipeline four times so far: three DeepSeek runs (seeds 7, 8 and 9) and one Llama run (seed 22) as a comparison generator. All tables below report promotion rate, the share of rows the judge scored 2.
@@ -154,6 +173,25 @@ Anchor coverage (unique tercets) and breakage by context source:
 | **cumulative** | **2,463 / 4,811 (51%)** | | dante_original ~0.3% everywhere |
 
 The seed 9 run sampled its anchors coverage-aware, restricting the draw to tercets no earlier run had used, which is why all of its 644 anchors are new. The broken pairs come almost entirely from the indirect sources, entity context and Wikipedia glosses. When the context is Dante's own text the breakage rate is near zero. This matches the off-by-one diagnosis: the error appears when the generator has to anchor a multi-tercet gloss to a single tercet.
+
+Coverage of cantos across the final promoted datasets (unique cantos covered per query type):
+
+| Query type | Inferno (34) | Purgatorio (33) | Paradiso (33) | Total (100) |
+|---|---|---|---|---|
+| `exact_italian_fragment` | 29 | 25 | 22 | 76 |
+| `english_translation_fragment` | 28 | 26 | 28 | 82 |
+| `modern_italian_paraphrase` | 29 | 25 | 29 | 83 |
+| `english_semantic_paraphrase` | 25 | 20 | 29 | 74 |
+| `thematic_emotional` | 22 | 24 | 21 | 67 |
+| `thematic_philosophical` | 25 | 24 | 19 | 68 |
+| `entity_it_name` | 19 | 26 | 9 | 54 |
+| `entity_en_name` | 20 | 24 | 6 | 50 |
+| `entity_it_descriptor` | 24 | 22 | 10 | 56 |
+| `scene_recall_it` | 33 | 33 | 32 | 98 |
+| `character_line_it` | 33 | 32 | 32 | 97 |
+| `misremembered_quote_it` | 34 | 33 | 33 | 100 |
+| `knowledge_required_it` | 33 | 32 | 31 | 96 |
+| **Overall** | **34** | **33** | **33** | **100** |
 
 ## Next steps
 
