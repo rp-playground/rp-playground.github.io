@@ -3,7 +3,7 @@ layout: article
 title: "Generating Synthetic Training Data for Verse Retrieval"
 subtitle: "DeepSeek generates the queries, Claude judges the fidelity"
 description: I built a synthetic data pipeline to fine-tune a verse retrieval reranker. DeepSeek generates realistic user queries, and Claude filters out the hallucinations and ambiguous matches.
-summary: I needed a dataset of (query, gold tercet) pairs to fine-tune a verse retrieval reranker. I built a two-step pipeline using an LLM to generate queries and a second LLM to filter them. I used DeepSeek-V4-Pro to generate queries because its generations sounded like real human users. I used Claude Sonnet as a judge to score the fidelity of the generated queries, rejecting ambiguous or off-by-one matches.
+summary: I needed a dataset of (query, gold tercet) pairs to fine-tune a verse retrieval reranker. I built a two-step pipeline using an LLM to generate queries and a second LLM to filter them. I used DeepSeek-V4-Pro to generate queries because its generations sounded more realistic in the simulation of human users. I used Claude Sonnet as a judge to score the fidelity of the generated queries, rejecting ambiguous or off-by-one matches.
 date: 2026-07-18
 tags: [synthetic data, LLM judge, reranking, Divine Comedy]
 published: true
