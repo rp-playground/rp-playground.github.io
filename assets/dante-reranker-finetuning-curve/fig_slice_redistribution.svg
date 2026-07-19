@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 460" font-family="-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif" font-size="12">
+<rect width="780" height="460" fill="#fcfcfb"/>
+<text x="52" y="30" fill="#0b0b0b" font-size="14.5" font-weight="600">Where fine-tuning acts: slice-level redistribution (in-style R@1)</text>
+<text x="52" y="49" fill="#52514e" font-size="11.5">large in-style slices peak early; knowledge/periphrasis slices climb to full scale</text>
+<line x1="52" y1="320.2" x2="760" y2="320.2" stroke="#ebeae6" stroke-width="1"/>
+<text x="44" y="324.2" fill="#52514e" font-size="10" text-anchor="end">0.2</text>
+<line x1="52" y1="252.4" x2="760" y2="252.4" stroke="#ebeae6" stroke-width="1"/>
+<text x="44" y="256.4" fill="#52514e" font-size="10" text-anchor="end">0.4</text>
+<line x1="52" y1="184.6" x2="760" y2="184.6" stroke="#ebeae6" stroke-width="1"/>
+<text x="44" y="188.6" fill="#52514e" font-size="10" text-anchor="end">0.6</text>
+<line x1="52" y1="116.8" x2="760" y2="116.8" stroke="#ebeae6" stroke-width="1"/>
+<text x="44" y="120.8" fill="#52514e" font-size="10" text-anchor="end">0.8</text>
+<rect x="68.8" y="116.8" width="34.0" height="271.2" fill="#a6a49d" rx="2"/>
+<text x="85.8" y="112.8" fill="#52514e" font-size="8.5" text-anchor="middle">0.80</text>
+<rect x="105.8" y="107.0" width="34.0" height="281.0" fill="#2a78d6" rx="2"/>
+<text x="122.8" y="103.0" fill="#52514e" font-size="8.5" text-anchor="middle">0.83</text>
+<rect x="142.8" y="126.7" width="34.0" height="261.3" fill="#1baf7a" rx="2"/>
+<text x="159.8" y="122.7" fill="#52514e" font-size="8.5" text-anchor="middle">0.77</text>
+<text x="122.8" y="406.0" fill="#0b0b0b" font-size="9.5" text-anchor="middle">scene_recall_it</text>
+<text x="122.8" y="419.0" fill="#52514e" font-size="9" text-anchor="middle">n=35</text>
+<rect x="210.4" y="203.3" width="34.0" height="184.7" fill="#a6a49d" rx="2"/>
+<text x="227.4" y="199.3" fill="#52514e" font-size="8.5" text-anchor="middle">0.55</text>
+<rect x="247.4" y="192.8" width="34.0" height="195.2" fill="#2a78d6" rx="2"/>
+<text x="264.4" y="188.8" fill="#52514e" font-size="8.5" text-anchor="middle">0.58</text>
+<rect x="284.4" y="172.4" width="34.0" height="215.6" fill="#1baf7a" rx="2"/>
+<text x="301.4" y="168.4" fill="#52514e" font-size="8.5" text-anchor="middle">0.64</text>
+<text x="264.4" y="406.0" fill="#0b0b0b" font-size="9.5" text-anchor="middle">knowledge_required_it</text>
+<text x="264.4" y="419.0" fill="#52514e" font-size="9" text-anchor="middle">n=33</text>
+<rect x="352.0" y="275.1" width="34.0" height="112.9" fill="#a6a49d" rx="2"/>
+<text x="369.0" y="271.1" fill="#52514e" font-size="8.5" text-anchor="middle">0.33</text>
+<rect x="389.0" y="275.1" width="34.0" height="112.9" fill="#2a78d6" rx="2"/>
+<text x="406.0" y="271.1" fill="#52514e" font-size="8.5" text-anchor="middle">0.33</text>
+<rect x="426.0" y="218.5" width="34.0" height="169.5" fill="#1baf7a" rx="2"/>
+<text x="443.0" y="214.5" fill="#52514e" font-size="8.5" text-anchor="middle">0.50</text>
+<text x="406.0" y="406.0" fill="#0b0b0b" font-size="9.5" text-anchor="middle">entity_it_descriptor</text>
+<text x="406.0" y="419.0" fill="#52514e" font-size="9" text-anchor="middle">n=12</text>
+<rect x="493.6" y="295.5" width="34.0" height="92.5" fill="#a6a49d" rx="2"/>
+<text x="510.6" y="291.5" fill="#52514e" font-size="8.5" text-anchor="middle">0.27</text>
+<rect x="530.6" y="233.8" width="34.0" height="154.2" fill="#2a78d6" rx="2"/>
+<text x="547.6" y="229.8" fill="#52514e" font-size="8.5" text-anchor="middle">0.46</text>
+<rect x="567.6" y="264.6" width="34.0" height="123.4" fill="#1baf7a" rx="2"/>
+<text x="584.6" y="260.6" fill="#52514e" font-size="8.5" text-anchor="middle">0.36</text>
+<text x="547.6" y="406.0" fill="#0b0b0b" font-size="9.5" text-anchor="middle">entity_en_name</text>
+<text x="547.6" y="419.0" fill="#52514e" font-size="9" text-anchor="middle">n=11</text>
+<rect x="635.2" y="275.1" width="34.0" height="112.9" fill="#a6a49d" rx="2"/>
+<text x="652.2" y="271.1" fill="#52514e" font-size="8.5" text-anchor="middle">0.33</text>
+<rect x="672.2" y="275.1" width="34.0" height="112.9" fill="#2a78d6" rx="2"/>
+<text x="689.2" y="271.1" fill="#52514e" font-size="8.5" text-anchor="middle">0.33</text>
+<rect x="709.2" y="275.1" width="34.0" height="112.9" fill="#1baf7a" rx="2"/>
+<text x="726.2" y="271.1" fill="#52514e" font-size="8.5" text-anchor="middle">0.33</text>
+<text x="689.2" y="406.0" fill="#0b0b0b" font-size="9.5" text-anchor="middle">entity_it_name</text>
+<text x="689.2" y="419.0" fill="#52514e" font-size="9" text-anchor="middle">n=12</text>
+<rect x="56" y="51" width="12" height="12" fill="#a6a49d" rx="2"/>
+<text x="73" y="61" fill="#52514e" font-size="10.5">baseline</text>
+<rect x="206" y="51" width="12" height="12" fill="#2a78d6" rx="2"/>
+<text x="223" y="61" fill="#52514e" font-size="10.5">n1200</text>
+<rect x="356" y="51" width="12" height="12" fill="#1baf7a" rx="2"/>
+<text x="373" y="61" fill="#52514e" font-size="10.5">n4549 (full)</text>
+</svg>

@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 440" font-family="-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif" font-size="12">
+<rect width="720" height="440" fill="#fcfcfb"/>
+<text x="62" y="30" fill="#0b0b0b" font-size="14.5" font-weight="600">Transfer top-1 saturates; transfer ranking-depth keeps improving</text>
+<text x="62" y="49" fill="#52514e" font-size="11.5">in-style R@1 peaks then drifts; transfer R@1 is flat while transfer R@5 climbs with data</text>
+<line x1="62" y1="348.7" x2="692" y2="348.7" stroke="#ebeae6" stroke-width="1"/>
+<text x="54" y="352.7" fill="#52514e" font-size="10" text-anchor="end">0.50</text>
+<line x1="62" y1="299.6" x2="692" y2="299.6" stroke="#ebeae6" stroke-width="1"/>
+<text x="54" y="303.6" fill="#52514e" font-size="10" text-anchor="end">0.55</text>
+<line x1="62" y1="250.5" x2="692" y2="250.5" stroke="#ebeae6" stroke-width="1"/>
+<text x="54" y="254.5" fill="#52514e" font-size="10" text-anchor="end">0.60</text>
+<line x1="62" y1="201.5" x2="692" y2="201.5" stroke="#ebeae6" stroke-width="1"/>
+<text x="54" y="205.5" fill="#52514e" font-size="10" text-anchor="end">0.65</text>
+<line x1="62" y1="152.4" x2="692" y2="152.4" stroke="#ebeae6" stroke-width="1"/>
+<text x="54" y="156.4" fill="#52514e" font-size="10" text-anchor="end">0.70</text>
+<line x1="62" y1="103.3" x2="692" y2="103.3" stroke="#ebeae6" stroke-width="1"/>
+<text x="54" y="107.3" fill="#52514e" font-size="10" text-anchor="end">0.75</text>
+<line x1="62" y1="144.5" x2="692" y2="144.5" stroke="#2a78d6" stroke-width="1.3" stroke-dasharray="5 3" opacity="0.5"/>
+<text x="692" y="138.5" fill="#2a78d6" font-size="10" text-anchor="end">in-style R@1 zero-shot 0.708</text>
+<line x1="62" y1="373.3" x2="692" y2="373.3" stroke="#eb6834" stroke-width="1.3" stroke-dasharray="5 3" opacity="0.5"/>
+<text x="692" y="367.3" fill="#eb6834" font-size="10" text-anchor="end">transfer R@1 zero-shot 0.475</text>
+<text x="62.0" y="410.0" fill="#52514e" font-size="10.5" text-anchor="middle">1200</text>
+<text x="287.7" y="410.0" fill="#52514e" font-size="10.5" text-anchor="middle">2400</text>
+<text x="513.5" y="410.0" fill="#52514e" font-size="10.5" text-anchor="middle">3600</text>
+<text x="692.0" y="410.0" fill="#52514e" font-size="10.5" text-anchor="middle">4549</text>
+<text x="377.0" y="432" fill="#52514e" font-size="11" text-anchor="middle">training queries (n)</text>
+<polyline points="62.0,103.3 287.7,107.2 513.5,120.0 692.0,111.1" fill="none" stroke="#2a78d6" stroke-width="2.4"/>
+<circle cx="62.0" cy="103.3" r="4" fill="#2a78d6"/>
+<circle cx="287.7" cy="107.2" r="4" fill="#2a78d6"/>
+<circle cx="513.5" cy="120.0" r="4" fill="#2a78d6"/>
+<circle cx="692.0" cy="111.1" r="4" fill="#2a78d6"/>
+<text x="62.0" y="92.3" fill="#2a78d6" font-size="10" text-anchor="start">0.750</text>
+<text x="692.0" y="100.1" fill="#2a78d6" font-size="10" text-anchor="end">0.742</text>
+<polyline points="62.0,216.2 287.7,216.2 513.5,205.4 692.0,193.6" fill="none" stroke="#eb6834" stroke-width="2.4" stroke-dasharray="2 3"/>
+<circle cx="62.0" cy="216.2" r="4" fill="#eb6834"/>
+<circle cx="287.7" cy="216.2" r="4" fill="#eb6834"/>
+<circle cx="513.5" cy="205.4" r="4" fill="#eb6834"/>
+<circle cx="692.0" cy="193.6" r="4" fill="#eb6834"/>
+<text x="62.0" y="205.2" fill="#eb6834" font-size="10" text-anchor="start">0.635</text>
+<text x="692.0" y="182.6" fill="#eb6834" font-size="10" text-anchor="end">0.658</text>
+<polyline points="62.0,340.9 287.7,334.0 513.5,337.9 692.0,340.9" fill="none" stroke="#eb6834" stroke-width="2.4" stroke-dasharray="6 4"/>
+<circle cx="62.0" cy="340.9" r="4" fill="#eb6834"/>
+<circle cx="287.7" cy="334.0" r="4" fill="#eb6834"/>
+<circle cx="513.5" cy="337.9" r="4" fill="#eb6834"/>
+<circle cx="692.0" cy="340.9" r="4" fill="#eb6834"/>
+<text x="62.0" y="357.9" fill="#eb6834" font-size="10" text-anchor="start">0.508</text>
+<text x="692.0" y="357.9" fill="#eb6834" font-size="10" text-anchor="end">0.508</text>
+<line x1="502" y1="68" x2="524" y2="68" stroke="#2a78d6" stroke-width="2.4"/>
+<text x="530" y="72" fill="#52514e" font-size="10.5">in-style R@1</text>
+<line x1="502" y1="85" x2="524" y2="85" stroke="#eb6834" stroke-width="2.4" stroke-dasharray="2 3"/>
+<text x="530" y="89" fill="#52514e" font-size="10.5">transfer R@5</text>
+<line x1="502" y1="102" x2="524" y2="102" stroke="#eb6834" stroke-width="2.4" stroke-dasharray="6 4"/>
+<text x="530" y="106" fill="#52514e" font-size="10.5">transfer R@1</text>
+</svg>
