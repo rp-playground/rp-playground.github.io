@@ -7,7 +7,7 @@ talk_date: 2021-06-04
 date: 2026-07-19   # watched the recording in July 2026
 link: https://www.youtube.com/watch?v=sJ7ekd1nUdU
 link_label: "Recording (MLOps World) ↗"
-tags: [AI product design, trust, automation bias, search UX, human-centered AI, DanteGPT]
+tags: [AI product design, trust, automation bias, search UX, human-centered AI, DanteGPT, Divine Comedy]
 summary: "Lovejoy's case for assistance over automation: automation bias, the trust-rebuild curve, levels of automation, and an image search that asks users for intent instead of guessing it. Plus my plan to port the focus-areas pattern into DanteGPT's semantic search."
 ---
 
@@ -23,7 +23,15 @@ nobody decided what the human is supposed to be doing while the AI works.
 Purposeful design means picking a level of assistance deliberately and making
 the system's interpretation of the user visible and correctable.
 
-## Automation bias and the automation conundrum
+**Contents**
+
+- [Automation bias and the automation conundrum](#automation-bias)
+- [Trust is built in layers, and AI starts from a false peak](#trust)
+- [Levels of automation: a menu, not a dial](#levels-of-automation)
+- [The image search example: ask for intent, don't guess it](#image-search)
+- [Porting this to DanteGPT](#dantegpt)
+
+## Automation bias and the automation conundrum {#automation-bias}
 
 Two definitions from the slides, verbatim:
 
@@ -46,7 +54,7 @@ more reliable you make it, the less prepared they are for the day it fails. So
 hides it. The conundrum is a known result in human-factors research (Endsley's
 work on situation awareness), not something Lovejoy invented for the talk.
 
-## Trust is built in layers, and AI starts from a false peak
+## Trust is built in layers, and AI starts from a false peak {#trust}
 
 Lovejoy borrows the structure of interpersonal trust from psychology. Between
 humans, trust grows through repeated interactions in three layers:
@@ -83,7 +91,7 @@ Predictability being the base layer inverts the usual instinct. A slightly
 worse model that behaves legibly and consistently earns trust faster than a
 stronger model that surprises people.
 
-## Levels of automation: a menu, not a dial
+## Levels of automation: a menu, not a dial {#levels-of-automation}
 
 The talk walks through the classic human-factors scale of automation levels
 (Parasuraman, Sheridan and Wickens), from "offers no assistance, nothing is
@@ -104,7 +112,7 @@ possible decisions for the human to approve" at decision selection. That
 middle level, narrow the options and let the human choose, is where most
 assistance should live.
 
-## The image search example: ask for intent, don't guess it
+## The image search example: ask for intent, don't guess it {#image-search}
 
 The part I came for. Lovejoy shows a theoretical image search app handling the
 query **"Lotus"**, which is genuinely ambiguous: car, flower, tattoo, drawing,
@@ -138,15 +146,16 @@ withdrawal from the trust account when it guesses wrong. Every guess it
 surfaces as an option is predictability training, the user learns what the
 system considered and why, one query at a time.
 
-## Porting this to DanteGPT
+## Porting this to DanteGPT {#dantegpt}
 
 My semantic search on the *Divine Comedy* has exactly the Lotus problem, and
 I've been solving it the silent way. The system serves two query types: **verse
 recall** ("a metà della vita" should return Inferno I:1–3) and **thematic
 search** ("I was 35 and felt lost" should surface the same tercet for a
-different reason). Right now a query-aware weighted fusion decides behind the
-scenes whether the query looks lexical or semantic, Italian or English, and
-blends BM25 and dense retrieval accordingly. When the classifier guesses wrong,
+different reason). Right now a
+[query-aware weighted fusion](/writing/dante-lemma-bm25-routing/) decides
+behind the scenes whether the query looks lexical or semantic, Italian or
+English, and blends BM25 and dense retrieval accordingly. When the classifier guesses wrong,
 the user just sees bad results with no explanation and no handle to correct
 them. That is precisely the silent personalization Lovejoy argues against.
 
@@ -166,9 +175,9 @@ What the Lotus pattern translates to, concretely:
   exact quotes wants the original Italian and BM25 weighted up; a student
   wants translations and paraphrases. Store it as a visible, editable
   preference rather than inferring it per session.
-- **The trust curve says: show five, not one.** My realistic benchmarks put
-  Recall@1 at 0.42 while Recall@5 stays much higher, and the bottleneck is
-  reranking. An interface that presents one autonomous answer is a level-of-
+- **The trust curve says: show five, not one.** My
+  [realistic benchmarks](/writing/dante-retrieval-reality-gap/) put Recall@1
+  at 0.42 while Recall@5 stays much higher, and the bottleneck is reranking. An interface that presents one autonomous answer is a level-of-
   automation choice my measured accuracy can't back. Presenting five candidate
   tercets with provenance (which representation matched: original verse,
   translation, or paraphrase) is the "narrowed set for the human to approve"
@@ -183,3 +192,14 @@ The one-line version I'm keeping: my retrieval pipeline guesses so the user
 doesn't have to, and Lovejoy convinced me that's backwards. The guessing
 should stay, but as suggestions the user can see and correct until the trust
 is earned.
+
+**My Divine Comedy write-ups referenced here:**
+
+- [The Reality Gap: Evaluating Verse Retrieval on Dante](/writing/dante-retrieval-reality-gap/):
+  the Recall@1 0.92 → 0.42 drop on realistic queries, and why reranking is the
+  bottleneck.
+- [Lemmas over Surfaces: Routing BM25 for Dante Verse Recall](/writing/dante-lemma-bm25-routing/):
+  the query-type router and fusion this talk made me want to surface in the UI.
+- [Generating Synthetic Training Data for Verse Retrieval](/writing/dante-reranker-finetuning-dataset/):
+  the fine-tuning dataset for the reranker that has to back the top-5
+  presentation.
