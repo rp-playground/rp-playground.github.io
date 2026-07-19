@@ -1,0 +1,60 @@
+# Talks queued to watch, aimed at ML product design.
+# Rendered as the "Watchlist" section on /talks/. When I watch one, it gets a
+# notes file in _talks/ and leaves this list.
+- title: "Designing Human-Centered AI Products"
+  speaker: "Jess Holbrook & Kristie Fisher"
+  event: "Google I/O 2019"
+  link: https://www.youtube.com/watch?v=rf83vRxLWFQ
+  tags: [human-centered AI, PAIR, design guidelines]
+  why: >
+    The talk that introduced the People + AI Guidebook. Much of the vocabulary
+    designers use for AI products (mental models, calibrated trust) started
+    here, so this is the baseline I want in place first.
+
+- title: "Design Is [Smart] — Human-Centered Machine Learning"
+  speaker: "Jess Holbrook & Josh Lovejoy"
+  event: "Google Design"
+  link: https://www.youtube.com/watch?v=FpgbqgAEPfo
+  tags: [human-centered AI, UX, ML as design material]
+  why: >
+    The talk version of the Google PAIR "Human-Centered Machine Learning"
+    essays. It argues for treating ML as a design material instead of a feature
+    you bolt on at the end.
+
+- title: "Climbing the Ladder of Abstraction"
+  speaker: "Amelia Wattenberger"
+  event: "AI Engineer Summit 2023"
+  link: https://www.youtube.com/watch?v=PAy_GHUAICw
+  tags: [LLM interfaces, UX, abstraction]
+  why: >
+    How LLM interfaces can let users zoom between levels of detail the way maps
+    do. The most concrete counter-argument to chat-as-default I have found.
+
+- title: "Generative Interfaces Beyond Chat"
+  speaker: "Linus Lee"
+  event: "LLMs in Production Conference 2023"
+  link: https://www.youtube.com/watch?v=rd-J3hmycQs
+  tags: [LLM interfaces, prototyping, latent space]
+  why: >
+    Lee's prototypes for non-chat LLM interfaces, from latent-space canvases to
+    writing tools that connect ideas on their own. A catalogue of interaction
+    patterns worth stealing.
+
+- title: "The Expanding Dark Forest and Generative AI"
+  speaker: "Maggie Appleton"
+  event: "UX Brighton 2024"
+  link: https://www.youtube.com/watch?v=3FBZNZ4yNlk
+  tags: [generative AI, trust, web]
+  why: >
+    What generative content does to trust on the web, from someone who designs
+    AI products for a living. It maps the constraints any new AI product now
+    ships into.
+
+- title: "Software Is Changing (Again)"
+  speaker: "Andrej Karpathy"
+  event: "YC AI Startup School 2025"
+  link: https://www.youtube.com/watch?v=LCEmiRjPEtQ
+  tags: [Software 3.0, partial autonomy, LLM apps]
+  why: >
+    Karpathy's Software 3.0 talk. The section on partial autonomy and autonomy
+    sliders reads like a product design brief for LLM apps.

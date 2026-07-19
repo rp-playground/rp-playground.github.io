@@ -43,6 +43,16 @@ permalink: /talks/
     .item-card .meta-year { margin-left: auto; color: var(--muted); font-size: 0.72rem; }
 
     .empty { color: var(--muted); }
+
+    /* Watchlist: not wired into the tag/date filters (plain section, no
+       .item-section/.item-card classes), so filter.js leaves it alone. */
+    section.watchlist { margin-top: 3rem; }
+    section.watchlist h2 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 0.4rem; }
+    .watchlist-note { color: var(--muted); font-size: 0.85rem; margin: 0 0 1.2rem; }
+    .watchlist .grid { max-height: none; overflow-y: visible; padding-right: 0; }
+    .watchlist .byline { color: var(--muted); font-size: 0.82rem; margin: 0.15rem 0 0.4rem; }
+    .watchlist .meta-external { margin-left: auto; color: var(--muted); font-size: 0.72rem; }
+
     footer { margin-top: 4rem; color: var(--muted); font-size: 0.85rem; }
   </style>
 </head>
@@ -88,6 +98,27 @@ permalink: /talks/
         </section>
         {%- else -%}
         <p class="empty">No talks yet.</p>
+        {%- endif -%}
+
+        {%- assign watchlist = site.data.talks_watchlist -%}
+        {%- if watchlist and watchlist.size > 0 -%}
+        <section class="watchlist">
+          <h2>Watchlist · ML product design ({{ watchlist.size }})</h2>
+          <p class="watchlist-note">Talks I've queued on designing ML-powered products. When I watch one, my notes land in the list above and it leaves this queue.</p>
+          <div class="grid">
+            {%- for t in watchlist -%}
+            <a class="card" href="{{ t.link }}" target="_blank" rel="noopener">
+              <h3>{{ t.title }}</h3>
+              <p class="byline">{{ t.speaker | escape }}{% if t.speaker and t.event %} · {% endif %}{{ t.event | escape }}</p>
+              <p>{{ t.why }}</p>
+              <div class="tags">
+                {%- for tag in t.tags -%}<span class="tag">{{ tag }}</span>{%- endfor -%}
+                <span class="meta-external">watch ↗</span>
+              </div>
+            </a>
+            {%- endfor -%}
+          </div>
+        </section>
         {%- endif -%}
       </main>
     </div>
