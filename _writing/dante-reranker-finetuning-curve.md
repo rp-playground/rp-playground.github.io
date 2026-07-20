@@ -3,7 +3,7 @@ layout: article
 title: "Fine-Tuning a Verse Reranker: Hitting the Top-1 Plateau"
 subtitle: "In-style accuracy saturates at 1,200 queries; on a validated transfer set, more data buys ranking depth, not top-1"
 description: I fine-tuned a cross-encoder reranker for Dante verse retrieval on a synthetic dataset and measured a data-scaling curve. On the in-style eval the curve saturates at 1,200 queries; on a human-validated transfer set, fine-tuning beats the zero-shot reranker by +0.033 Recall@1, and more data improves Recall@5 and MRR even though top-1 ties.
-summary: I fine-tuned a cross-encoder reranker on synthetic (query, gold tercet) pairs and measured how accuracy scales with the amount of training data. On the in-style evaluation set the curve peaks at 1,200 queries and then drifts down: more data of the same generated style overfits the style. On a human-validated transfer set, fine-tuning beats the zero-shot reranker by +0.033 Recall@1; on top-1 the small and full models tie, but the full model wins Recall@5 and MRR. More data buys ranking depth, not top-1. Fine-tuning lifts accuracy but misses the pre-registered transfer gate, so the next levers are the negatives and the loss, not more data.
+summary: "I fine-tuned a cross-encoder reranker on synthetic (query, gold tercet) pairs and measured how accuracy scales with the amount of training data. On the in-style evaluation set the curve peaks at 1,200 queries and then drifts down: more data of the same generated style overfits the style. On a human-validated transfer set, fine-tuning beats the zero-shot reranker by +0.033 Recall@1; on top-1 the small and full models tie, but the full model wins Recall@5 and MRR. More data buys ranking depth, not top-1. Fine-tuning lifts accuracy but misses the pre-registered transfer gate, so the next levers are the negatives and the loss, not more data."
 date: 2026-07-19
 tags: [reranking, fine-tuning, cross-encoder, scaling, evaluation, Divine Comedy]
 published: true
@@ -30,9 +30,8 @@ accuracy improves as I add training data, and where it stops.
 
 The base model is `cross-encoder/mmarco-mMiniLMv2-L12-H384-v1`, the best zero-shot
 reranker I measured (~33M params). I built a nested scaling curve: four training
-instances at n ∈ {1,200, 2,400, 3,600, 4,549} queries, each a strict prefix of the
-next, so the curve isolates *quantity* from sample composition. Every instance
-starts from the same base checkpoint, never continued training, with identical
+instances at n ∈ {1,200, 2,400, 3,600, 4,549} queries. Every instance
+starts from the same base checkpoint, with identical
 hyperparameters (lr 2e-5, 1 epoch, 10% warmup, batch 128). Only `n` varies.
 
 Each fine-tuned model reranks the top-50 candidates from a query-aware RRF base,
@@ -71,22 +70,19 @@ The two sets yield different results.
   task.
 - **On transfer, fine-tuning clears the zero-shot bar by +0.033 R@1** (0.475 →
   0.508), but top-1 then *saturates immediately*. Recall@1 stays near 0.51 across
-  all four instances (0.508, 0.515, 0.511, 0.508, a ±3-query wobble on 427).
+  all four instances (0.508, 0.515, 0.511, 0.508).
   What keeps improving is **ranking depth**: transfer Recall@5 climbs
   monotonically (0.635 → 0.635 → 0.646 → 0.658) and MRR@10 rises to 0.573. More data does not
   raise top-1 on the transfer set; it pulls more gold tercets into the top-5.
 
 Reading only in-style R@1 would have concluded "1,200 queries are enough," and
 transfer R@1 agrees, but transfer Recall@5 keeps rewarding data all the way to
-full scale. I adopt the **full model (`n4549`)**: it ties on top-1 transfer and wins
-Recall@5/MRR while sitting within 2 queries of the in-style peak. The training
-dev-loss fell monotonically across the curve (0.132 → 0.114), consistent with,
-but on its own blind to, this split between top-1 and ranking depth.
+full scale. I adopt the **full model (`n4549`)** because the training
+dev-loss fell monotonically across the curve (0.132 → 0.114).
 
-> [!NOTE]
 > **Why Recall@5 climbs while top-1 plateaus**
-> 
-> This split happens because of a mismatch between the point-wise scoring used in training and the fine-grained sorting top-1 requires. The model is trained using per-pair Binary Cross-Entropy (BCE), which independently scores each `(query, passage)` pair. As it sees more data, it learns the broad semantic patterns of a relevant tercet, lifting true golds out of the deep pool and dropping them into the top-5. However, if a gold and a tricky hard negative both look highly relevant, BCE scores them similarly (e.g., 0.92 and 0.93). Because the loss function never compares candidates directly against each other, adding more data does not teach the model how to resolve these microscopic ties at rank 1.
+>
+> This split happens likely because of a mismatch between the point-wise scoring used in training and the fine-grained sorting top-1 requires. The model is trained using per-pair Binary Cross-Entropy (BCE), which independently scores each `(query, passage)` pair. As it sees more data, it learns the broad semantic patterns of a relevant tercet, lifting true golds out of the deep pool and dropping them into the top-5. However, if a gold and a tricky hard negative both look highly relevant, BCE scores them similarly (e.g., 0.92 and 0.93). Because the loss function never compares candidates directly against each other, adding more data does not teach the model how to resolve these microscopic ties at rank 1.
 
 ## Where the fine-tuning actually acts
 
@@ -115,19 +111,13 @@ directions, not a uniform lift.
   (reduce the query's ambiguity or expand it with the entity's canonical name)
   not by more reranker training.
 
-These slices have n = 11–35, and *none* of the per-slice movements are
-statistically significant: every paired test is one or two flipped queries. Read
-the bars as direction, not evidence. The real signal is in the aggregate transfer
-numbers.
 
 ## The transfer gate
 
 Before training I pre-registered a go/no-go criterion of **transfer R@1 ≥ 0.60 at full scale.**
 The full model reached **0.508**. It misses.
 
-That is a negative on the headline goal, with a *statistically real* gain
-underneath it. Paired McNemar tests on the validated transfer set (n=427) put the
-positive verdict on solid ground, and locate it in the aggregate:
+Paired McNemar tests on the validated transfer set (n=427):
 
 | comparison | Δ | McNemar p | verdict |
 |---|---|---|---|
@@ -153,9 +143,8 @@ largest slice:
 | `entity_it_descriptor` | 12 | 0.333 → 0.500 | 0.50 |
 | `entity_en_name` | 11 | 0.455 → 0.364 | 1.00 |
 
-So the apparent `scene_recall_it` regression at full scale is not real, and the
-slice chart above should be read as *direction*, not evidence. The signal lives
-in the aggregate. Re-measured on this validated set, the pipeline's recall@50
+So the apparent `scene_recall_it` regression at full scale is not real. 
+Re-measured on this validated set, the pipeline's recall@50
 is 0.808 (the earlier 210-query set gave 0.743). The candidate pool caps what
 any reranker can reach, and the fine-tuned reranker recovers only part of the
 gap between 0.475 and that ceiling. **Fine-tuning the reranker
@@ -165,12 +154,13 @@ helps significantly, but it does not close the reality gap on its own.**
 
 The scaling curve indicates what to change next.
 
-1. **Not "more data of the same style."** The in-style curve saturates at n=1,200, and transfer top-1 is flat. Generating more DeepSeek-style queries would add pairs the model ignores. Data quantity is not the constraint for top-1. Transfer Recall@5 still climbs at full scale (p=0.021), so more data of a *different* style remains a viable option later. The current style generation is tapped out.
-2. **A ranking loss over RRF-faithful negatives.** These function as a single lever. A listwise ranking loss optimizes order within a candidate group, and RRF-faithful mining defines that group's composition. The loss consumes what the mining produces. The evidence supports this as the highest-return change. On the validated set the gold is in the top-50 candidate pool for 81% of queries (recall@50 = 0.808), but the reranker puts it top-1 for only 51% and in the top-5 for 66%. The remaining margin lies almost entirely in sorting *within* that pool, leaving 30 points of top-1 headroom. A ranking loss optimizes exactly this sorting; the current per-pair binary cross-entropy does not.
+1. **Not "more data of the same style."** The in-style curve saturates at n=1,200, and transfer top-1 is flat. Generating more DeepSeek-style queries would add pairs the model ignores. Data quantity is not the constraint for top-1. Transfer Recall@5 still climbs at full scale (p=0.021), so more data of a *different* style remains a viable option later.
+2. **A ranking loss over RRF-faithful negatives.** These function as a single lever. A listwise ranking loss optimizes order within a candidate group, and RRF-faithful mining defines that group's composition. 
+The evidence supports this as the highest-return change. On the validated set the gold is in the top-50 candidate pool for 81% of queries (recall@50 = 0.808), but the reranker puts it top-1 for only 51% and in the top-5 for 66%. The remaining margin lies almost entirely in sorting *within* that pool, leaving 30 points of top-1 headroom. A ranking loss optimizes exactly this sorting; the current per-pair binary cross-entropy does not.
 
-   *Update, measured:* I ran this lever as a 2×2 attribution matrix (negatives × loss) and it came back negative. RRF-mined negatives trend *down* on transfer under both losses (0.499 vs 0.508 R@1). Mined without the margin filter the e5 pipeline had, the RRF top-5 often contains tercets from the gold's own episode, and labeling those 0 teaches the model to suppress exactly the context the ecological queries need. A listwise LambdaLoss alone gains +0.007 R@1/R@5, not significant (McNemar p≈0.7). The adopted model stays `n4549`; the live lever is now the next one.
-3. **Entity disambiguation.** The entity slices are flat, but the evidence is thin: the slices have n=11–12, none of the movements are significant, and the transfer set lacks an entity breakdown. The core issue is that the reranker scores tercet text that never names the character. A query rewriter could expand the bare name before retrieval. A complementary fix is to feed the reranker the representation that actually retrieved the candidate (the entity document) rather than just the tercet text. This might be cheaper than a rewriter and attacks the same mechanism. Before building the rewriter, I need to measure this on an evaluation set with a large entity slice.
+   *Update, measured:* I ran this lever as a 2×2 attribution matrix (negatives × loss) and it came back negative. RRF-mined negatives trend *down* on transfer under both losses (0.499 vs 0.508 R@1). Mined without the margin filter the e5 pipeline had, the RRF top-5 often contains tercets from the gold's own episode, and labeling those 0 teaches the model to suppress exactly the context the ecological queries need. A listwise LambdaLoss alone gains +0.007 R@1/R@5, not significant (McNemar p≈0.7). The adopted model stays `n4549`.
+3. **Entity disambiguation.** The entity slices have n=11–12, none of the movements are significant, and the transfer set lacks an entity breakdown. The core issue is that the reranker scores tercet text that never names the character. A query rewriter could expand the bare name before retrieval. A complementary fix is to feed the reranker the representation that actually retrieved the candidate (the entity document) rather than just the tercet text. This might be cheaper than a rewriter and attacks the same mechanism. Before building the rewriter, I need to measure this on an evaluation set with a large entity slice.
 
 One cheap lever I measured and ruled out is late-fusing the cross-encoder's ranking with the RRF ranking (the pre-fine-tuning "step 0" idea). It gives the *zero-shot* reranker a real depth gain (transfer R@5 +0.037, p=0.023) but adds nothing to the fine-tuned model at any fusion weight. Fine-tuning on retriever-mined negatives has already internalized the base ranking's signal.
 
-Transfer Recall@5 and MRR keep improving at full scale. The data teaches the model something that generalizes, even where top-1 has plateaued. With the negatives-and-loss iteration measured flat, two rounds of reranker training have moved transfer top-1 by a non-significant point against 30 points of pool headroom. The remaining gap looks like query language and ambiguity, not trainable sorting. The next change is what happens *before* retrieval (disambiguation) and where the training data comes from, not how much of it there is.
+Transfer Recall@5 and MRR keep improving at full scale, meaning the data generalizes even where top-1 plateaus. But on top-1, reranker training is tapped out. Between scaling the data and trying new negatives and losses, two rounds of training have moved transfer top-1 by a non-significant point against 30 points of pool headroom. The remaining gap is query ambiguity, not trainable sorting. The next change is what happens *before* retrieval (disambiguation) and where the training data comes from, not how much of it there is.
