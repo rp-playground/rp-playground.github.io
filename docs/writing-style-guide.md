@@ -76,6 +76,11 @@ The core voice rules apply primarily to narrative writing. Calibrate the tone an
 - **No sentences of the "this is the case I care about"-type.** Don't announce your interest in a specific scenario as a meta-statement. Instead, directly explain why the scenario matters or what it reveals.
   - ✗ "When evaluating this, the high-latency regime is the case I really care about."
   - ✓ "The high-latency regime is where the fallback mechanism actually breaks."
+- **Don't add redundant narrative summaries.** Once you state a clear result (e.g., "It misses."), do not add a follow-up sentence that dramatizes or restates its impact. Move directly to the evidence.
+  - ✗ "Before training I pre-registered a go/no-go criterion of **transfer R@1 ≥ 0.60 at full scale.** The full model reached **0.508**. It misses. That is a negative on the headline goal, with a *statistically real* gain underneath it. Paired McNemar tests..."
+  - ✓ "Before training I pre-registered a go/no-go criterion of **transfer R@1 ≥ 0.60 at full scale.** The full model reached **0.508**. It misses. Paired McNemar tests..."
+  - ✗ "**Not 'more data of the same style.'** The in-style curve saturates at n=1,200, and transfer top-1 is flat. Generating more DeepSeek-style queries would add pairs the model ignores. Data quantity is not the constraint for top-1. Transfer Recall@5 still climbs at full scale (p=0.021), so more data of a *different* style remains a viable option later. The current style generation is tapped out."
+  - ✓ "**Not 'more data of the same style.'** The in-style curve saturates at n=1,200, and transfer top-1 is flat. Generating more DeepSeek-style queries would add pairs the model ignores. Data quantity is not the constraint for top-1. Transfer Recall@5 still climbs at full scale (p=0.021), so more data of a *different* style remains a viable option later."
 
 ## Calibration note
 
