@@ -418,7 +418,19 @@ becomes public, so it stays manual.
 journal" into a queue rather than a decision. `latest` is that computation with a
 report attached.
 
-Two extensions are queued. A `--check` mode that verifies every number in a
-published article still matches its source record, as a regression test against
-silent edits to the journal. And a scheduled run that opens a draft once the
-number of unreported records crosses a threshold.
+A `--check` mode closes the loop in the other direction. The journal keeps moving
+after an article ships, so `/report <project> --check` re-reads every published
+article, loads the records it declares, and asserts that each number in the
+article still occurs in them. It runs clean on this page against records 0023 to
+0030.
+
+The check is lexical, and its boundary is worth stating because it is easy to
+overclaim. It catches a number that occurs nowhere in the covered records, which
+is the stale case and the fabricated case. It does not catch a value swapped for
+another value that also appears somewhere in the records: editing a table cell
+from 0.508 to 0.611 passes, because 0.611 is a real number in a different row of
+a different record. Column placement is semantic. The script narrows the search
+and a table-level read finishes it.
+
+Still queued: a scheduled run that opens a draft once the number of unreported
+records crosses a threshold.
