@@ -357,9 +357,9 @@ to decide what counts as a win.
 
 ### The `/report` skill
 
-Generation runs from a Claude Code skill versioned in the site repository at
-`.claude/skills/report/SKILL.md`. It takes the source repository and a record
-selector:
+Generation runs from a Claude Code skill, versioned in a personal skills
+repository and symlinked into `~/.claude/skills/`. It takes the source repository
+and a record selector:
 
 ```
 /report ~/git/rp-playground/play-dantegpt 0023-0030
@@ -370,16 +370,18 @@ This article is the output of the first of those two commands.
 
 The first argument is the project root; the skill assumes `docs/ml-journal/`
 underneath it and nothing else about the project, so it works for any repository
-that adopts the journal layout. `latest` means "every record not yet covered by a
-published article", which is why the front matter of this page carries
-`journal_repo: play-dantegpt` and `journal_records: "0023-0030"`. Coverage is a
-directory listing minus a front-matter scan, with no separate state file to
-drift.
+that adopts the journal layout. The publishing site is the working directory the
+skill runs in, which is why it belongs to neither repository and sits at user
+level. `latest` means "every record not yet covered by a published article",
+which is why the front matter of this page carries `journal_repo: play-dantegpt`
+and `journal_records: "0023-0030"`. Coverage is a directory listing minus a
+front-matter scan, with no separate state file to drift.
 
 The eight steps:
 
-1. resolve `<project-root>/docs/ml-journal/`, failing early if `decisions/` is
-   missing;
+1. verify the working directory is the site (`_writing/` and the style guide both
+   present), then resolve `<project-root>/docs/ml-journal/`, failing early if
+   `decisions/` is missing;
 2. resolve the selector, either an explicit range or the uncovered set for
    `latest`, and confirm the id list before writing anything;
 3. read every selected record in full, plus the journal README for the reference
