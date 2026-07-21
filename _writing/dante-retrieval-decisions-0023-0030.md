@@ -1,0 +1,310 @@
+---
+layout: article
+title: "Eight Experiments, Three Adoptions: A Decision Log Summary"
+subtitle: "How the bottleneck in Dante verse retrieval moved from recall to ranking, and why five of the eight experiments were negative results"
+description: A summary of decision records 0023–0030 in the DanteGPT ML journal. Reranker fine-tuning gave a significant but saturating transfer gain; late fusion, RRF-mined negatives, ranking loss, entity-aware rerank passages, and a query rewriter all failed their pre-registered criteria; entity docs and Chiavacci commentary docs were adopted. The bottleneck is now the ranking stage, not the candidate pool.
+summary: "Eight decision records, three adoptions, five negative results. Fine-tuning the cross-encoder reranker beats zero-shot by +0.042 Recall@1 on a human-validated transfer set (p=0.006), but top-1 saturates at the smallest data scale. Every training-side lever I tried afterwards failed its pre-registered criterion: RRF-faithful negatives, a listwise ranking loss, late fusion. The representation-side levers all paid off instead, and commentary notes indexed as extra tercet representations lifted pool recall@50 from 0.813 to 0.864. But the reranker promotes only 1 of the 29 newly retrieved gold tercets to rank 1, so the bottleneck has moved from recall to ranking."
+date: 2026-07-21
+tags: [reranking, fine-tuning, cross-encoder, retrieval, evaluation, negative-results, Divine Comedy]
+published: true
+permalink: /writing/dante-retrieval-decisions-0023-0030/
+---
+
+This is a summary of eight decision records (0023–0030) from the *DanteGPT* ML
+journal, a verse-recall retrieval system over Dante's *Divine Comedy*. Earlier
+pieces set the stage: [the reality gap](/writing/dante-retrieval-reality-gap/)
+identified reranking as the bottleneck, [the synthetic data
+pipeline](/writing/dante-reranker-finetuning-dataset/) produced the training
+pairs, and [the scaling curve](/writing/dante-reranker-finetuning-curve/) covers
+record 0023 in depth.
+
+Five of the eight were negative results, and they are the reason the summary is
+worth writing. Every lever I pulled on the training side stopped paying almost
+immediately, while every lever on the representation side kept working. By the
+end the bottleneck had moved from recall to ranking.
+
+{:.no_toc}
+
+**Contents**
+{:.no_toc}
+* TOC
+{:toc}
+
+---
+
+## Terminology
+
+**CE (cross-encoder)** is the reranker. It takes the pair `(query, passage)` in a
+single input and scores relevance with cross-attention. The **bi-encoder**
+(`multilingual-e5-large`, which I refer to as *e5*) instead encodes query and
+passage separately into vectors compared by dot product. The bi-encoder is fast
+and pre-indexable, so it does retrieval; the cross-encoder is slow but much more
+precise, so it reranks the top-50 candidates.
+
+**Mined hard negatives** are negative examples extracted automatically from the
+corpus rather than written by hand. Search with a similarity model, take the
+top-k, drop the gold along with its acceptable spans and the ±1 adjacent
+tercets, then label whatever remains as 0. Mining *with e5* means the search
+model is the pipeline's own dense retriever, so the negatives resemble the
+confusions this system actually makes.
+
+**Eval sets.** `eco` is the human-validated ecological transfer set (n=427,
+Inferno scope). `250` is the in-style synthetic set (n=236, whole corpus,
+anchor-disjoint from training by construction). Verdicts live on `eco`, and `250`
+is the in-style guardrail. All significance testing is paired McNemar on the
+strict criterion (primary gold only). Slices with n<40 count as direction, not
+evidence.
+
+---
+
+## Phase 1: fine-tuning the reranker (0023–0025)
+
+| # | Decision | Outcome | Rationale |
+|---|---|---|---|
+| **0023** | Fine-tune `mmarco-mMiniLMv2` on 4,549 queries, e5-mined hard negatives, nested data-scaling curve | **Adopted `n4549`** (full scale) | On the validated transfer set: R@1 +0.042 (p=0.006), R@5 +0.052 (p=0.0001) vs zero-shot. Top-1 **saturates immediately** (~0.51 at every n) but depth grows with data (R@5 n1200→full, p=0.021), hence full scale. Pre-registered gate R@1 ≥ 0.60 **not met**. |
+| **0024** | Late fusion (RRF base rank ⊕ CE rank) + re-measure the recall ceiling | **Late fusion rejected**; ceiling corrected | LF helps zero-shot (R@5 +0.037, p=0.023) but is neutral to harmful on the fine-tuned model (R@1 −0.028). The retriever-mined negatives already internalised the base signal. Recall@50 is **0.808**, not 0.743; the old number came from an unvalidated Grok set. 30 points of headroom, so recall is not the limiter. |
+| **0025** | 3-run matrix: RRF-faithful negatives × LambdaLoss | **Nothing adopted**, stays on `n4549` | Pre-registered criterion (R@1 > 0.508 at p<0.05) unmet. RRF negatives trend **negative**: labelling same-episode tercets as 0 teaches the CE to suppress episode context, which v1's e5 margin filter had been quietly excluding. Ranking loss gives +0.007, noise. Reranker-only levers are exhausted at ~0.51 with this data. |
+
+### The scaling curve (0023)
+
+Transfer set (`eco`, n=427) beside the in-style set (`250`, n=236):
+
+| config | 250 R@1 | 250 R@5 | 250 MRR@10 | eco R@1 | eco R@5 | eco MRR@10 |
+|---|---|---|---|---|---|---|
+| RRF + zero-shot rerank (baseline) | 0.708 | 0.801 | 0.748 | 0.475 | 0.609 | 0.531 |
+| reranker-ft-n1200 | **0.750** | 0.822 | **0.782** | 0.508 | 0.635 | 0.566 |
+| reranker-ft-n2400 | 0.746 | 0.818 | 0.777 | **0.515** | 0.635 | 0.570 |
+| reranker-ft-n3600 | 0.733 | 0.822 | 0.775 | 0.511 | 0.646 | 0.568 |
+| **reranker-ft-n4549 (full)** | 0.742 | 0.818 | 0.778 | 0.508 | **0.658** | **0.573** |
+
+The two curves read differently. In-style accuracy peaks at n=1200 and then
+drifts down, so more data of the same generated style overfits the style. On
+transfer, top-1 is flat within ±3 queries across all scales, but R@5 and MRR@10
+climb monotonically. More data buys ranking depth, not top-1.
+
+Paired significance on transfer:
+
+| comparison | Δ | p |
+|---|---|---|
+| R@1 base → full | +0.042 | **0.006** |
+| R@5 base → full | +0.052 | **0.0001** |
+| R@5 n1200 → full | +0.024 | **0.021** |
+| R@1 n1200 → full | +0.009 | 0.52 |
+
+### The corrected ceiling (0024)
+
+I re-measured recall@50 on the validated set, because the 0.743 I had been
+quoting came from a different, unvalidated set and had been propagating through
+the reasoning of several records.
+
+| stage | R@1 | R@5 | R@10 | R@20 | **R@50** |
+|---|---|---|---|---|---|
+| bm25 | 0.314 | 0.464 | 0.504 | 0.515 | 0.536 |
+| dense | 0.421 | 0.579 | 0.644 | 0.707 | 0.789 |
+| rrf (query-aware) | 0.438 | 0.611 | 0.670 | 0.742 | **0.808** |
+| rerank n4549 | 0.508 | 0.658 | 0.707 | 0.754 | **0.808** |
+
+Thirty points of top-1 headroom sit inside the pool. Whatever was blocking
+progress, it was not the candidate set.
+
+### Why RRF-faithful negatives backfired (0025)
+
+Record 0023 left two suspects for the saturated top-1, and I tested them as a
+2×2 so each could be attributed separately rather than bundled.
+
+**Axis 1: where the hard negatives come from** (`v1` vs `v2`). These are not two
+different datasets. Same pool of 4,549 queries, same seeds, same canonical
+shuffle, same positives, same anti-false-negative post-filters (drop the gold,
+its acceptable spans, and the ±1 adjacent tercets). The only thing that changes
+is *which model proposes the 5 hard negatives per query*.
+
+| | `v1` | `v2` |
+|---|---|---|
+| candidate source | the `e5` bi-encoder alone | the production query-aware RRF (BM25 ⊕ dense), top-50 over the full-corpus index |
+| extra filter | `relative_margin=0.02`, drops candidates scoring ≈ the positive | none |
+| hard negatives per query | bimodal: **603 of 4,549 queries end up with zero** | `{5: 4549}`, every query has exactly five |
+| total pairs | 33,320 | 36,392 |
+
+The hypothesis behind `v2` was reasonable: train on the distractors the model
+will actually meet, the ones the production fusion puts in the pool, rather than
+the ones the dense model imagines on its own.
+
+**Axis 2: how the loss is computed** (`bce` vs `lambda`).
+
+| | `BinaryCrossEntropyLoss` (BCE) | `LambdaLoss` (NDCG2++ scheme) |
+|---|---|---|
+| granularity | **point-wise**, one `(query, passage)` pair at a time | **listwise**, the whole group `(query, [8 passages], [8 labels])` together |
+| objective | "is this passage relevant? yes/no", in isolation | the **ordering** of the passages within the group, NDCG-weighted |
+| batch unit | 128 pairs | 16 groups (≈128 pairs, held constant on purpose) |
+
+R@1 and MRR measure an ordering, but BCE never compares two candidates against
+each other. The supporting clue came from 0024, where late fusion improved the
+fine-tuned model at deep cutoffs (R@10, R@20) but not at top-1. The model puts
+the gold near the top and then fails to break ties.
+
+**The matrix.** One cell was already measured in 0023 and serves as the
+reference; 0025 filled in the other three.
+
+| | **BCE** (point-wise) | **LambdaLoss** (listwise) |
+|---|---|---|
+| **`v1`**, e5 negatives | `n4549`, the **reference** (0.508 / 0.658 / 0.573) | `v1-lambda`, isolates the **loss** lever |
+| **`v2`**, RRF negatives | `v2-bce`, isolates the **negatives** lever | `v2-lambda`, the **bundle** |
+
+Every run changes exactly one thing relative to the reference. Everything else is
+held fixed: same base checkpoint (`mmarco-mMiniLMv2-L12-H384-v1`), lr 2e-5, 1
+epoch, 10% warmup, seed 42, always retrained from the base rather than continued.
+
+| config | R@1 | R@5 | MRR@10 | McNemar R@1 vs ref | McNemar R@5 vs ref |
+|---|---|---|---|---|---|
+| v2-bce (RRF negatives, BCE) | 0.499 | 0.644 | 0.559 | −0.009, p=0.29 | −0.014, p=0.15 |
+| **v1-lambda (e5 negatives, λ)** | **0.515** | **0.665** | **0.578** | +0.007, p=0.69 | +0.007, p=0.65 |
+| v2-lambda (RRF negatives, λ) | 0.499 | 0.646 | 0.559 | −0.009, p=0.50 | −0.012, p=0.30 |
+
+Both `v2` rows drop, on both losses and on both eval sets. The negatives are the
+harmful lever, and the harm does not depend on the loss. `v1-lambda` is the only
+row above the reference, but +0.007 on n=427 is three queries, below the
+pre-registered threshold, so nothing was adopted.
+
+The mechanism is in the "extra filter" row of the first table. Without e5's
+relative margin, the RRF top-5 for a narrative query frequently contains tercets
+*from the same episode*, two or three lines away, or the cross-canto callback.
+Labelling those 0 teaches the CE to suppress exactly the episode context the
+ecological set depends on, and 41 of its rows are multi-gold precisely because
+the gold boundaries are fuzzy. On top of that, `v2` is uniformly hard (five hard
+negatives for *every* query, against v1's 603 easy ones) at an unchanged training
+budget. That is more difficulty, not more information.
+
+---
+
+## Phase 2: entities (0026–0028)
+
+| # | Decision | Outcome | Rationale |
+|---|---|---|---|
+| **0026** | Prepend the entity line (name + bio) to the CE passage | **Rejected**, both guardrails red | Primary failed (pooled entity slices 15→13) with diffuse regressions: eco 0.508 → 0.440 (p=0.0003), in-style p=0.011. Train/inference mismatch for `n4549`, pure distractor for zero-shot. |
+| **0027** | Query rewriter: link the query to an entity, expand with canonical name + bio | **Rejected**, zero effect | Structural redundancy, not a tuning problem. |
+| **0028** | Index canonical entity docs in production | **Adopted** | Direct consequence of 0026's incidental finding. |
+
+### The incidental finding that changed the plan (0026)
+
+The experiment failed, but its control arm rewrote an old conclusion. Records
+0018 and 0022 had established that the reranker *demolished* the entity slices
+whenever entity docs were indexed (en_name 0.455 → 0.273), which is why entity
+docs were kept out of production. Re-measuring with the fine-tuned model:
+
+| set | with entity docs | without | per-query Δ (McNemar) |
+|---|---|---|---|
+| 250 | **0.750** | 0.742 | b=2 c=0, p=0.50 (ns, positive direction) |
+| eco | 0.508 | 0.508 | 0 discordant pairs out of 427: identical |
+
+The demolition was a property of the *zero-shot* reranker, not of the rerank
+stage. With `n4549` the entity docs are free downstream, so 0028 adopted them.
+Two queries gained, none lost, measured cost zero.
+
+### Why the query rewriter was inert (0027)
+
+| run | set | links (lex/sem) | aggregate | per-query Δ |
+|---|---|---|---|---|
+| sweep τ∈{.86,.88,.90} | 250 | 47 (47/0) | 0.750 = ref | b=0 c=0, identical |
+| τ=0.83 post-fix | 250 | 63 (61/2) | 0.750 = ref | b=0 c=0, identical |
+| τ=0.83 | eco | 90 (82/8) | 0.506 vs 0.508 | b=0 c=1, p=1.0 |
+
+Two reasons, both structural. The lexical links (61 of 63) fire on queries that
+*already contain the name*, which bm25 and dense with entity docs already match.
+And the semantic linker uses the same e5 similarity over the same entity rows
+already indexed as entity docs, so if the linker resolves a periphrasis, dense
+had already retrieved that entity doc, and if retrieval fails, the linker fails
+identically. I designed the rewriter branch before entity docs became free
+(0026's finding); downstream of that, a query-side e5 linker adds no new
+information. Unlocking periphrases needs new information, either a trained linker
+or an entity file enriched with canonical epithets, not a rewiring of the same
+embedding space.
+
+---
+
+## Phase 3: commentary documents (0029–0030)
+
+| # | Decision | Outcome | Rationale |
+|---|---|---|---|
+| **0029** | Index Chiavacci's commentary notes as extra tercet representations (dense only) | **Adopted** | Pool recall 0.813 → **0.864** (p=3.1e-04), R@1 0.508 → 0.522, in-style guardrail green. |
+| **0030** | (A) fuse the `excerpt` lemma into the note text; (B) add a second commentary (Sapegno) | **A adopted, B rejected** | A: no regression, adopted for uniform treatment across sources. B: pool 0.869 → 0.883 but 7 vs 1 discordant, **p=0.0703**, above the pre-registered threshold. |
+
+### Chiavacci (0029)
+
+The diagnosis came first. Of the 210 rerank errors on `eco`, 80 had the gold
+outside the top-50: modern-Italian, episodic queries that neither Trecento lexis
+nor the English translations catch. I checked coverage before running anything,
+and 77 of those 80 gold tercets had at least one commentary note attached.
+
+| set | config | pool recall@50 (rrf) | strict R@1 (rerank) |
+|---|---|---|---|
+| eco | 0028 reference (baseline) | 0.813 (347/427) | 0.508 (217/427) |
+| eco | + commentary docs | **0.864** (369/427) | **0.522** (223/427) |
+| 250 | 0028 reference (baseline) | | 0.750 (177/236) |
+| 250 | + commentary docs | | **0.758** (179/236) |
+
+Then the finding that reframed everything downstream. Of the 29 queries whose
+gold entered the pool via a commentary note, the reranker promotes exactly one to
+rank 1, and four into the top-5. The error breakdown moved from 210 = 80
+out-of-pool + 130 mis-ranked to **204 = 58 out-of-pool + 146 mis-ranked**.
+
+### Sapegno (0030)
+
+| set | config | pool recall@50 (rrf) | strict R@1 (rerank) |
+|---|---|---|---|
+| eco | 0029 reference (chiavacci) | 0.864 (369/427) | 0.522 (223/427) |
+| eco | A: + excerpt fusion | 0.869 (371/427) | 0.518 (221/427) |
+| eco | B: A + sapegno | 0.883 (377/427) | 0.515 (220/427) |
+| 250 | 0029 reference (chiavacci) | | 0.758 (179/236) |
+| 250 | A: + excerpt fusion | | 0.750 (177/236) |
+| 250 | B: A + sapegno | | 0.750 (177/236) |
+
+Sapegno covered 56 of the 58 residual out-of-pool gold tercets and is
+stylistically the furthest from Chiavacci among the available Italian
+commentaries. The net pool gain was +6. Direction positive, p=0.0703, above the
+pre-registered p<0.05, so I did not adopt it. Notes that look stylistically
+different to a human do not necessarily hook the queries any better on the metric
+that decides, which is e5 similarity. Adding commentaries shows steeply
+diminishing returns after the first source.
+
+---
+
+## Where things stand
+
+The reference configuration is query-aware RRF, entity docs, Chiavacci commentary
+docs with excerpt fusion, and the `n4549` rerank over a pool of 50. Reference
+numbers: eco pool@50 0.869, strict R@1 0.518; in-style 250 R@1 0.750.
+
+The bottleneck is now the reranker. The 206 errors on `eco` break down as 56
+out-of-pool and 150 mis-ranked.
+
+The next lever is training the reranker on ecologically similar data, including
+pairs where the match runs through the commentary's vocabulary rather than the
+tercet's. That work is blocked on human validation of the 0021 pairs.
+
+There is also a standing rule not to add further commentary sources until ranking
+improves. Sapegno is the first candidate to revisit if out-of-pool becomes the
+bottleneck again, since its +8 gross pool gain was real and merely under
+threshold.
+
+## What I take from the method
+
+Five of these eight experiments were negative results, and they are the ones that
+saved time. Three practices made that possible.
+
+**Pre-registered criteria.** Every record fixes its primary metric, guardrails,
+and adoption rule *before* the runs execute. Without that, 0025's +0.007 and
+0030's p=0.07 would both have been written up as wins. I know this because both
+had a plausible story attached before I ran them.
+
+**Paired significance, applied to slices too.** McNemar on the same queries, with
+a standing rule that slices below n=40 show direction only. The per-slice
+movements in 0023 look dramatic (`entity_en_name` 0.273 → 0.455) and are all
+p≥0.5. Two queries moving on n=11.
+
+**Control arms that outlive their experiments.** 0026 failed its own hypothesis,
+but its blind-passage control overturned a conclusion two records old about
+entity documents, which directly produced the 0028 adoption. 0024's
+re-measurement found that a stale ceiling (0.743 against the true 0.808) had been
+shaping priorities for several records. Neither finding was the point of the
+experiment that produced it, which is an argument for keeping the boring control
+arm in every run.
